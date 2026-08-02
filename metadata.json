@@ -1,0 +1,6 @@
+{
+  "name": "Hệ thống Nộp bài, Chấm điểm & Luyện nói HSK",
+  "description": "Hệ thống làm bài thi HSK, ghi âm luyện nói, nộp bài qua Google Apps Script / Sheet, chấm điểm giáo viên và tra cứu kết quả.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
