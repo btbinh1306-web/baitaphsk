@@ -1712,7 +1712,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                       <p className="text-[11px] font-semibold text-indigo-900 mb-1 flex items-center gap-1">
                         <Volume2 className="w-3.5 h-3.5 text-indigo-600" /> File nghe đính kèm:
                       </p>
-                      <audio controls src={q.audioUrl || q.audioPromptUrl} className="w-full h-8 rounded-md" />
+                      <audio
+                        controls
+                        src={getDriveAudioPlayerUrl(q.audioUrl || q.audioPromptUrl || '')}
+                        className="w-full h-8 rounded-md"
+                      />
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 pt-1">
@@ -1815,7 +1819,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Đã đính kèm âm thanh!
                     </span>
-                    <audio controls src={newListenAudioUrl} className="h-7 w-full max-w-md" />
+                    <audio
+                      controls
+                      src={getDriveAudioPlayerUrl(newListenAudioUrl)}
+                      className="h-7 w-full max-w-md"
+                    />
                     <button
                       type="button"
                       onClick={() => setNewListenAudioUrl('')}

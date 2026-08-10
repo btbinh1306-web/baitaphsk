@@ -4,6 +4,7 @@ import { AudioRecorder } from './AudioRecorder';
 import { AudioRecordItem, ExamLesson } from '../types';
 import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
+import { getDriveAudioPlayerUrl } from '../utils/audioUtils';
 import { sanitizeExamSections } from '../utils/lessonParser';
 import { ExerciseRenderer } from './ExerciseRenderer';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
@@ -1044,7 +1045,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           </div>
 
                           {(q.audioUrl || q.audioPromptUrl) ? (
-                            <audio controls src={q.audioUrl || q.audioPromptUrl} className="w-full sm:max-w-md h-9 rounded-md" />
+                            <audio
+                              controls
+                              src={getDriveAudioPlayerUrl(q.audioUrl || q.audioPromptUrl || '')}
+                              className="w-full sm:max-w-md h-9 rounded-md"
+                            />
                           ) : (
                             <button
                               type="button"

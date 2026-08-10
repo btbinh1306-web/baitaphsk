@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Mic, Square, Play, Volume2, CheckCircle2 } from 'lucide-react';
 import { speakText } from '../../utils/tts';
+import { getDriveAudioPlayerUrl } from '../../utils/audioUtils';
 
 interface ItemData {
   prompt?: string;
@@ -35,7 +36,7 @@ const SpeakingItemRow: React.FC<SpeakingItemProps> = ({ item, index, parentAudio
 
   const handlePlayPrompt = () => {
     if (itemAudioUrl) {
-      const audio = new Audio(itemAudioUrl);
+      const audio = new Audio(getDriveAudioPlayerUrl(itemAudioUrl));
       setIsPlayingPrompt(true);
       audio.onended = () => setIsPlayingPrompt(false);
       audio.play().catch(() => setIsPlayingPrompt(false));
