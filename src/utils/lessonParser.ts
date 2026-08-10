@@ -30,6 +30,40 @@ export const STANDARD_CONVERTED_TYPES = new Set([
   'handwriting_submission'
 ]);
 
+function parseWordBankFromPrompt(prompt?: string): { wordBank: string[]; prompt: string } | undefined {
+  if (!prompt) return undefined;
+
+  const match = prompt.match(/Từ\s+gợi\s+ý\s*[:：]\s*(.*?)(?=\s*\d+\s*[.)]|[\r\n]|$)/iu);
+  if (!match) return undefined;
+
+  const wordBank = match[1]
+    .split(/[、,，]/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  if (wordBank.length === 0) return undefined;
+
+  return {
+    wordBank,
+    prompt: prompt.replace(match[0], '').trim()
+  };
+}
+
+function normalizeFillQuestions(questions: Question[]): Question[] {
+  return questions.map((question) => {
+    const parsedPrompt = parseWordBankFromPrompt(question.prompt);
+    const wordBank = question.wordBank?.length
+      ? question.wordBank
+      : parsedPrompt?.wordBank;
+
+    return {
+      ...question,
+      prompt: parsedPrompt?.prompt || question.prompt,
+      wordBank,
+      tier: wordBank?.length && !question.wordBank ? 'tier1' : (question.tier || (wordBank?.length ? 'tier1' : 'tier2'))
+    };
+  });
+}
+
 export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
   if (!exam) return exam;
 
@@ -42,6 +76,7 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
   const essayQuestions = [...(exam.essayQuestions || [])];
   const translationQuestions = [...(exam.translationQuestions || [])];
   const handwritingQuestions = [...(exam.handwritingQuestions || [])];
+  const normalizedFillQuestions = normalizeFillQuestions(fillQuestions);
 
   if (!exam.sections || exam.sections.length === 0) {
     return {
@@ -50,7 +85,7 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
       speakingQuestions,
       vocabList,
       mcQuestions,
-      fillQuestions,
+      fillQuestions: normalizedFillQuestions,
       arrangeQuestions,
       essayQuestions,
       translationQuestions,
@@ -128,7 +163,7 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
     speakingQuestions,
     vocabList,
     mcQuestions,
-    fillQuestions,
+    fillQuestions: normalizedFillQuestions,
     arrangeQuestions,
     essayQuestions,
     translationQuestions,
@@ -247,12 +282,20 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
 
       // Fill in blank
       if (type === 'fill' || type === 'fill_in_blank') {
+        const itemWordBank = Array.isArray(itemData.wordBank)
+          ? itemData.wordBank.map(String).filter(Boolean)
+          : undefined;
+        const itemTier = itemData.tier === 'tier1' || itemData.tier === 'tier2' || itemData.tier === 'tier3'
+          ? itemData.tier
+          : (itemWordBank?.length ? 'tier1' : 'tier2');
+
         fillQuestions.push({
           id: qId,
           type: 'fill',
-          tier: 'tier2',
+          tier: itemTier,
           prompt: itemPrompt || 'Điền từ vào chỗ trống:',
           pinyin: itemPinyin,
+          wordBank: itemWordBank,
           acceptableAnswers:
             itemAcceptableAnswers || (typeof itemAnswer === 'string' ? itemAnswer : undefined),
           explanation: itemExplanation
