@@ -2,8 +2,23 @@ import React, { useState } from 'react';
 import { SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { fetchTeacherSubmissions, gradeSubmissionInGas, getGasConfig } from '../services/gasService';
-import { generateExamWithAI } from '../services/aiExamService';
 import { speakText } from '../utils/tts';
+import { sanitizeExamSections } from '../utils/lessonParser';
+import { getAudioSrcFromObject, getDriveAudioPlayerUrl } from '../utils/audioUtils';
+import { fileToCompressedDataUrl } from '../utils/imageUtils';
+import { ImportLesson } from './ImportLesson';
+import { EditQuestionModal } from './EditQuestionModal';
+import { HandwritingExerciseEditor } from './exercises/HandwritingExerciseEditor';
+import { HandwritingGradingPanel } from './exercises/HandwritingGradingPanel';
+import { HandwritingExercise, HandwritingSubmission } from '../types/handwriting';
+import {
+  getHandwritingExercises,
+  saveHandwritingExercise,
+  deleteHandwritingExercise,
+  getHandwritingSubmissions,
+  convertHandwritingToExamLesson
+} from '../services/handwritingService';
+import { uploadMediaFile } from '../services/apiService';
 import {
   Lock,
   Unlock,
@@ -24,20 +39,25 @@ import {
   Trash2,
   BookOpen,
   List,
-  Sparkles,
   Save,
-  Wand2,
-  FileText
+  FileText,
+  Headphones,
+  FileCode,
+  Pencil,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface TeacherPortalProps {
   customExams?: ExamLesson[];
+  deletedExamIds?: string[];
   onSaveCustomExam?: (exam: ExamLesson) => void;
   onDeleteCustomExam?: (examId: string) => void;
 }
 
 export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   customExams = [],
+  deletedExamIds = [],
   onSaveCustomExam,
   onDeleteCustomExam
 }) => {
@@ -46,7 +66,13 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'submissions' | 'editor' | 'ai_creator'>('submissions');
+  const [activeTab, setActiveTab] = useState<'submissions' | 'handwriting' | 'editor' | 'import_json'>('submissions');
+
+  // Handwriting exercises state
+  const [hwExercises, setHwExercises] = useState<HandwritingExercise[]>(() => getHandwritingExercises());
+  const [selectedHwSub, setSelectedHwSub] = useState<HandwritingSubmission | null>(null);
+  const [editingHwExercise, setEditingHwExercise] = useState<HandwritingExercise | null>(null);
+  const [showCreateHwModal, setShowCreateHwModal] = useState(false);
 
   const [submissions, setSubmissions] = useState<SubmissionData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,20 +81,28 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'Chờ chấm' | 'Đã chấm'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'HANDWRITING' | 'OTHER'>('ALL');
 
   // Selected Submission for Modal Detail & Grading
   const [selectedSub, setSelectedSub] = useState<SubmissionData | null>(null);
   const [speakScoreInput, setSpeakScoreInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
   const [itemComments, setItemComments] = useState<Record<string, string>>({});
+  const [modalCorrectedImages, setModalCorrectedImages] = useState<string[]>([]);
+  const [isUploadingCorrected, setIsUploadingCorrected] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
   const [gradeSuccess, setGradeSuccess] = useState(false);
 
   // All Available Exams
-  const allExams = [...customExams, ...SAMPLE_EXAMS.filter((s) => !customExams.some((c) => c.id === s.id))];
+  const rawExams = [...customExams, ...SAMPLE_EXAMS.filter((s) => !customExams.some((c) => c.id === s.id))];
+  const allExams = rawExams.filter((e) => !deletedExamIds.includes(e.id));
+
+  // Delete Confirm & Notice state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
 
   // Exam Selection for Editing
-  const initialExam = allExams[0] || SAMPLE_EXAMS[0];
+  const initialExam = sanitizeExamSections(allExams[0] || SAMPLE_EXAMS[0]);
   const [selectedExamId, setSelectedExamId] = useState<string>(initialExam?.id || 'hsk3-b1');
   const [editingExam, setEditingExam] = useState<ExamLesson>({
     ...initialExam,
@@ -76,16 +110,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     mcQuestions: initialExam?.mcQuestions || [],
     fillQuestions: initialExam?.fillQuestions || [],
     arrangeQuestions: initialExam?.arrangeQuestions || [],
+    listeningQuestions: initialExam?.listeningQuestions || [],
     essayQuestions: initialExam?.essayQuestions || [],
     speakingQuestions: initialExam?.speakingQuestions || [],
     translationQuestions: initialExam?.translationQuestions || []
   });
-
-  // AI Exam Generator State
-  const [aiTopic, setAiTopic] = useState('');
-  const [aiLevel, setAiLevel] = useState<ExamLesson['level']>('HSK 3');
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
-  const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
 
   // New Vocab Form state
   const [newHanzi, setNewHanzi] = useState('');
@@ -114,16 +143,198 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   // New Essay Question state
   const [newEssayPrompt, setNewEssayPrompt] = useState('');
   const [newEssayAnswer, setNewEssayAnswer] = useState('');
+  const [newEssayImageUrl, setNewEssayImageUrl] = useState('');
 
   // New Speaking Question state
+  const [newSpeakingType, setNewSpeakingType] = useState<'speaking' | 'speaking_record'>('speaking');
   const [newSpeakingPrompt, setNewSpeakingPrompt] = useState('');
   const [newSpeakingPinyin, setNewSpeakingPinyin] = useState('');
+  const [newSpeakingItems, setNewSpeakingItems] = useState('');
+  const [newSpeakingImageUrl, setNewSpeakingImageUrl] = useState('');
 
   // New Translation Question state
   const [newTransType, setNewTransType] = useState<'vi_to_zh_audio' | 'vi_to_zh_text' | 'zh_to_vi_text'>('vi_to_zh_audio');
   const [newTransPrompt, setNewTransPrompt] = useState('');
   const [newTransPinyin, setNewTransPinyin] = useState('');
   const [newTransSuggestedAnswer, setNewTransSuggestedAnswer] = useState('');
+
+  // New Listening Question state
+  const [newListenType, setNewListenType] = useState<'listening_multiple_choice' | 'listening_true_false' | 'listening_fill' | 'listening_mc' | 'listening_tf'>('listening_multiple_choice');
+  const [newListenPrompt, setNewListenPrompt] = useState('');
+  const [newListenPinyin, setNewListenPinyin] = useState('');
+  const [newListenAudioUrl, setNewListenAudioUrl] = useState('');
+  const [newListenOptA, setNewListenOptA] = useState('');
+  const [newListenOptB, setNewListenOptB] = useState('');
+  const [newListenOptC, setNewListenOptC] = useState('');
+  const [newListenOptD, setNewListenOptD] = useState('');
+  const [newListenFillAnswer, setNewListenFillAnswer] = useState('');
+  const [newListenCorrectMc, setNewListenCorrectMc] = useState(0);
+  const [newListenCorrectTf, setNewListenCorrectTf] = useState(0);
+  const [newListenExplanation, setNewListenExplanation] = useState('');
+
+  // Editing Modal state for questions
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+
+  const handleSaveEditQuestion = (updatedQ: Question) => {
+    if (!editingExam) return;
+    const updatedExam = { ...editingExam };
+
+    const removeQ = (arr?: Question[]) => arr?.filter((q) => q.id !== updatedQ.id);
+    const type = updatedQ.type;
+
+    updatedExam.mcQuestions = removeQ(updatedExam.mcQuestions) || [];
+    updatedExam.fillQuestions = removeQ(updatedExam.fillQuestions);
+    updatedExam.arrangeQuestions = removeQ(updatedExam.arrangeQuestions);
+    updatedExam.listeningQuestions = removeQ(updatedExam.listeningQuestions);
+    updatedExam.essayQuestions = removeQ(updatedExam.essayQuestions) || [];
+    updatedExam.speakingQuestions = removeQ(updatedExam.speakingQuestions) || [];
+    updatedExam.translationQuestions = removeQ(updatedExam.translationQuestions);
+
+    if (type === 'mc') {
+      updatedExam.mcQuestions = [...updatedExam.mcQuestions, updatedQ];
+    } else if (type === 'fill') {
+      updatedExam.fillQuestions = [...(updatedExam.fillQuestions || []), updatedQ];
+    } else if (type === 'arrange') {
+      updatedExam.arrangeQuestions = [...(updatedExam.arrangeQuestions || []), updatedQ];
+    } else if (
+      type === 'listening_mc' ||
+      type === 'listening_tf' ||
+      type === 'listening_multiple_choice' ||
+      type === 'listening_true_false'
+    ) {
+      updatedExam.listeningQuestions = [...(updatedExam.listeningQuestions || []), updatedQ];
+    } else if (type === 'essay') {
+      updatedExam.essayQuestions = [...updatedExam.essayQuestions, updatedQ];
+    } else if (type === 'speaking' || type === 'speaking_record') {
+      updatedExam.speakingQuestions = [...updatedExam.speakingQuestions, updatedQ];
+    } else if (type === 'translation') {
+      updatedExam.translationQuestions = [...(updatedExam.translationQuestions || []), updatedQ];
+    } else {
+      updatedExam.mcQuestions = [...updatedExam.mcQuestions, updatedQ];
+    }
+
+    setEditingExam(updatedExam);
+    if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+  };
+
+  const handleEditVocabItem = (idx: number) => {
+    if (!editingExam?.vocabList) return;
+    const item = editingExam.vocabList[idx];
+    setNewHanzi(item.hanzi);
+    setNewPinyin(item.pinyin);
+    setNewType(item.type || 'Từ');
+    setNewMeaning(item.meaning);
+    handleDeleteVocabItem(idx);
+  };
+
+  const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const res = event.target?.result as string;
+      if (res) {
+        const uploadedUrl = await uploadMediaFile(res, file.name, file.type);
+        setNewListenAudioUrl(uploadedUrl || res);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEssayImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const res = event.target?.result as string;
+      if (res) {
+        const uploadedUrl = await uploadMediaFile(res, file.name, file.type);
+        setNewEssayImageUrl(uploadedUrl || res);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSpeakingImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const res = event.target?.result as string;
+      if (res) {
+        const uploadedUrl = await uploadMediaFile(res, file.name, file.type);
+        setNewSpeakingImageUrl(uploadedUrl || res);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddListenQuestion = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newListenPrompt.trim()) {
+      alert('Vui lòng nhập câu hỏi hoặc yêu cầu cho bài nghe.');
+      return;
+    }
+
+    let options: string[] | undefined = undefined;
+    let answerVal: number | string | undefined = undefined;
+    let acceptableVal: string | undefined = undefined;
+
+    if (newListenType === 'listening_mc' || newListenType === 'listening_multiple_choice') {
+      if (!newListenOptA.trim() || !newListenOptB.trim()) {
+        alert('Vui lòng nhập ít nhất 2 lựa chọn A và B cho bài nghe chọn đáp án.');
+        return;
+      }
+      options = [newListenOptA.trim(), newListenOptB.trim()];
+      if (newListenOptC.trim()) options.push(newListenOptC.trim());
+      if (newListenOptD.trim()) options.push(newListenOptD.trim());
+      answerVal = newListenCorrectMc;
+    } else if (newListenType === 'listening_tf' || newListenType === 'listening_true_false') {
+      options = ['Đúng (正确)', 'Sai (错误)'];
+      answerVal = newListenCorrectTf;
+    } else if (newListenType === 'listening_fill') {
+      options = undefined;
+      acceptableVal = newListenFillAnswer.trim() || undefined;
+      answerVal = newListenFillAnswer.trim() || undefined;
+    }
+
+    const newQ: Question = {
+      id: `listen_${Date.now()}`,
+      type: newListenType,
+      tier: 'tier2',
+      prompt: newListenPrompt.trim(),
+      pinyin: newListenPinyin.trim() || undefined,
+      audioUrl: newListenAudioUrl.trim() || undefined,
+      audioPromptUrl: newListenAudioUrl.trim() || undefined,
+      options: options,
+      answer: answerVal,
+      acceptableAnswers: acceptableVal,
+      suggestedAnswer: acceptableVal,
+      explanation: newListenExplanation.trim() || undefined
+    };
+
+    const updatedListen = [...(editingExam.listeningQuestions || []), newQ];
+    const updatedExam = { ...editingExam, listeningQuestions: updatedListen };
+    setEditingExam(updatedExam);
+    if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+
+    setNewListenPrompt('');
+    setNewListenPinyin('');
+    setNewListenAudioUrl('');
+    setNewListenOptA('');
+    setNewListenOptB('');
+    setNewListenOptC('');
+    setNewListenOptD('');
+    setNewListenFillAnswer('');
+    setNewListenExplanation('');
+  };
+
+  const handleDeleteListenQuestion = (qId: string) => {
+    const updatedListen = (editingExam.listeningQuestions || []).filter((q) => q.id !== qId);
+    const updatedExam = { ...editingExam, listeningQuestions: updatedListen };
+    setEditingExam(updatedExam);
+    if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,11 +364,68 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   };
 
   const openGradingModal = (sub: SubmissionData) => {
+    const hwList = getHandwritingSubmissions();
+    const matchedHw = hwList.find(
+      (h) => h.id === sub.id || (h.studentName.toLowerCase() === sub.name.toLowerCase() && h.exerciseTitle === sub.lesson)
+    );
+
+    const isHandwritingSub =
+      sub.isHandwriting ||
+      (sub.submissionImages && sub.submissionImages.length > 0) ||
+      (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
+      sub.lesson.toLowerCase().includes('chép') ||
+      sub.lesson.toLowerCase().includes('nộp ảnh') ||
+      !!matchedHw;
+
+    if (isHandwritingSub) {
+      const imagesToUse =
+        sub.submissionImages && sub.submissionImages.length > 0
+          ? sub.submissionImages
+          : matchedHw?.submissionImages || [];
+
+      const hwSub: HandwritingSubmission = {
+        id: sub.id || matchedHw?.id || `hw_${Date.now()}`,
+        exerciseId: sub.exerciseId || matchedHw?.exerciseId || sub.id,
+        exerciseTitle: sub.lesson,
+        studentName: sub.name,
+        studentClass: sub.class,
+        submissionImages: imagesToUse,
+        status: sub.status === 'Đã chấm' || matchedHw?.status === 'graded' ? 'graded' : 'submitted',
+        submittedAt: sub.submittedAt || matchedHw?.submittedAt || sub.time || new Date().toISOString(),
+        correctedImages: sub.correctedImages || matchedHw?.correctedImages || [],
+        teacherComment: sub.teacherComment || sub.comment || matchedHw?.teacherComment || '',
+        gradedAt: sub.gradedAt || matchedHw?.gradedAt
+      };
+      setSelectedHwSub(hwSub);
+      return;
+    }
     setSelectedSub(sub);
     setSpeakScoreInput(String(sub.speakScore || ''));
     setCommentInput(sub.comment || '');
     setItemComments({});
+    setModalCorrectedImages(sub.correctedImages || matchedHw?.correctedImages || []);
     setGradeSuccess(false);
+  };
+
+  const handleCorrectedUploadInModal = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploadingCorrected(true);
+    try {
+      const newImgs: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const compressed = await fileToCompressedDataUrl(files[i]);
+        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type);
+        newImgs.push(uploadedUrl || compressed);
+      }
+      setModalCorrectedImages((prev) => [...prev, ...newImgs]);
+    } catch (err) {
+      console.error('Lỗi khi tải ảnh chữa:', err);
+      alert('Không thể tải ảnh chữa. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingCorrected(false);
+      e.target.value = '';
+    }
   };
 
   const handleSaveGrade = async (e: React.FormEvent) => {
@@ -187,7 +455,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       selectedSub.id,
       speakScoreInput,
       finalComment,
-      passwordInput || config.teacherPass
+      passwordInput || config.teacherPass,
+      modalCorrectedImages
     );
 
     if (res.ok) {
@@ -195,43 +464,33 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       setSubmissions((prev) =>
         prev.map((item) =>
           item.id === selectedSub.id
-            ? { ...item, speakScore: speakScoreInput, comment: finalComment, status: 'Đã chấm' }
+            ? {
+                ...item,
+                speakScore: speakScoreInput,
+                comment: finalComment,
+                teacherComment: finalComment,
+                correctedImages: modalCorrectedImages,
+                status: 'Đã chấm'
+              }
             : item
         )
       );
       setSelectedSub((prev) =>
-        prev ? { ...prev, speakScore: speakScoreInput, comment: finalComment, status: 'Đã chấm' } : null
+        prev
+          ? {
+              ...prev,
+              speakScore: speakScoreInput,
+              comment: finalComment,
+              teacherComment: finalComment,
+              correctedImages: modalCorrectedImages,
+              status: 'Đã chấm'
+            }
+          : null
       );
     } else {
       alert(res.error || 'Không thể lưu điểm chấm');
     }
     setIsGrading(false);
-  };
-
-  // AI Exam Generation Handler
-  const handleGenerateAiExam = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiTopic.trim()) {
-      alert('Vui lòng nhập chủ đề hoặc danh sách từ vựng bài học.');
-      return;
-    }
-    setIsAiGenerating(true);
-    setAiSuccessMsg(null);
-
-    try {
-      const generated = await generateExamWithAI(aiTopic.trim(), aiLevel);
-      if (onSaveCustomExam) {
-        onSaveCustomExam(generated);
-      }
-      setEditingExam(generated);
-      setAiSuccessMsg(`Đã tạo thành công bài thi AI: "${generated.title}"! Đã tự động lưu vào danh sách.`);
-      setAiTopic('');
-    } catch (err) {
-      console.error(err);
-      alert('Không thể tạo bài thi bằng AI. Vui lòng thử lại.');
-    } finally {
-      setIsAiGenerating(false);
-    }
   };
 
   // Save changes to current exam
@@ -398,6 +657,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       type: 'essay',
       tier: 'tier3',
       prompt: newEssayPrompt.trim(),
+      imageUrl: newEssayImageUrl.trim() || undefined,
       suggestedAnswer: newEssayAnswer.trim() || undefined
     };
 
@@ -408,6 +668,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
     setNewEssayPrompt('');
     setNewEssayAnswer('');
+    setNewEssayImageUrl('');
   };
 
   const handleDeleteEssayQuestion = (qId: string) => {
@@ -424,12 +685,20 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       alert('Vui lòng nhập đề bài khẩu ngữ phát âm.');
       return;
     }
+
+    const itemsList =
+      newSpeakingType === 'speaking_record' && newSpeakingItems.trim()
+        ? newSpeakingItems.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined;
+
     const newQ: Question = {
       id: `s_${Date.now()}`,
-      type: 'speaking',
+      type: newSpeakingType,
       tier: 'tier3',
       prompt: newSpeakingPrompt.trim(),
-      pinyin: newSpeakingPinyin.trim() || undefined
+      pinyin: newSpeakingPinyin.trim() || undefined,
+      imageUrl: newSpeakingImageUrl.trim() || undefined,
+      items: itemsList
     };
 
     const updatedSpeaking = [...(editingExam.speakingQuestions || []), newQ];
@@ -439,6 +708,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
     setNewSpeakingPrompt('');
     setNewSpeakingPinyin('');
+    setNewSpeakingItems('');
+    setNewSpeakingImageUrl('');
   };
 
   const handleDeleteSpeakingQuestion = (qId: string) => {
@@ -484,6 +755,19 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStatus = statusFilter === 'ALL' || sub.status === statusFilter;
+
+    const isHw =
+      sub.isHandwriting ||
+      (sub.submissionImages && sub.submissionImages.length > 0) ||
+      (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
+      sub.lesson.toLowerCase().includes('chép') ||
+      sub.lesson.toLowerCase().includes('nộp ảnh');
+
+    const matchesType =
+      typeFilter === 'ALL' ||
+      (typeFilter === 'HANDWRITING' && isHw) ||
+      (typeFilter === 'OTHER' && !isHw);
+
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !q ||
@@ -492,7 +776,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       sub.id.toLowerCase().includes(q) ||
       sub.lesson.toLowerCase().includes(q);
 
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesType && matchesSearch;
   });
 
   if (!isAuthenticated) {
@@ -548,10 +832,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <Award className="w-6 h-6 text-red-700" />
-              <h2 className="text-xl font-bold text-slate-800">Cổng Quản Lý, Chấm Bài & Soạn Đề Thi AI</h2>
+              <h2 className="text-xl font-bold text-slate-800">Cổng Quản Lý, Chấm Bài & Quản Lý Giáo Trình</h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Nghe ghi âm phát âm, chấm điểm khẩu ngữ, đưa ra nhận xét và dùng AI soạn/sửa bài thi tự động.
+              Nghe ghi âm phát âm, chấm điểm khẩu ngữ, đưa ra nhận xét và nhập giáo trình bằng file JSON.
             </p>
           </div>
 
@@ -590,14 +874,14 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
           <button
             type="button"
-            onClick={() => setActiveTab('ai_creator')}
+            onClick={() => setActiveTab('import_json')}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-              activeTab === 'ai_creator'
-                ? 'bg-purple-700 text-white shadow-xs'
-                : 'bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100'
+              activeTab === 'import_json'
+                ? 'bg-indigo-700 text-white shadow-xs'
+                : 'bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-purple-600" /> AI Soạn Đề Thi Mới Tự Động
+            <FileCode className="w-4 h-4 text-indigo-600" /> Nhập Bài Học (Import JSON)
           </button>
 
           <button
@@ -630,12 +914,22 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               />
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <Filter className="w-4 h-4 text-slate-400" />
+              <select
+                value={typeFilter}
+                onChange={(e: any) => setTypeFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-medium outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
+              >
+                <option value="ALL">Tất cả loại bài</option>
+                <option value="HANDWRITING">📝 Nộp ảnh / Bài viết tay</option>
+                <option value="OTHER">📊 Khác (Trắc nghiệm / Tự luận)</option>
+              </select>
+
               <select
                 value={statusFilter}
                 onChange={(e: any) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-medium outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
               >
                 <option value="ALL">Tất cả trạng thái</option>
                 <option value="Chờ chấm">Chờ chấm</option>
@@ -669,51 +963,87 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider">
                       <th className="p-3.5">Mã ID</th>
                       <th className="p-3.5">Họ tên & Lớp</th>
-                      <th className="p-3.5">Bài thi</th>
-                      <th className="p-3.5">Trắc nghiệm</th>
+                      <th className="p-3.5">Bài thi / Đề bài</th>
+                      <th className="p-3.5">Kết quả / Loại bài</th>
                       <th className="p-3.5">Trạng thái</th>
                       <th className="p-3.5 text-right">Hành động</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {filteredSubmissions.map((sub) => (
-                      <tr key={sub.id} className="hover:bg-slate-50/80 transition">
-                        <td className="p-3.5 font-mono font-bold text-red-700">{sub.id}</td>
-                        <td className="p-3.5">
-                          <div className="font-semibold text-slate-800">{sub.name}</div>
-                          <div className="text-xs text-slate-500">Lớp: {sub.class}</div>
-                        </td>
-                        <td className="p-3.5 max-w-xs truncate text-slate-700" title={sub.lesson}>
-                          {sub.lesson}
-                        </td>
-                        <td className="p-3.5">
-                          <span className="font-bold text-slate-800">{sub.percent}%</span>
-                          <span className="text-xs text-slate-500 block">
-                            ({sub.correct}/{sub.total} câu)
-                          </span>
-                        </td>
-                        <td className="p-3.5">
-                          {sub.status === 'Đã chấm' ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({sub.speakScore || 'N/A'})
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">
-                              <Clock className="w-3.5 h-3.5" /> Chờ chấm
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => openGradingModal(sub)}
-                            className="inline-flex items-center gap-1 bg-red-700 hover:bg-red-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer"
-                          >
-                            Chấm bài / Chi tiết <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredSubmissions.map((sub) => {
+                      const isHw =
+                        sub.isHandwriting ||
+                        (sub.submissionImages && sub.submissionImages.length > 0) ||
+                        (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
+                        sub.lesson.toLowerCase().includes('chép') ||
+                        sub.lesson.toLowerCase().includes('nộp ảnh');
+
+                      return (
+                        <tr key={sub.id} className="hover:bg-slate-50/80 transition">
+                          <td className="p-3.5 font-mono font-bold text-red-700">{sub.id}</td>
+                          <td className="p-3.5">
+                            <div className="font-semibold text-slate-800">{sub.name}</div>
+                            <div className="text-xs text-slate-500">Lớp: {sub.class}</div>
+                            {isHw && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200 mt-1">
+                                <Pencil className="w-3 h-3 text-teal-600" /> Bài chép tay / Nộp ảnh
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 max-w-xs truncate text-slate-700" title={sub.lesson}>
+                            {sub.lesson}
+                          </td>
+                          <td className="p-3.5">
+                            {isHw ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 inline-flex items-center gap-1.5 text-xs w-fit">
+                                  <ImageIcon className="w-3.5 h-3.5 text-teal-600" /> {sub.submissionImages?.length || 1} ảnh bài nộp
+                                </span>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="font-bold text-slate-800">
+                                  {sub.total > 0 ? Math.round((sub.correct / sub.total) * 100) : (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
+                                </span>
+                                <span className="text-xs text-slate-500 block">
+                                  ({sub.correct}/{sub.total} câu)
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3.5">
+                            {sub.status === 'Đã chấm' ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({sub.speakScore || 'N/A'})
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">
+                                <Clock className="w-3.5 h-3.5" /> Chờ chấm
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-right">
+                            {isHw ? (
+                              <button
+                                type="button"
+                                onClick={() => openGradingModal(sub)}
+                                className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5" /> Chấm bài chép tay <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openGradingModal(sub)}
+                                className="inline-flex items-center gap-1 bg-red-700 hover:bg-red-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                              >
+                                Chấm bài / Chi tiết <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -722,80 +1052,14 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         </div>
       )}
 
-      {/* TAB 2: AI EXAM GENERATOR */}
-      {activeTab === 'ai_creator' && (
-        <div className="bg-white rounded-xl border border-purple-200 p-6 shadow-sm space-y-6">
-          <div className="flex items-center gap-3 border-b border-purple-100 pb-4">
-            <div className="w-10 h-10 bg-purple-100 text-purple-700 rounded-xl flex items-center justify-center">
-              <Wand2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="font-bold text-purple-900 text-lg">AI Trợ Lý Soạn Đề Thi Tiếng Trung</h3>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Nhập chủ đề hoặc danh sách từ vựng. Trợ lý AI sẽ tự động tạo bảng từ vựng, câu hỏi trắc nghiệm, bài điền từ, xếp câu chip, đoạn đọc hiểu và bài ghi âm luyện nói.
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handleGenerateAiExam} className="space-y-4 max-w-2xl">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Trình độ HSK
-              </label>
-              <select
-                value={aiLevel}
-                onChange={(e: any) => setAiLevel(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="HSK 1">HSK 1</option>
-                <option value="HSK 2">HSK 2</option>
-                <option value="HSK 3">HSK 3</option>
-                <option value="HSK 4">HSK 4</option>
-                <option value="HSK 5">HSK 5</option>
-                <option value="HSK 6">HSK 6</option>
-                <option value="Luyện nói">Luyện nói & Khẩu ngữ</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Chủ đề hoặc Danh sách từ vựng cần soạn <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                rows={4}
-                value={aiTopic}
-                onChange={(e) => setAiTopic(e.target.value)}
-                placeholder="Ví dụ: Soạn bài thi HSK 3 Bài 2 chủ đề Mua sắm & Đồ ăn 饮料, 啤酒, 瘦, 花, 拿..."
-                required
-                className="w-full p-3 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-
-            {aiSuccessMsg && (
-              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span>{aiSuccessMsg}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isAiGenerating}
-              className="inline-flex items-center gap-2 bg-purple-700 hover:bg-purple-800 text-white font-bold text-sm px-6 py-3 rounded-xl shadow-md transition cursor-pointer disabled:opacity-60"
-            >
-              {isAiGenerating ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  AI Đang Tự Động Soạn Đề Thi...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" /> Tự Động Soạn Bài Thi Bằng AI
-                </>
-              )}
-            </button>
-          </form>
-        </div>
+      {/* TAB 2: IMPORT LESSON FROM JSON */}
+      {activeTab === 'import_json' && (
+        <ImportLesson
+          onSaveCustomExam={onSaveCustomExam}
+          onImportSuccess={(newExam) => {
+            setEditingExam(sanitizeExamSections(newExam));
+          }}
+        />
       )}
 
       {/* TAB 3: MANUAL EDITOR MODE FOR TEACHER */}
@@ -830,6 +1094,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 value={editingExam.id || ''}
                 onChange={(e) => {
                   const selectedId = e.target.value;
+                  setShowDeleteConfirm(false);
                   if (selectedId === 'NEW') {
                     const newExam: ExamLesson = {
                       id: `custom_${Date.now()}`,
@@ -840,6 +1105,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                       mcQuestions: [],
                       fillQuestions: [],
                       arrangeQuestions: [],
+                      listeningQuestions: [],
                       essayQuestions: [],
                       speakingQuestions: [],
                       translationQuestions: []
@@ -848,15 +1114,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                   } else {
                     const found = allExams.find((item) => item.id === selectedId);
                     if (found) {
+                      const cleanFound = sanitizeExamSections(found);
                       setEditingExam({
-                        ...found,
-                        vocabList: found.vocabList || [],
-                        mcQuestions: found.mcQuestions || [],
-                        fillQuestions: found.fillQuestions || [],
-                        arrangeQuestions: found.arrangeQuestions || [],
-                        essayQuestions: found.essayQuestions || [],
-                        speakingQuestions: found.speakingQuestions || [],
-                        translationQuestions: found.translationQuestions || []
+                        ...cleanFound,
+                        vocabList: cleanFound.vocabList || [],
+                        mcQuestions: cleanFound.mcQuestions || [],
+                        fillQuestions: cleanFound.fillQuestions || [],
+                        arrangeQuestions: cleanFound.arrangeQuestions || [],
+                        listeningQuestions: cleanFound.listeningQuestions || [],
+                        essayQuestions: cleanFound.essayQuestions || [],
+                        speakingQuestions: cleanFound.speakingQuestions || [],
+                        translationQuestions: cleanFound.translationQuestions || []
                       });
                     }
                   }
@@ -872,31 +1140,91 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               </select>
             </div>
 
-            {onDeleteCustomExam && customExams.some((c) => c.id === editingExam.id) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm(`Bạn có chắc muốn xóa bài thi "${editingExam.title}"?`)) {
-                    onDeleteCustomExam(editingExam.id);
-                    const remaining = allExams.filter((e) => e.id !== editingExam.id);
-                    const fallback = remaining[0] || SAMPLE_EXAMS[0];
-                    setEditingExam({
-                      ...fallback,
-                      vocabList: fallback.vocabList || [],
-                      mcQuestions: fallback.mcQuestions || [],
-                      fillQuestions: fallback.fillQuestions || [],
-                      arrangeQuestions: fallback.arrangeQuestions || [],
-                      essayQuestions: fallback.essayQuestions || [],
-                      speakingQuestions: fallback.speakingQuestions || []
-                    });
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-lg font-semibold transition border border-rose-200 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Xóa bài thi này
-              </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {editingExam.id !== 'NEW' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(editingExam, null, 2));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `${editingExam.id || 'bai-thi'}_export.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2 rounded-lg font-semibold transition border border-indigo-200 cursor-pointer shadow-xs"
+                  title="Xuất file JSON bài thi (bao gồm file âm thanh) để mang sang máy khác"
+                >
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" /> Tải File JSON Bài Thi
+                </button>
+              )}
+
+              {onDeleteCustomExam && editingExam.id !== 'NEW' && (
+                !showDeleteConfirm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="inline-flex items-center gap-1.5 text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-3.5 py-2 rounded-lg font-semibold transition border border-rose-300 cursor-pointer shadow-xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Xóa bài thi này
+                  </button>
+                ) : (
+                <div className="flex flex-wrap items-center gap-2 bg-rose-50 border border-rose-300 p-2 rounded-lg text-xs font-medium text-rose-900 animate-in fade-in">
+                  <span className="font-bold">Xác nhận xóa bài thi này?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const idToDelete = editingExam.id;
+                      const titleToDelete = editingExam.title;
+                      const remaining = allExams.filter((e) => e.id !== idToDelete);
+                      const fallbackRaw = remaining[0] || SAMPLE_EXAMS[0];
+                      const fallback = fallbackRaw ? sanitizeExamSections(fallbackRaw) : null;
+
+                      onDeleteCustomExam(idToDelete);
+                      setShowDeleteConfirm(false);
+                      setDeleteNotice(`Đã xóa bài thi "${titleToDelete}" thành công!`);
+
+                      if (fallback) {
+                        setSelectedExamId(fallback.id);
+                        setEditingExam({
+                          ...fallback,
+                          vocabList: fallback.vocabList || [],
+                          mcQuestions: fallback.mcQuestions || [],
+                          fillQuestions: fallback.fillQuestions || [],
+                          arrangeQuestions: fallback.arrangeQuestions || [],
+                          listeningQuestions: fallback.listeningQuestions || [],
+                          essayQuestions: fallback.essayQuestions || [],
+                          speakingQuestions: fallback.speakingQuestions || [],
+                          translationQuestions: fallback.translationQuestions || []
+                        });
+                      }
+
+                      setTimeout(() => setDeleteNotice(null), 4000);
+                    }}
+                    className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 rounded font-bold cursor-pointer transition shadow-xs"
+                  >
+                    Có, Xóa Ngay
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1 rounded font-semibold cursor-pointer transition"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              )
             )}
           </div>
+        </div>
+
+          {deleteNotice && (
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl font-bold text-sm flex items-center gap-2 shadow-xs animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{deleteNotice}</span>
+            </div>
+          )}
 
           {/* Exam Info Form */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -972,11 +1300,20 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                           <Volume2 className="w-4 h-4" />
                         </button>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-right flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleEditVocabItem(idx)}
+                          className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                          title="Sửa từ vựng này"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteVocabItem(idx)}
                           className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                          title="Xóa từ vựng"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1043,13 +1380,24 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     <span className="font-bold text-slate-800">C{idx + 1}: {q.prompt}</span>
                     <span className="text-slate-500 block">Lựa chọn: {q.options?.join(' | ')}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteMcQuestion(q.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuestion(q)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                      title="Sửa câu hỏi này"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMcQuestion(q.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      title="Xóa câu hỏi"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1130,13 +1478,24 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     <span className="font-bold text-slate-800">C{idx + 1}: {q.prompt}</span>
                     <span className="text-emerald-700 font-medium block">Đáp án chuẩn: {q.acceptableAnswers}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteFillQuestion(q.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuestion(q)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                      title="Sửa câu hỏi này"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFillQuestion(q.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      title="Xóa câu hỏi"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1186,13 +1545,24 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     </div>
                     <span className="text-emerald-700 font-medium block">Đáp án chuẩn: {q.acceptableAnswers}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteArrQuestion(q.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuestion(q)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                      title="Sửa câu hỏi này"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteArrQuestion(q.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      title="Xóa câu hỏi"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1231,44 +1601,407 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </form>
           </div>
 
-          {/* Form Thêm Bài Tự Luận & Dịch Thuật */}
+          {/* Form Thêm Bài Tập Nghe (Nghe Chọn Đáp Án & Nghe Chọn Đúng/Sai) */}
           <div className="space-y-3 pt-4 border-t border-slate-200">
-            <h4 className="font-bold text-slate-800 text-sm">Quản Lý Bài Tự Luận & Dịch Thuật ({(editingExam.essayQuestions || []).length} câu)</h4>
+            <h4 className="font-bold text-slate-800 text-sm flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-indigo-900 font-extrabold">
+                <Headphones className="w-4 h-4 text-indigo-600" />
+                Quản Lý Bài Tập Luyện Nghe ({(editingExam.listeningQuestions || []).length} câu)
+              </span>
+            </h4>
+
+            {/* List of existing listening questions */}
+            <div className="space-y-2">
+              {(editingExam.listeningQuestions || []).map((q, idx) => (
+                <div key={q.id} className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">
+                          Câu nghe #{idx + 1}: {q.prompt}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          q.type === 'listening_tf' || q.type === 'listening_true_false'
+                            ? 'bg-amber-100 text-amber-900'
+                            : q.type === 'listening_fill' || q.type === 'listening_fill_in_blank'
+                            ? 'bg-purple-100 text-purple-900'
+                            : 'bg-indigo-100 text-indigo-900'
+                        }`}>
+                          {q.type === 'listening_tf' || q.type === 'listening_true_false'
+                            ? '🎧 Nghe Phán Đoán Đúng / Sai'
+                            : q.type === 'listening_fill' || q.type === 'listening_fill_in_blank'
+                            ? '🎧 Nghe Điền Tự Luận'
+                            : '🎧 Nghe Tích Trắc Nghiệm ABCD'}
+                        </span>
+                      </div>
+                      {q.pinyin && <p className="text-indigo-600 font-mono">Pinyin: {q.pinyin}</p>}
+                      
+                      {q.options && q.options.length > 0 && (
+                        <div className="text-slate-600 pt-0.5">
+                          <span className="font-semibold text-slate-700">Lựa chọn: </span>
+                          <span>{q.options.join(' | ')}</span>
+                          <span className="font-bold text-emerald-700 ml-2">
+                            (Đáp án đúng: {q.options[q.answer as number] || q.answer})
+                          </span>
+                        </div>
+                      )}
+
+                      {(q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') && (
+                        <div className="text-slate-600 pt-0.5">
+                          <span className="font-semibold text-slate-700">Đáp án từ cần điền: </span>
+                          <span className="font-bold text-emerald-700">
+                            {q.acceptableAnswers || (typeof q.answer === 'string' ? q.answer : q.suggestedAnswer) || 'Chưa đặt'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingQuestion(q)}
+                        className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                        title="Sửa câu hỏi này"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteListenQuestion(q.id)}
+                        className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                        title="Xóa câu hỏi"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Audio player preview */}
+                  {(q.audioUrl || q.audioPromptUrl) ? (
+                    <div className="pt-1">
+                      <p className="text-[11px] font-semibold text-indigo-900 mb-1 flex items-center gap-1">
+                        <Volume2 className="w-3.5 h-3.5 text-indigo-600" /> File nghe đính kèm:
+                      </p>
+                      <audio controls src={q.audioUrl || q.audioPromptUrl} className="w-full h-8 rounded-md" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-[11px] text-slate-500 italic">Không có file nghe đính kèm (sử dụng đọc tự động TTS).</span>
+                      <button
+                        type="button"
+                        onClick={() => speakText(q.pinyin || q.prompt)}
+                        className="inline-flex items-center gap-1 text-[11px] text-indigo-700 hover:underline font-bold cursor-pointer"
+                      >
+                        <Volume2 className="w-3 h-3" /> Thử phát TTS
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* New Listening Question Form */}
+            <form onSubmit={handleAddListenQuestion} className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-4 space-y-3.5">
+              <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-indigo-600" /> Soạn Bài Tập Luyện Nghe Mới:
+              </span>
+
+              {/* Type Select */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Loại bài nghe:</label>
+                  <select
+                    value={newListenType}
+                    onChange={(e: any) => setNewListenType(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="listening_multiple_choice">🎧 Nghe tích trắc nghiệm ABCD (listening_multiple_choice)</option>
+                    <option value="listening_true_false">🎧 Nghe phán đoán Đúng / Sai (listening_true_false)</option>
+                    <option value="listening_fill">🎧 Nghe điền tự luận (listening_fill)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phiên âm / Nội dung nói (Pinyin / Hán tự):</label>
+                  <input
+                    type="text"
+                    value={newListenPinyin}
+                    onChange={(e) => setNewListenPinyin(e.target.value)}
+                    placeholder="Ví dụ: Nǐ zhōumò yǒu shénme dǎsuàn?"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Question Prompt */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Đề bài / Câu hỏi hướng dẫn bài nghe:</label>
+                <input
+                  type="text"
+                  value={newListenPrompt}
+                  onChange={(e) => setNewListenPrompt(e.target.value)}
+                  placeholder={
+                    newListenType === 'listening_multiple_choice' || newListenType === 'listening_mc'
+                      ? 'Ví dụ: Nghe đoạn âm thanh và chọn đáp án đúng:'
+                      : newListenType === 'listening_true_false' || newListenType === 'listening_tf'
+                      ? 'Ví dụ: Nghe đoạn hội thoại và cho biết phát biểu sau Đúng hay Sai:'
+                      : 'Ví dụ: Nghe đoạn âm thanh và điền từ thích hợp vào chỗ trống:'
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Audio File Upload or URL Input */}
+              <div className="p-3 bg-white border border-indigo-200 rounded-xl space-y-2">
+                <label className="block text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                  <Volume2 className="w-4 h-4 text-indigo-600" /> Tải Lên File Âm Thanh Hoặc Dán Link MP3:
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                  <div>
+                    <span className="block text-[11px] text-slate-500 mb-1">Cách 1: Chọn file nghe từ máy (.mp3, .wav, .m4a)</span>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={handleAudioFileUpload}
+                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-100 file:text-indigo-800 hover:file:bg-indigo-200 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="block text-[11px] text-slate-500 mb-1">Cách 2: Hoặc Dán Đường Dẫn Link MP3 / Audio</span>
+                    <input
+                      type="text"
+                      value={newListenAudioUrl}
+                      onChange={(e) => setNewListenAudioUrl(e.target.value)}
+                      placeholder="https://.../file.mp3 hoặc data:audio/..."
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                {newListenAudioUrl && (
+                  <div className="pt-2 border-t border-indigo-100 flex items-center gap-3">
+                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã đính kèm âm thanh!
+                    </span>
+                    <audio controls src={newListenAudioUrl} className="h-7 w-full max-w-md" />
+                    <button
+                      type="button"
+                      onClick={() => setNewListenAudioUrl('')}
+                      className="text-xs text-red-600 hover:underline shrink-0"
+                    >
+                      Gỡ bỏ
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Options or Answer Input based on Type */}
+              {newListenType === 'listening_multiple_choice' || newListenType === 'listening_mc' ? (
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-700">Các Lựa Chọn Đáp Án (A, B, C, D):</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <input
+                      type="text"
+                      value={newListenOptA}
+                      onChange={(e) => setNewListenOptA(e.target.value)}
+                      placeholder="Đáp án A"
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={newListenOptB}
+                      onChange={(e) => setNewListenOptB(e.target.value)}
+                      placeholder="Đáp án B"
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={newListenOptC}
+                      onChange={(e) => setNewListenOptC(e.target.value)}
+                      placeholder="Đáp án C"
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={newListenOptD}
+                      onChange={(e) => setNewListenOptD(e.target.value)}
+                      placeholder="Đáp án D"
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <label className="text-xs font-semibold text-slate-700">Đáp án đúng chính xác:</label>
+                    <select
+                      value={newListenCorrectMc}
+                      onChange={(e) => setNewListenCorrectMc(Number(e.target.value))}
+                      className="px-2 py-1 border border-slate-300 rounded-lg text-xs bg-white font-bold"
+                    >
+                      <option value={0}>A</option>
+                      <option value={1}>B</option>
+                      <option value={2}>C</option>
+                      <option value={3}>D</option>
+                    </select>
+                  </div>
+                </div>
+              ) : newListenType === 'listening_true_false' || newListenType === 'listening_tf' ? (
+                <div className="p-3 bg-white border border-amber-200 rounded-lg space-y-2">
+                  <label className="block text-xs font-bold text-amber-900">Chọn Đáp Án Chuẩn Cho Bài Nghe Đúng / Sai:</label>
+                  <div className="flex items-center gap-4 text-xs font-bold">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer text-emerald-800">
+                      <input
+                        type="radio"
+                        name="listen_tf_ans"
+                        checked={newListenCorrectTf === 0}
+                        onChange={() => setNewListenCorrectTf(0)}
+                        className="text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>Đúng (正确)</span>
+                    </label>
+
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer text-rose-800">
+                      <input
+                        type="radio"
+                        name="listen_tf_ans"
+                        checked={newListenCorrectTf === 1}
+                        onChange={() => setNewListenCorrectTf(1)}
+                        className="text-rose-600 focus:ring-rose-500"
+                      />
+                      <span>Sai (错误)</span>
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
+                  <label className="block text-xs font-bold text-purple-950">Đáp Án / Từ Cần Điền Tự Luận Chuẩn:</label>
+                  <input
+                    type="text"
+                    value={newListenFillAnswer}
+                    onChange={(e) => setNewListenFillAnswer(e.target.value)}
+                    placeholder="Ví dụ: 苹果 (dùng dấu | nếu có nhiều cách viết đồng nghĩa, ví dụ: 苹果|quả táo)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800"
+                  />
+                </div>
+              )}
+
+              {/* Explanation / Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Giải thích đáp án (không bắt buộc):</label>
+                <input
+                  type="text"
+                  value={newListenExplanation}
+                  onChange={(e) => setNewListenExplanation(e.target.value)}
+                  placeholder="Giải thích câu trả lời khi học sinh tra cứu kết quả..."
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs px-4 py-2.5 rounded-lg transition cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-4 h-4" /> Thêm Bài Tập Nghe
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Form Thêm Bài Tự Luận */}
+          <div className="space-y-3 pt-4 border-t border-slate-200">
+            <h4 className="font-bold text-slate-800 text-sm">Quản Lý Bài Tự Luận ({(editingExam.essayQuestions || []).length} câu)</h4>
 
             <div className="space-y-2">
               {(editingExam.essayQuestions || []).map((q, idx) => (
                 <div key={q.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
-                  <div>
+                  <div className="space-y-1">
                     <span className="font-bold text-slate-800">C{idx + 1}: {q.prompt}</span>
+                    {q.imageUrl && (
+                      <div className="mt-1">
+                        <img src={q.imageUrl} alt="Đề bài" className="h-16 rounded border border-slate-200 object-contain bg-white" />
+                      </div>
+                    )}
                     {q.suggestedAnswer && (
                       <span className="text-slate-500 block mt-0.5">Gợi ý/Đáp án mẫu: {q.suggestedAnswer}</span>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteEssayQuestion(q.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuestion(q)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                      title="Sửa câu hỏi này"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEssayQuestion(q.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      title="Xóa câu hỏi"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
             <form onSubmit={handleAddEssayQuestion} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <span className="text-xs font-bold text-slate-800 block">Soạn Bài Tự Luận / Dịch Thuật Mới:</span>
+              <span className="text-xs font-bold text-slate-800 block">Soạn Bài Tự Luận Mới:</span>
               <textarea
                 rows={2}
                 value={newEssayPrompt}
                 onChange={(e) => setNewEssayPrompt(e.target.value)}
-                placeholder="Đề bài tự luận hoặc dịch thuật (Ví dụ: Dịch câu sau sang tiếng Trung: Kế hoạch của bạn là gì?)"
+                placeholder="Đề bài tự luận (Ví dụ: Hãy viết một đoạn văn ngắn khoảng 50 từ giới thiệu về bản thân...)"
                 className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
               />
+
+              {/* Up ảnh đính kèm bài Tự luận */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Hình ảnh đính kèm đề bài (không bắt buộc):
+                </label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    type="text"
+                    value={newEssayImageUrl}
+                    onChange={(e) => setNewEssayImageUrl(e.target.value)}
+                    placeholder="Dán URL hình ảnh hoặc bấm nút bên để tải ảnh từ thiết bị ->"
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <label className="inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs px-3 py-2 rounded-lg cursor-pointer transition shrink-0">
+                    <Upload className="w-3.5 h-3.5" /> Chọn ảnh...
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEssayImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {newEssayImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setNewEssayImageUrl('')}
+                      className="px-2 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition shrink-0"
+                    >
+                      Xóa ảnh
+                    </button>
+                  )}
+                </div>
+                {newEssayImageUrl && (
+                  <div className="mt-2">
+                    <img src={newEssayImageUrl} alt="Preview" className="h-24 rounded-lg border border-slate-200 object-contain bg-white" />
+                  </div>
+                )}
+              </div>
+
               <input
                 type="text"
                 value={newEssayAnswer}
                 onChange={(e) => setNewEssayAnswer(e.target.value)}
-                placeholder="Gợi ý/Đáp án mẫu (không bắt buộc, ví dụ: 你的打算是什么？)"
+                placeholder="Gợi ý/Đáp án mẫu (không bắt buộc, ví dụ: 我叫...) "
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
               />
               <div className="flex justify-end">
@@ -1282,54 +2015,141 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </form>
           </div>
 
-          {/* Form Thêm Bài Khẩu Ngữ & Luyện Ghi Âm */}
+          {/* Form Thêm Bài Luyện Nói */}
           <div className="space-y-3 pt-4 border-t border-slate-200">
-            <h4 className="font-bold text-slate-800 text-sm">Quản Lý Bài Khẩu Ngữ & Luyện Ghi Âm ({(editingExam.speakingQuestions || []).length} câu)</h4>
+            <h4 className="font-bold text-slate-800 text-sm">Quản Lý Bài Luyện Nói ({(editingExam.speakingQuestions || []).length} câu)</h4>
 
             <div className="space-y-2">
               {(editingExam.speakingQuestions || []).map((q, idx) => (
                 <div key={q.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
-                  <div>
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-800 text-sm">C{idx + 1}: {q.prompt}</span>
-                      <button
-                        type="button"
-                        onClick={() => speakText(q.prompt)}
-                        className="p-1 rounded-full hover:bg-slate-200 text-slate-600 transition cursor-pointer"
-                        title="Nghe mẫu TTS"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </button>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                        🎙️ Luyện nói
+                      </span>
                     </div>
+                    {q.imageUrl && (
+                      <div className="mt-1">
+                        <img src={q.imageUrl} alt="Hình luyện nói" className="h-16 rounded border border-slate-200 object-contain bg-white" />
+                      </div>
+                    )}
                     {q.pinyin && <span className="text-indigo-600 font-mono block mt-0.5">Pinyin: {q.pinyin}</span>}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSpeakingQuestion(q.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuestion(q)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                      title="Sửa câu hỏi này"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSpeakingQuestion(q.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      title="Xóa câu hỏi"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
             <form onSubmit={handleAddSpeakingQuestion} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <span className="text-xs font-bold text-slate-800 block">Soạn Câu Luyện Nói / Khẩu Ngữ Mới:</span>
-              <input
-                type="text"
-                value={newSpeakingPrompt}
-                onChange={(e) => setNewSpeakingPrompt(e.target.value)}
-                placeholder="Câu tiếng Trung cần học sinh phát âm ghi âm (Ví dụ: 我最近比较忙。)"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
-              />
-              <input
-                type="text"
-                value={newSpeakingPinyin}
-                onChange={(e) => setNewSpeakingPinyin(e.target.value)}
-                placeholder="Phiên âm Pinyin (Ví dụ: Wǒ zuìjìn bǐjiào máng.)"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
-              />
+              <span className="text-xs font-bold text-slate-800 block">Soạn Bài Luyện Nói Mới:</span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Loại bài tập:</label>
+                  <select
+                    value={newSpeakingType}
+                    onChange={(e: any) => setNewSpeakingType(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="speaking">🎙️ Luyện nói (speaking)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phiên âm Pinyin (không bắt buộc):</label>
+                  <input
+                    type="text"
+                    value={newSpeakingPinyin}
+                    onChange={(e) => setNewSpeakingPinyin(e.target.value)}
+                    placeholder="Phiên âm Pinyin (Ví dụ: Wǒ zuìjìn bǐjiào máng.)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nội dung / Đề bài luyện nói:</label>
+                <input
+                  type="text"
+                  value={newSpeakingPrompt}
+                  onChange={(e) => setNewSpeakingPrompt(e.target.value)}
+                  placeholder="Ví dụ: Đọc ghi âm câu sau: 我最近比较忙。"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              {/* Up ảnh đính kèm bài Luyện nói */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Hình ảnh đính kèm đề bài (không bắt buộc):
+                </label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    type="text"
+                    value={newSpeakingImageUrl}
+                    onChange={(e) => setNewSpeakingImageUrl(e.target.value)}
+                    placeholder="Dán URL hình ảnh hoặc bấm nút bên để tải ảnh từ thiết bị ->"
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <label className="inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs px-3 py-2 rounded-lg cursor-pointer transition shrink-0">
+                    <Upload className="w-3.5 h-3.5" /> Chọn ảnh...
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSpeakingImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {newSpeakingImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setNewSpeakingImageUrl('')}
+                      className="px-2 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition shrink-0"
+                    >
+                      Xóa ảnh
+                    </button>
+                  )}
+                </div>
+                {newSpeakingImageUrl && (
+                  <div className="mt-2">
+                    <img src={newSpeakingImageUrl} alt="Preview" className="h-24 rounded-lg border border-slate-200 object-contain bg-white" />
+                  </div>
+                )}
+              </div>
+
+              {newSpeakingType === 'speaking_record' && (
+                <div>
+                  <label className="block text-xs font-bold text-rose-800 mb-1">
+                    Danh sách các từ / âm tiết cần ghi âm (cách nhau bởi dấu phẩy):
+                  </label>
+                  <input
+                    type="text"
+                    value={newSpeakingItems}
+                    onChange={(e) => setNewSpeakingItems(e.target.value)}
+                    placeholder="Ví dụ: b, p, m, f, d, t, n, l"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                  />
+                </div>
+              )}
+
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -1361,13 +2181,24 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     </div>
                     {q.suggestedAnswer && <span className="text-slate-500 block mt-0.5">Đáp án mẫu: {q.suggestedAnswer}</span>}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteTransQuestion(q.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuestion(q)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                      title="Sửa câu hỏi này"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTransQuestion(q.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                      title="Xóa câu hỏi"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1477,7 +2308,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               <div>
                 <span className="text-slate-500 block">Điểm trắc nghiệm</span>
                 <span className="font-bold text-red-700 text-sm">
-                  {selectedSub.percent}% ({selectedSub.correct}/{selectedSub.total})
+                  {selectedSub.total > 0 ? Math.round((selectedSub.correct / selectedSub.total) * 100) : (selectedSub.percent <= 1 && selectedSub.percent > 0 ? Math.round(selectedSub.percent * 100) : selectedSub.percent)}% ({selectedSub.correct}/{selectedSub.total})
                 </span>
               </div>
               <div>
@@ -1568,13 +2399,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               {selectedSub.audios && selectedSub.audios.length > 0 ? (
                 <div className="space-y-3">
                   {selectedSub.audios.map((aud, idx) => {
-                    const audioSrc = aud.url || `data:${aud.mime || 'audio/webm'};base64,${aud.data}`;
+                    const audioSrc = getAudioSrcFromObject(aud);
                     return (
                       <div key={idx} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2 shadow-2xs">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-indigo-950">{aud.label || `Ghi âm câu ${idx + 1}`}</span>
                         </div>
-                        <audio controls src={audioSrc} className="w-full h-8" />
+                        {audioSrc ? (
+                          <audio controls src={audioSrc} className="w-full h-8" />
+                        ) : (
+                          <p className="text-xs text-rose-600 font-medium">Không thể tải file âm thanh ghi âm này.</p>
+                        )}
 
                         {/* Per-audio comment input for teacher */}
                         <div className="pt-2 border-t border-indigo-100 space-y-1">
@@ -1595,36 +2430,48 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 </div>
               ) : selectedSub.driveLinks ? (
                 <div className="space-y-3 text-xs">
-                  <p className="text-slate-600 font-medium">Link file ghi âm trên Google Drive (từ Sheet):</p>
-                  {selectedSub.driveLinks.split('\n').filter(Boolean).map((link, idx) => (
-                    <div key={idx} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2">
-                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
-                        <span>File ghi âm câu {idx + 1}:</span>
-                        <a
-                          href={link.substring(link.indexOf('http'))}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 hover:underline text-indigo-700"
-                        >
-                          Mở link Drive <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
+                  <p className="text-slate-600 font-medium">File ghi âm trên Google Drive (từ Sheet):</p>
+                  {selectedSub.driveLinks.split('\n').filter(Boolean).map((link, idx) => {
+                    const rawUrl = link.substring(link.indexOf('http'));
+                    const playableUrl = getDriveAudioPlayerUrl(link);
 
-                      {/* Per-audio comment input for teacher */}
-                      <div className="pt-2 border-t border-indigo-100 space-y-1">
-                        <label className="block text-xs font-semibold text-indigo-900">
-                          🎙️ Nhận xét của giáo viên cho bài ghi âm này:
-                        </label>
-                        <input
-                          type="text"
-                          value={itemComments[`audio_${idx}`] || ''}
-                          onChange={(e) => setItemComments((prev) => ({ ...prev, [`audio_${idx}`]: e.target.value }))}
-                          placeholder="Nhập nhận xét riêng cho bài ghi âm này..."
-                          className="w-full px-3 py-1.5 border border-indigo-300 rounded-lg text-xs bg-indigo-50/50 text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                        />
+                    return (
+                      <div key={idx} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-indigo-900">
+                          <span>{link.split(':')[0] || `File ghi âm câu ${idx + 1}`}</span>
+                          {rawUrl && (
+                            <a
+                              href={rawUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 hover:underline text-indigo-700"
+                            >
+                              Mở link Drive <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Direct HTML5 Audio player for Google Drive link */}
+                        {playableUrl && (
+                          <audio controls src={playableUrl} className="w-full h-8 rounded-md" />
+                        )}
+
+                        {/* Per-audio comment input for teacher */}
+                        <div className="pt-2 border-t border-indigo-100 space-y-1">
+                          <label className="block text-xs font-semibold text-indigo-900">
+                            🎙️ Nhận xét của giáo viên cho bài ghi âm này:
+                          </label>
+                          <input
+                            type="text"
+                            value={itemComments[`audio_${idx}`] || ''}
+                            onChange={(e) => setItemComments((prev) => ({ ...prev, [`audio_${idx}`]: e.target.value }))}
+                            placeholder="Nhập nhận xét riêng cho bài ghi âm này..."
+                            className="w-full px-3 py-1.5 border border-indigo-300 rounded-lg text-xs bg-indigo-50/50 text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-xs text-slate-500 italic">Không có file ghi âm cho bài làm này.</p>
@@ -1662,6 +2509,48 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 </div>
               </div>
 
+              {/* Upload Corrected Images by Teacher */}
+              <div className="space-y-3 p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="block text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-emerald-700" />
+                    Tải Ảnh Bài Chữa / Nhận Xét Viết Tay Của Giáo Viên ({modalCorrectedImages.length} ảnh):
+                  </label>
+                  <label className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer transition shadow-xs shrink-0">
+                    <Upload className="w-3.5 h-3.5" />
+                    {isUploadingCorrected ? 'Đang nén & tải ảnh...' : 'Thêm ảnh bài chữa'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleCorrectedUploadInModal}
+                      disabled={isUploadingCorrected}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {modalCorrectedImages.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                    {modalCorrectedImages.map((imgUrl, idx) => (
+                      <div key={idx} className="relative group rounded-lg overflow-hidden border border-emerald-300 bg-slate-900 aspect-4/3">
+                        <img src={imgUrl} alt={`Corrected ${idx + 1}`} className="w-full h-full object-contain" />
+                        <button
+                          type="button"
+                          onClick={() => setModalCorrectedImages((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 p-1 bg-red-600/90 text-white rounded-full hover:bg-red-700 transition"
+                          title="Xóa ảnh chữa này"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-emerald-800 italic">Chưa có ảnh bài chữa nào được tải lên.</p>
+                )}
+              </div>
+
               {gradeSuccess && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -1686,6 +2575,54 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Chỉnh Sửa Câu Hỏi */}
+      <EditQuestionModal
+        question={editingQuestion}
+        isOpen={!!editingQuestion}
+        onClose={() => setEditingQuestion(null)}
+        onSave={handleSaveEditQuestion}
+      />
+
+      {/* Modal Soạn / Sửa Bài Chép Tay */}
+      {showCreateHwModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden my-auto p-5 space-y-4">
+            <HandwritingExerciseEditor
+              initialExercise={editingHwExercise || undefined}
+              onSave={(savedEx) => {
+                saveHandwritingExercise(savedEx);
+                if (onSaveCustomExam) {
+                  onSaveCustomExam(convertHandwritingToExamLesson(savedEx));
+                }
+                setHwExercises(getHandwritingExercises());
+                setShowCreateHwModal(false);
+                setEditingHwExercise(null);
+              }}
+              onCancel={() => {
+                setShowCreateHwModal(false);
+                setEditingHwExercise(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal Chấm Bài Chép Tay */}
+      {selectedHwSub && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden my-auto p-5 max-h-[90vh] overflow-y-auto">
+            <HandwritingGradingPanel
+              submission={selectedHwSub}
+              onGradingComplete={() => {
+                setSelectedHwSub(null);
+                loadSubmissions(passwordInput);
+              }}
+              onClose={() => setSelectedHwSub(null)}
+            />
           </div>
         </div>
       )}

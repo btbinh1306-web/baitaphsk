@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { AudioRecorder } from './AudioRecorder';
 import { AudioRecordItem, ExamLesson } from '../types';
 import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
+import { sanitizeExamSections } from '../utils/lessonParser';
+import { ExerciseRenderer } from './ExerciseRenderer';
+import { HandwritingExerciseView } from './exercises/HandwritingExerciseView';
+import { getHandwritingExercises, convertHandwritingToExamLesson } from '../services/handwritingService';
+import { loadFormDraft, useStudentFormDraft } from '../hooks/useStudentFormDraft';
 import {
   Send,
   CheckCircle2,
@@ -21,36 +26,100 @@ import {
   ChevronUp,
   Check,
   FileText,
-  HelpCircle
+  HelpCircle,
+  Headphones,
+  Layers,
+  Pencil,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface StudentExamFormProps {
   customExams?: ExamLesson[];
+  deletedExamIds?: string[];
   onSuccessNavigateToResult: (submissionId: string) => void;
 }
 
 export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   customExams = [],
+  deletedExamIds = [],
   onSuccessNavigateToResult
 }) => {
-  // Combine default sample exams with teacher custom exams
-  const allExams = [...customExams, ...SAMPLE_EXAMS.filter(s => !customExams.some(c => c.id === s.id))];
+  // Load handwriting exercises from handwritingService
+  const hwExamLessons = useMemo(() => {
+    try {
+      return getHandwritingExercises().map(convertHandwritingToExamLesson);
+    } catch (e) {
+      return [];
+    }
+  }, []);
 
-  const [studentName, setStudentName] = useState('');
-  const [studentClass, setStudentClass] = useState('');
-  const [selectedExamId, setSelectedExamId] = useState(allExams[0]?.id || 'hsk3-b1');
+  // Combine custom exams, handwriting exercises, and sample exams
+  const rawExams = useMemo(() => {
+    const list: ExamLesson[] = [...customExams];
+
+    // Add handwriting exercises if not already in customExams
+    hwExamLessons.forEach((hw) => {
+      if (!list.some((e) => e.id === hw.id)) {
+        list.push(hw);
+      }
+    });
+
+    // Add sample exams if not already in customExams
+    SAMPLE_EXAMS.forEach((s) => {
+      if (!list.some((e) => e.id === s.id)) {
+        list.push(s);
+      }
+    });
+
+    return list;
+  }, [customExams, hwExamLessons]);
+
+  const allExams = useMemo(() => {
+    return rawExams.filter(
+      (e) =>
+        !deletedExamIds.includes(e.id) &&
+        e.id !== 'hw_hsk1_b5' &&
+        !e.title.includes('HSK1 Bài 5') &&
+        !e.title.includes('HSK 1 Bài 5')
+    );
+  }, [rawExams, deletedExamIds]);
+
+  const filteredExams = allExams;
+
+  // Load draft from localStorage on initial mount
+  const initialDraft = useMemo(() => loadFormDraft(), []);
+
+  const [studentName, setStudentName] = useState(() => initialDraft?.studentName || '');
+  const [studentClass, setStudentClass] = useState(() => initialDraft?.studentClass || '');
+  const [selectedExamId, setSelectedExamId] = useState(
+    () => initialDraft?.selectedExamId || allExams[0]?.id || 'hsk3-b1'
+  );
 
   // Vocabulary lock state - per exam
-  const [vocabUnlocked, setVocabUnlocked] = useState<Record<string, boolean>>({});
+  const [vocabUnlocked, setVocabUnlocked] = useState<Record<string, boolean>>(
+    () => initialDraft?.vocabUnlocked || {}
+  );
   const [showVocabTable, setShowVocabTable] = useState(true);
 
   // Exam answers state
-  const [mcAnswers, setMcAnswers] = useState<Record<string, number>>({});
-  const [fillAnswers, setFillAnswers] = useState<Record<string, string>>({});
-  const [arrangeAnswers, setArrangeAnswers] = useState<Record<string, string[]>>({}); // ordered chips
-  const [essayAnswers, setEssayAnswers] = useState<Record<string, string>>({});
-  const [questionComments, setQuestionComments] = useState<Record<string, string>>({});
-  const [unlockedReference, setUnlockedReference] = useState<Record<string, boolean>>({});
+  const [mcAnswers, setMcAnswers] = useState<Record<string, number>>(
+    () => initialDraft?.mcAnswers || {}
+  );
+  const [fillAnswers, setFillAnswers] = useState<Record<string, string>>(
+    () => initialDraft?.fillAnswers || {}
+  );
+  const [arrangeAnswers, setArrangeAnswers] = useState<Record<string, string[]>>(
+    () => initialDraft?.arrangeAnswers || {}
+  );
+  const [essayAnswers, setEssayAnswers] = useState<Record<string, string>>(
+    () => initialDraft?.essayAnswers || {}
+  );
+  const [questionComments, setQuestionComments] = useState<Record<string, string>>(
+    () => initialDraft?.questionComments || {}
+  );
+  const [unlockedReference, setUnlockedReference] = useState<Record<string, boolean>>(
+    () => initialDraft?.unlockedReference || {}
+  );
   const [audioRecords, setAudioRecords] = useState<Record<string, AudioRecordItem>>({});
 
   // UI status
@@ -59,8 +128,45 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
 
-  const currentExam: ExamLesson =
+  // Persist form draft automatically in localStorage
+  const { clearDraft } = useStudentFormDraft(
+    {
+      studentName,
+      studentClass,
+      selectedExamId,
+      vocabUnlocked,
+      mcAnswers,
+      fillAnswers,
+      arrangeAnswers,
+      essayAnswers,
+      questionComments,
+      unlockedReference,
+    },
+    !!submittedId
+  );
+
+  const rawCurrentExam: ExamLesson =
     allExams.find((e) => e.id === selectedExamId) || allExams[0] || SAMPLE_EXAMS[0];
+
+  const currentExam: ExamLesson = useMemo(() => sanitizeExamSections(rawCurrentExam), [rawCurrentExam]);
+
+  const groupedFillQuestions = useMemo(() => {
+    if (!currentExam.fillQuestions) return [];
+    const groups: { tier: string; wordBank?: string[]; questions: typeof currentExam.fillQuestions }[] = [];
+    currentExam.fillQuestions.forEach((q) => {
+      const tierKey = q.tier || 'tier1';
+      let g = groups.find((item) => item.tier === tierKey);
+      if (!g) {
+        g = { tier: tierKey, wordBank: q.wordBank, questions: [] };
+        groups.push(g);
+      }
+      if (!g.wordBank && q.wordBank) {
+        g.wordBank = q.wordBank;
+      }
+      g.questions.push(q);
+    });
+    return groups;
+  }, [currentExam.fillQuestions]);
 
   const hasVocabList = !!(currentExam.vocabList && currentExam.vocabList.length > 0);
   // Strictly enforce: if exam has vocab list, questions MUST stay locked until user clicks "Đã học xong"
@@ -226,10 +332,54 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         });
       }
 
+      // 5. Grade Listening Questions (Nghe tích trắc nghiệm / Nghe chọn đúng sai / Nghe điền tự luận)
+      if (currentExam.listeningQuestions) {
+        currentExam.listeningQuestions.forEach((q, idx) => {
+          if (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') {
+            const userText = (fillAnswers[q.id] || '').trim();
+            if (!userText) {
+              notDoneCount++;
+            } else {
+              const acceptableList = (q.acceptableAnswers || (typeof q.answer === 'string' ? q.answer : q.suggestedAnswer) || '')
+                .split('|')
+                .map((s) => s.trim().toLowerCase().replace(/\s+/g, ''))
+                .filter(Boolean);
+              const cleanUser = userText.toLowerCase().replace(/\s+/g, '');
+              if (acceptableList.length > 0 && acceptableList.includes(cleanUser)) {
+                correctCount++;
+              } else if (acceptableList.length > 0) {
+                wrongCount++;
+                wrongDetails.push(
+                  `[Bài nghe điền C${idx + 1}: "${q.prompt}"]: Bạn điền [${userText}] — Đáp án đúng [${
+                    q.acceptableAnswers || q.answer || q.suggestedAnswer
+                  }]`
+                );
+              } else {
+                correctCount++;
+              }
+            }
+          } else {
+            const userAns = mcAnswers[q.id];
+            if (userAns === undefined) {
+              notDoneCount++;
+            } else if (userAns === q.answer) {
+              correctCount++;
+            } else {
+              wrongCount++;
+              const opts = q.options || [];
+              const userOptionText = opts[userAns] !== undefined ? opts[userAns] : `Đáp án ${userAns}`;
+              const correctOptionText = opts[q.answer as number] !== undefined ? opts[q.answer as number] : `Đáp án ${q.answer}`;
+              wrongDetails.push(`[Bài nghe C${idx + 1}: "${q.prompt}"]: Bạn chọn [${userOptionText}] — Đáp án đúng [${correctOptionText}]`);
+            }
+          }
+        });
+      }
+
       let totalMc =
         currentExam.mcQuestions.length +
         (currentExam.fillQuestions?.length || 0) +
-        (currentExam.arrangeQuestions?.length || 0);
+        (currentExam.arrangeQuestions?.length || 0) +
+        (currentExam.listeningQuestions?.length || 0);
 
       if (currentExam.readingPassages) {
         currentExam.readingPassages.forEach(p => {
@@ -309,6 +459,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
       if (res.ok && res.id) {
         setSubmittedId(res.id);
+        clearDraft();
       } else {
         setSubError(res.error || 'Nộp bài không thành công. Vui lòng thử lại.');
       }
@@ -389,21 +540,48 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Chọn bài học / Đề thi
+                Chọn bài học / Đề thi <span className="text-red-500">*</span>
               </label>
+
               <select
                 value={selectedExamId}
                 onChange={(e) => handleSelectExam(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition font-medium text-slate-800"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition font-medium text-slate-800 truncate"
               >
-                {allExams.map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    [{ex.level}] {ex.title}
-                  </option>
-                ))}
+                {filteredExams.map((ex) => {
+                  const isHw =
+                    ex.isHandwriting ||
+                    ex.type === 'handwriting_submission' ||
+                    (ex.handwritingQuestions && ex.handwritingQuestions.length > 0);
+                  const hasLevelInTitle =
+                    ex.title.toLowerCase().startsWith(ex.level.toLowerCase()) ||
+                    ex.title.startsWith('[') ||
+                    ex.title.startsWith('「');
+                  const tag = hasLevelInTitle ? '' : `[${ex.level}] `;
+                  const displayTitle = tag + ex.title;
+                  return (
+                    <option key={ex.id} value={ex.id}>
+                      {displayTitle}
+                    </option>
+                  );
+                })}
               </select>
+
+              {(currentExam.isHandwriting ||
+                currentExam.type === 'handwriting_submission' ||
+                (currentExam.handwritingQuestions && currentExam.handwritingQuestions.length > 0)) && (
+                <div className="p-2.5 bg-teal-50 border border-teal-200 rounded-lg flex items-center justify-between text-xs text-teal-900 font-medium">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Pencil className="w-4 h-4 text-teal-600 shrink-0" />
+                    Đang chọn bài tập Nộp ảnh bài viết / Chép từ mới
+                  </span>
+                  <span className="text-[10px] bg-teal-600 text-white px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
+                    Chụp Ảnh Nộp
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -419,25 +597,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </h3>
               </div>
               {isVocabDone && (
-                <button
-                  type="button"
-                  onClick={() => setShowVocabTable(!showVocabTable)}
-                  className="text-xs font-medium text-teal-800 hover:text-teal-900 flex items-center gap-1 border border-teal-300 px-2.5 py-1 rounded-lg bg-teal-50 cursor-pointer transition"
-                >
-                  {showVocabTable ? (
-                    <>
-                      <ChevronUp className="w-3.5 h-3.5" /> Thống kê từ vựng
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-3.5 h-3.5" /> Xem lại bảng từ vựng
-                    </>
-                  )}
-                </button>
+                <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                  <Lock className="w-3.5 h-3.5 text-amber-700" /> Đã ẩn vĩnh viễn trong lúc làm bài
+                </span>
               )}
             </div>
 
-            {(!isVocabDone || showVocabTable) && (
+            {!isVocabDone && (
               <div className="overflow-x-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-teal-50 text-teal-900 border-b border-slate-200 font-bold">
@@ -482,7 +648,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 max-w-xl mx-auto">
-                  Lưu ý: Sau khi bấm nút, bảng từ vựng sẽ ẩn đi để em tự kiểm tra trí nhớ bằng cách làm bài tập.
+                  Lưu ý: Sau khi bấm nút, bảng từ vựng sẽ ẩn vĩnh viễn để em tự kiểm tra trí nhớ bằng cách làm bài tập (không thể xem lại trong lúc làm bài).
                 </p>
                 <button
                   type="button"
@@ -493,11 +659,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-emerald-800 text-xs font-semibold">
+              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-emerald-800 text-xs font-semibold">
                 <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Bảng từ vựng đã ẩn. Em hãy hoàn thành bài tập bằng trí nhớ nhé!
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> Bảng từ vựng đã ẩn vĩnh viễn. Em hãy hoàn thành bài tập bằng trí nhớ nhé! (Không thể mở lại trong lúc làm bài)
                 </span>
-                <span className="text-[11px] text-emerald-700 font-normal">Sẵn sàng làm bài tập</span>
               </div>
             )}
           </div>
@@ -512,8 +677,47 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               Vui lòng xem kỹ bảng từ vựng ở trên và bấm nút "Đã học xong" để mở bài tập.
             </p>
           </div>
+        ) : currentExam.isHandwriting || currentExam.type === 'handwriting_submission' ? (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <HandwritingExerciseView
+              exercise={{
+                id: currentExam.id,
+                type: 'handwriting_submission',
+                title: currentExam.title,
+                instruction: currentExam.instruction,
+                referenceImages: currentExam.referenceImages || [],
+                createdAt: new Date().toISOString(),
+                level: currentExam.level,
+                description: currentExam.description
+              }}
+              studentName={studentName}
+              studentClass={studentClass}
+              onSubmissionComplete={(sub) => {
+                setSubmittedId(sub.id);
+              }}
+            />
+          </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-300">
+            {/* RENDER CUSTOM / IMPORTED LESSON SECTIONS (Matching, Dictation, Paragraph Order, Picture Writing, etc.) */}
+            {currentExam.sections && currentExam.sections.length > 0 && (
+              <div className="space-y-6">
+                {currentExam.sections.map((sec) => (
+                  <div key={sec.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                      <Layers className="w-5 h-5 text-indigo-600" />
+                      <h3 className="font-bold text-slate-800 text-lg">{sec.title}</h3>
+                    </div>
+                    <div className="space-y-6">
+                      {sec.items.map((item) => (
+                        <ExerciseRenderer key={item.id} item={item} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* SECTION 1: MULTIPLE CHOICE */}
             {currentExam.mcQuestions.length > 0 && (
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
@@ -532,6 +736,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 <div className="space-y-6">
                   {currentExam.mcQuestions.map((q, idx) => (
                     <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+                      {q.type && !['mc', 'multiple_choice', 'flashcard', 'vocab', 'fill', 'fill_in_blank', 'arrange', 'ordering', 'matching', 'dictation', 'paragraph_order', 'picture_writing', 'speaking_record', 'listening_multiple_choice', 'listening_true_false', 'listening', 'listening_mc', 'listening_tf', 'reading', 'passage', 'essay', 'writing', 'speaking', 'pronunciation', 'translation', 'translate', 'translate_vi_zh'].includes(q.type) && (
+                        <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 font-mono flex items-center justify-between">
+                          <span>Unsupported Exercise Type: <strong>{q.type}</strong></span>
+                          <span className="text-[10px] text-amber-700 font-sans italic">Item này được giữ lại đầy đủ</span>
+                        </div>
+                      )}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2">
                           <span className="font-bold text-teal-600 text-sm mt-0.5">Câu {idx + 1}:</span>
@@ -591,80 +801,61 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   </span>
                 </div>
 
-                {(() => {
-                  // Group fill questions by tier
-                  const groups: { tier: string; wordBank?: string[]; questions: typeof currentExam.fillQuestions }[] = [];
-                  currentExam.fillQuestions.forEach((q) => {
-                    const tierKey = q.tier || 'tier1';
-                    let g = groups.find((item) => item.tier === tierKey);
-                    if (!g) {
-                      g = { tier: tierKey, wordBank: q.wordBank, questions: [] };
-                      groups.push(g);
-                    }
-                    if (!g.wordBank && q.wordBank) {
-                      g.wordBank = q.wordBank;
-                    }
-                    g.questions.push(q);
-                  });
+                <div className="space-y-6">
+                  {groupedFillQuestions.map((group, groupIdx) => (
+                    <div key={groupIdx} className="space-y-4">
+                      {/* Group Header Badge */}
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                        <span className="text-xs font-bold text-emerald-900 bg-emerald-50 px-3 py-1 rounded-md uppercase tracking-wider border border-emerald-200">
+                          {group.tier === 'tier1' && '📌 Cấp 1: Tri thức - Điền từ vựng'}
+                          {group.tier === 'tier2' && '📌 Cấp 2: Bán giao tiếp - Ngữ pháp & Hội thoại'}
+                          {group.tier === 'tier3' && '📌 Cấp 3: Giao tiếp tự do'}
+                        </span>
+                      </div>
 
-                  return (
-                    <div className="space-y-6">
-                      {groups.map((group, groupIdx) => (
-                        <div key={groupIdx} className="space-y-4">
-                          {/* Group Header Badge */}
-                          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                            <span className="text-xs font-bold text-emerald-900 bg-emerald-50 px-3 py-1 rounded-md uppercase tracking-wider border border-emerald-200">
-                              {group.tier === 'tier1' && '📌 Cấp 1: Tri thức - Điền từ vựng'}
-                              {group.tier === 'tier2' && '📌 Cấp 2: Bán giao tiếp - Ngữ pháp & Hội thoại'}
-                              {group.tier === 'tier3' && '📌 Cấp 3: Giao tiếp tự do'}
-                            </span>
+                      {/* Prominent Word Bank Display */}
+                      {group.wordBank && group.wordBank.length > 0 && (
+                        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2">
+                          <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs uppercase tracking-wider">
+                            <Sparkles className="w-4 h-4 text-emerald-600" />
+                            <span>Bảng từ cho sẵn (Chọn từ thích hợp để điền vào câu):</span>
                           </div>
-
-                          {/* Prominent Word Bank Display */}
-                          {group.wordBank && group.wordBank.length > 0 && (
-                            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2">
-                              <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs uppercase tracking-wider">
-                                <Sparkles className="w-4 h-4 text-emerald-600" />
-                                <span>Bảng từ cho sẵn (Chọn từ thích hợp để điền vào câu):</span>
-                              </div>
-                              <div className="flex flex-wrap gap-2.5 pt-1">
-                                {group.wordBank.map((word, wIdx) => (
-                                  <span
-                                    key={wIdx}
-                                    className="px-3.5 py-1.5 bg-white border border-emerald-300 text-emerald-950 font-bold text-base rounded-lg shadow-2xs font-mono hover:scale-105 transition transform cursor-default"
-                                  >
-                                    {word}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Questions list with RESET index for Tier 2 */}
-                          <div className="space-y-3">
-                            {group.questions.map((q, qIdx) => (
-                              <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="text-sm font-semibold text-slate-800">
-                                    Câu {qIdx + 1}: {q.prompt}
-                                  </p>
-                                  {renderTierBadge(q.tier)}
-                                </div>
-                                <input
-                                  type="text"
-                                  value={fillAnswers[q.id] || ''}
-                                  onChange={(e) => handleFillChange(q.id, e.target.value)}
-                                  placeholder="Nhập câu trả lời bằng chữ Hán..."
-                                  className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                                />
-                              </div>
+                          <div className="flex flex-wrap gap-2.5 pt-1">
+                            {group.wordBank.map((word, wIdx) => (
+                              <span
+                                key={wIdx}
+                                className="px-3.5 py-1.5 bg-white border border-emerald-300 text-emerald-950 font-bold text-base rounded-lg shadow-2xs font-mono hover:scale-105 transition transform cursor-default"
+                              >
+                                {word}
+                              </span>
                             ))}
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Questions list with RESET index for Tier 2 */}
+                      <div className="space-y-3">
+                        {group.questions.map((q, qIdx) => (
+                          <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-semibold text-slate-800">
+                                Câu {qIdx + 1}: {q.prompt}
+                              </p>
+                              {renderTierBadge(q.tier)}
+                            </div>
+                            <input
+                              type="text"
+                              value={fillAnswers[q.id] || ''}
+                              onChange={(e) => handleFillChange(q.id, e.target.value)}
+                              placeholder="Nhập câu trả lời bằng chữ Hán..."
+                              className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  );
-                })()}
+                  ))}
+                </div>
               </div>
             )}
 
@@ -763,6 +954,116 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               </div>
             )}
 
+            {/* SECTION: LISTENING EXERCISES */}
+            {currentExam.listeningQuestions && currentExam.listeningQuestions.length > 0 && (
+              <div className="bg-white rounded-xl border border-indigo-200 p-5 shadow-sm space-y-5">
+                <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-900 font-bold flex items-center justify-center text-sm">
+                      🎧
+                    </span>
+                    <h3 className="font-bold text-slate-800 text-lg">Phần Luyện Nghe</h3>
+                  </div>
+                  <span className="text-xs font-medium bg-indigo-50 text-indigo-900 px-2.5 py-1 rounded-full border border-indigo-200">
+                    {currentExam.listeningQuestions.filter(q => (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') ? !!fillAnswers[q.id]?.trim() : mcAnswers[q.id] !== undefined).length}/{currentExam.listeningQuestions.length} đã làm
+                  </span>
+                </div>
+
+                <div className="space-y-6">
+                  {currentExam.listeningQuestions.map((q, idx) => {
+                    const isFillType = q.type === 'listening_fill' || q.type === 'listening_fill_in_blank';
+                    const isTfType = q.type === 'listening_tf' || q.type === 'listening_true_false';
+
+                    return (
+                      <div key={q.id} className="p-4 rounded-xl bg-indigo-50/40 border border-indigo-100 space-y-3.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2">
+                            <span className="font-bold text-indigo-700 text-sm mt-0.5">Câu nghe {idx + 1}:</span>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">{q.prompt}</p>
+                              {q.pinyin && <p className="text-xs text-indigo-600 font-mono mt-0.5">Pinyin / Phiên âm: {q.pinyin}</p>}
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                            isTfType
+                              ? 'bg-amber-100 text-amber-900'
+                              : isFillType
+                              ? 'bg-purple-100 text-purple-900'
+                              : 'bg-indigo-100 text-indigo-900'
+                          }`}>
+                            {isTfType ? 'Nghe Phán Đoán Đúng / Sai' : isFillType ? 'Nghe Điền Tự Luận' : 'Nghe Tích Trắc Nghiệm ABCD'}
+                          </span>
+                        </div>
+
+                        {/* Audio Player Component */}
+                        <div className="p-3 bg-white rounded-xl border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                          <div className="flex items-center gap-2 text-indigo-950 font-semibold text-xs shrink-0">
+                            <Volume2 className="w-4 h-4 text-indigo-600 animate-pulse" />
+                            <span>File âm thanh bài nghe:</span>
+                          </div>
+
+                          {(q.audioUrl || q.audioPromptUrl) ? (
+                            <audio controls src={q.audioUrl || q.audioPromptUrl} className="w-full sm:max-w-md h-9 rounded-md" />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => speakText(q.pinyin || q.prompt)}
+                              className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition cursor-pointer shadow-xs"
+                            >
+                              <Volume2 className="w-4 h-4" /> Bấm để phát âm thanh (Giọng đọc tự động TTS)
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Fill in blank answer input or Multiple choice / True False options */}
+                        {isFillType ? (
+                          <div className="pt-2">
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                              Nhập câu trả lời / từ điền tự luận:
+                            </label>
+                            <input
+                              type="text"
+                              value={fillAnswers[q.id] || ''}
+                              onChange={(e) => setFillAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                              placeholder="Gõ đáp án của bạn vào đây..."
+                              className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs font-medium"
+                            />
+                          </div>
+                        ) : q.options ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            {q.options.map((opt, optIdx) => {
+                              const isSelected = mcAnswers[q.id] === optIdx;
+                              return (
+                                <button
+                                  type="button"
+                                  key={optIdx}
+                                  onClick={() => handleMcSelect(q.id, optIdx)}
+                                  className={`text-left text-sm p-3 rounded-lg border transition cursor-pointer flex items-center gap-2.5 ${
+                                    isSelected
+                                      ? 'bg-indigo-50 border-indigo-500 text-indigo-950 font-bold ring-1 ring-indigo-500'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                                      isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'
+                                    }`}
+                                  >
+                                    {isSelected ? '✓' : ''}
+                                  </span>
+                                  <span>{opt}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* SECTION 4: READING PASSAGES */}
             {currentExam.readingPassages && currentExam.readingPassages.length > 0 && (
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
@@ -854,9 +1155,6 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                 <div className="space-y-4">
                   {currentExam.essayQuestions.map((q, idx) => {
-                    const userTyped = essayAnswers[q.id] && essayAnswers[q.id].trim().length > 0;
-                    const isUnlocked = unlockedReference[q.id];
-
                     return (
                       <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">
@@ -865,6 +1163,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           </p>
                         </div>
 
+                        {q.imageUrl && (
+                          <div className="my-2">
+                            <img
+                              src={q.imageUrl}
+                              alt={`Hình ảnh đề bài câu ${idx + 1}`}
+                              className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
+                            />
+                          </div>
+                        )}
+
                         <textarea
                           rows={3}
                           value={essayAnswers[q.id] || ''}
@@ -872,42 +1180,6 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           placeholder="Nhập bài viết hoặc câu tự luận tại đây..."
                           className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition"
                         />
-
-                        {/* Reference Answer Toggle */}
-                        {q.suggestedAnswer && (
-                          <div className="pt-1">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleReference(q.id)}
-                              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition cursor-pointer ${
-                                isUnlocked
-                                  ? 'bg-amber-100 border-amber-300 text-amber-900'
-                                  : userTyped
-                                  ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                                  : 'bg-slate-100 border-slate-200 text-slate-400'
-                              }`}
-                            >
-                              {isUnlocked ? (
-                                <>
-                                  <Unlock className="w-3.5 h-3.5 text-amber-700" /> Ẩn đáp án tham khảo
-                                </>
-                              ) : (
-                                <>
-                                  <Lock className="w-3.5 h-3.5 text-slate-500" /> Xem đáp án tham khảo (Viết bài trước)
-                                </>
-                              )}
-                            </button>
-
-                            {isUnlocked && (
-                              <div className="mt-2.5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
-                                <span className="font-bold uppercase text-[10px] text-amber-700 block">
-                                  Đáp án gợi ý từ giáo viên:
-                                </span>
-                                <p className="font-medium whitespace-pre-line text-sm">{q.suggestedAnswer}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -932,11 +1204,21 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                 <div className="space-y-4">
                   {currentExam.speakingQuestions.map((q, idx) => (
-                    <AudioRecorder
-                      key={q.id}
-                      label={`Câu ${idx + 1}: ${q.prompt}`}
-                      onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
-                    />
+                    <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                      {q.imageUrl && (
+                        <div className="mb-2">
+                          <img
+                            src={q.imageUrl}
+                            alt={`Hình ảnh luyện nói câu ${idx + 1}`}
+                            className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
+                          />
+                        </div>
+                      )}
+                      <AudioRecorder
+                        label={`Câu ${idx + 1}: ${q.prompt}`}
+                        onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1140,6 +1422,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   setEssayAnswers({});
                   setUnlockedReference({});
                   setAudioRecords({});
+                  clearDraft();
                 }}
                 className="w-full text-xs text-slate-500 hover:text-slate-800 py-2 transition"
               >

@@ -1,6 +1,5 @@
 import React from 'react';
-import { PenTool, Award, Search, Settings, CheckCircle2, AlertCircle } from 'lucide-react';
-import { getGasConfig } from '../services/gasService';
+import { PenTool, Award, Search, Settings } from 'lucide-react';
 
 export type TabType = 'STUDENT' | 'TEACHER' | 'LOOKUP' | 'SETUP';
 
@@ -10,11 +9,8 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
-  const config = getGasConfig();
-  const isConnected = Boolean(config.sheetUrl && config.sheetUrl.trim());
-
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+    <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 py-3">
           {/* Logo Brand */}
@@ -32,20 +28,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                 </h1>
                 <p className="text-[11px] text-slate-500 font-medium">Học tiếng Trung cùng Thanh Bình + Thanh Tùng nhé</p>
               </div>
-            </div>
-
-            {/* Status Pill on mobile */}
-            <div className="sm:hidden">
-              <button
-                type="button"
-                onClick={() => setActiveTab('SETUP')}
-                className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${
-                  isConnected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                }`}
-              >
-                {isConnected ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                {isConnected ? 'Sheet' : 'Local'}
-              </button>
             </div>
           </div>
 
@@ -90,13 +72,14 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             <button
               type="button"
               onClick={() => setActiveTab('SETUP')}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'SETUP'
-                  ? 'bg-slate-800 text-white font-bold shadow-xs'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                  ? 'bg-red-700 text-white font-bold shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
+              title="Cấu hình Google Sheet"
             >
-              <Settings className="w-4 h-4" /> Cấu Hình
+              <Settings className="w-4 h-4" /> Cấu hình Google Sheet
             </button>
           </nav>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, Pause, Trash2, CheckCircle2, AlertCircle, Volume2 } from 'lucide-react';
+import { Mic, Square, Play, Pause, Trash2, CheckCircle2, AlertCircle, Volume2, Upload, ExternalLink } from 'lucide-react';
 import { AudioRecordItem } from '../types';
 import { speakText } from '../utils/tts';
 
@@ -9,9 +9,16 @@ interface AudioRecorderProps {
   comment?: string;
   onCommentChange?: (val: string) => void;
   onAudioRecorded: (record: AudioRecordItem | null) => void;
+  showAudioSample?: boolean;
 }
 
-export const AudioRecorder: React.FC<AudioRecorderProps> = ({ label, comment, onCommentChange, onAudioRecorded }) => {
+export const AudioRecorder: React.FC<AudioRecorderProps> = ({
+  label,
+  comment,
+  onCommentChange,
+  onAudioRecorded,
+  showAudioSample = false
+}) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -37,6 +44,9 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ label, comment, on
     setRecordingTime(0);
 
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Trình duyệt không hỗ trợ MediaDevices.');
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -83,8 +93,37 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ label, comment, on
       }, 1000);
     } catch (err: any) {
       console.error('Error accessing microphone:', err);
-      setErrorMsg('Không thể mở micro. Vui lòng cho phép quyền truy cập Micro trên trình duyệt.');
+      setErrorMsg(
+        'Không thể mở micro (Do chưa cấp quyền hoặc môi trường iFrame bị giới hạn). Bạn có thể mở ở Tab Mới hoặc tải file âm thanh lên.'
+      );
     }
+  };
+
+  const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErrorMsg(null);
+    const mimeType = file.type || 'audio/webm';
+    setAudioBlob(file);
+
+    const url = URL.createObjectURL(file);
+    setAudioUrl(url);
+    setRecordingTime(0);
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = () => {
+      const base64Data = reader.result as string;
+      const base64Clean = base64Data.split(',')[1] || '';
+      onAudioRecorded({
+        label,
+        data: base64Clean,
+        mime: mimeType,
+        duration: 0,
+        url
+      });
+    };
   };
 
   const stopRecording = () => {
@@ -127,41 +166,75 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ label, comment, on
         <div>
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-800 text-sm sm:text-base">{label}</span>
-            <button
-              type="button"
-              onClick={() => speakText(label.replace(/^Câu \d+:\s*/, ''))}
-              title="Nghe mẫu phát âm"
-              className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
-            >
-              <Volume2 className="w-4 h-4" />
-            </button>
+            {showAudioSample && (
+              <button
+                type="button"
+                onClick={() => speakText(label.replace(/^Câu \d+:\s*/, ''))}
+                title="Nghe mẫu phát âm"
+                className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
+              >
+                <Volume2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
         {audioBlob && (
           <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full w-fit">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Đã ghi âm xong ({formatTime(recordingTime)})
+            <CheckCircle2 className="w-3.5 h-3.5" /> Đã ghi âm / Tải file xong {recordingTime > 0 ? `(${formatTime(recordingTime)})` : ''}
           </span>
         )}
       </div>
 
       {errorMsg && (
-        <div className="flex items-center gap-2 p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg mb-3">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="space-y-2 p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg mb-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{errorMsg}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => window.open(window.location.href, '_blank')}
+              className="inline-flex items-center gap-1 bg-white border border-rose-300 text-rose-800 px-2.5 py-1 rounded-md font-semibold text-[11px] hover:bg-rose-100 transition cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Mở ở Tab Mới
+            </button>
+            <label className="inline-flex items-center gap-1 bg-rose-600 text-white px-2.5 py-1 rounded-md font-semibold text-[11px] hover:bg-rose-700 transition cursor-pointer">
+              <Upload className="w-3.5 h-3.5" /> Tải File Âm Thanh
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={handleAudioFileUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
       )}
 
       {!audioBlob ? (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {!isRecording ? (
-            <button
-              type="button"
-              onClick={startRecording}
-              className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-sm transition cursor-pointer"
-            >
-              <Mic className="w-4 h-4 animate-pulse" />
-              Bắt đầu ghi âm
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={startRecording}
+                className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-sm transition cursor-pointer"
+              >
+                <Mic className="w-4 h-4 animate-pulse" />
+                Bắt đầu ghi âm
+              </button>
+
+              <label className="inline-flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium text-xs px-3 py-2.5 rounded-lg transition cursor-pointer">
+                <Upload className="w-3.5 h-3.5" /> Tải File Âm Thanh
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleAudioFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </>
           ) : (
             <div className="flex items-center gap-3 w-full">
               <button
@@ -201,7 +274,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ label, comment, on
           )}
 
           <div className="flex-1 text-xs text-slate-500 font-mono text-center sm:text-left">
-            Thời lượng: {formatTime(recordingTime)}
+            {recordingTime > 0 ? `Thời lượng: ${formatTime(recordingTime)}` : 'File âm thanh đã tải lên'}
           </div>
 
           <button
@@ -234,3 +307,4 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ label, comment, on
     </div>
   );
 };
+

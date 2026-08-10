@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { SubmissionData } from '../types';
-import { fetchResultById } from '../services/gasService';
+import { fetchResultById, cleanImageTagsFromText, getLocalSubmissions } from '../services/gasService';
+import { getHandwritingSubmissions } from '../services/handwritingService';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
+import { getAudioSrcFromObject, getDriveAudioPlayerUrl } from '../utils/audioUtils';
+import { ImageLightboxModal } from './ImageLightboxModal';
 import {
   Search,
   CheckCircle2,
@@ -14,7 +17,11 @@ import {
   FileText,
   Mic,
   XCircle,
-  Sparkles
+  Sparkles,
+  Eye,
+  Image as ImageIcon,
+  Pencil,
+  Download
 } from 'lucide-react';
 
 interface ResultLookupProps {
@@ -26,6 +33,125 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   const [result, setResult] = useState<SubmissionData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Lightbox Modal state
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightboxTitle, setLightboxTitle] = useState<string>('');
+
+  const openLightbox = (images: string[], index: number, titleText: string) => {
+    setLightboxImages(images);
+    setLightboxIndex(index);
+    setLightboxTitle(titleText);
+  };
+
+  const handleOpenNewTab = (url: string, title = 'Xem ảnh bài chữa') => {
+    try {
+      const win = window.open();
+      if (win) {
+        win.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${title}</title>
+              <style>
+                body { margin: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #fff; font-family: sans-serif; }
+                img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+              </style>
+            </head>
+            <body>
+              <img src="${url}" alt="Full Image" />
+            </body>
+          </html>
+        `);
+        win.document.close();
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      window.open(url, '_blank');
+    }
+  };
+
+  const getValidImages = (rawList?: string[], fallbackTextSources: (string | undefined)[] = []): string[] => {
+    const resultUrls: string[] = [];
+
+    const addUrl = (url?: string) => {
+      if (!url || typeof url !== 'string') return;
+      const trimmed = url.trim().replace(/^["'\\]+|["'\\]+$/g, '');
+      if (trimmed.length > 10 && !trimmed.startsWith('[') && !resultUrls.includes(trimmed)) {
+        resultUrls.push(trimmed);
+      }
+    };
+
+    if (Array.isArray(rawList)) {
+      rawList.forEach((url) => addUrl(url));
+    }
+
+    fallbackTextSources.forEach((text) => {
+      if (!text || typeof text !== 'string') return;
+
+      const normalizedText = text
+        .replace(/\\"/g, '"')
+        .replace(/\\\//g, '/')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r');
+
+      const tagRegex = /\[(?:SUBMISSION_IMAGES|CORRECTED_IMAGES)\]:\s*(\[.*?\])/gs;
+      let match;
+      while ((match = tagRegex.exec(normalizedText)) !== null) {
+        if (match[1]) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((item) => addUrl(item));
+            }
+          } catch (e) {
+            const strMatches = match[1].match(/"(data:image\/[^"]+|https?:\/\/[^"]+)"/g);
+            if (strMatches) {
+              strMatches.forEach((m) => addUrl(m));
+            }
+          }
+        }
+      }
+
+      const base64Regex = /data:image\/[a-zA-Z0-9]+;base64,[a-zA-Z0-9+/=]+/g;
+      const base64Matches = normalizedText.match(base64Regex);
+      if (base64Matches) {
+        base64Matches.forEach((m) => addUrl(m));
+      }
+
+      const httpRegex = /https?:\/\/[^\s"'\\]+\.(?:png|jpg|jpeg|webp|gif)/gi;
+      const httpMatches = normalizedText.match(httpRegex);
+      if (httpMatches) {
+        httpMatches.forEach((m) => addUrl(m));
+      }
+    });
+
+    return resultUrls;
+  };
+
+  const handleDownloadImage = (url: string, filename: string) => {
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Lỗi khi tải ảnh:', err);
+    }
+  };
+
+  const handleDownloadAllCorrected = () => {
+    if (!result?.correctedImages) return;
+    result.correctedImages.forEach((url, idx) => {
+      setTimeout(() => {
+        handleDownloadImage(url, `Bai_chua_${result.id || 'hsk'}_trang_${idx + 1}.png`);
+      }, idx * 300);
+    });
+  };
 
   useEffect(() => {
     if (initialSubmissionId && initialSubmissionId.trim()) {
@@ -214,9 +340,103 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     return { title, prompt, userAns, correctAns, raw };
   };
 
-  const { itemComments, generalComment } = parseTeacherComment(result?.comment);
+  const lessonLower = (result?.lesson || '').toLowerCase();
+  const essaysLower = (result?.essays || '').toLowerCase();
+
+  // Look up in local handwriting store & local submissions store for supplemental images if needed
+  const hwListSubmissions = getHandwritingSubmissions();
+  const localListSubmissions = getLocalSubmissions();
+
+  const hwMatchForLookup = result
+    ? hwListSubmissions.find(
+        (h) =>
+          String(h.id).trim().toLowerCase() === String(result.id).trim().toLowerCase() ||
+          (result.name &&
+            h.studentName.trim().toLowerCase() === result.name.trim().toLowerCase() &&
+            (h.exerciseTitle.toLowerCase().includes(lessonLower) || lessonLower.includes(h.exerciseTitle.toLowerCase())))
+      )
+    : undefined;
+
+  const localMatchForLookup = result
+    ? localListSubmissions.find(
+        (l) =>
+          String(l.id).trim().toLowerCase() === String(result.id).trim().toLowerCase() ||
+          (result.name &&
+            l.name.trim().toLowerCase() === result.name.trim().toLowerCase() &&
+            (l.lesson.toLowerCase().includes(lessonLower) || lessonLower.includes(l.lesson.toLowerCase())))
+      )
+    : undefined;
+
+  const combinedSubImages = [
+    ...(result?.submissionImages || []),
+    ...(hwMatchForLookup?.submissionImages || []),
+    ...(localMatchForLookup?.submissionImages || [])
+  ];
+
+  const combinedCorrImages = [
+    ...(result?.correctedImages || []),
+    ...(hwMatchForLookup?.correctedImages || []),
+    ...(localMatchForLookup?.correctedImages || [])
+  ];
+
+  const submissionImgs = result
+    ? getValidImages(combinedSubImages, [result.essays, result.driveLinks, localMatchForLookup?.essays])
+    : [];
+
+  const correctedImgs = result
+    ? getValidImages(combinedCorrImages, [
+        result.teacherComment,
+        result.comment,
+        hwMatchForLookup?.teacherComment,
+        localMatchForLookup?.teacherComment,
+        localMatchForLookup?.comment
+      ])
+    : [];
+
+  const isHandwritingType = Boolean(
+    result &&
+      (result.isHandwriting ||
+        submissionImgs.length > 0 ||
+        correctedImgs.length > 0 ||
+        result.type === 'handwriting_submission' ||
+        lessonLower.includes('nộp ảnh') ||
+        lessonLower.includes('chép từ') ||
+        lessonLower.includes('chép') ||
+        lessonLower.includes('chữ hán') ||
+        lessonLower.includes('bài viết') ||
+        lessonLower.includes('tự luận') ||
+        lessonLower.includes('nộp bài') ||
+        essaysLower.includes('nộp bài chép tay') ||
+        essaysLower.includes('chép từ'))
+  );
+
+  const { itemComments, generalComment } = parseTeacherComment(
+    result?.comment || hwMatchForLookup?.teacherComment || localMatchForLookup?.comment
+  );
   const essayList = parseEssays(result?.essays);
+
+  // Filter essayList to remove auto-generated placeholder strings
+  const essayListFiltered = essayList.filter((item) => {
+    const cleaned = cleanImageTagsFromText(item.answer);
+    return cleaned && cleaned.trim().length > 0;
+  });
+
   const wrongList = parseWrongDetails(result?.wrong);
+
+  const displayTeacherComment = cleanImageTagsFromText(
+    result?.teacherComment ||
+    result?.comment ||
+    hwMatchForLookup?.teacherComment ||
+    localMatchForLookup?.teacherComment ||
+    localMatchForLookup?.comment ||
+    generalComment
+  );
+
+  const displayPercent = result
+    ? (result.total > 0
+        ? Math.round((result.correct / result.total) * 100)
+        : (result.percent <= 1 && result.percent > 0 ? Math.round(result.percent * 100) : result.percent))
+    : 0;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -229,7 +449,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         <div>
           <h2 className="text-xl font-bold text-slate-800">Tra Cứu Kết Quả & Nhận Xét Bài Tập HSK</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Nhập Mã bài nộp (ID gồm 8 ký tự được cấp khi nộp bài) để xem điểm trắc nghiệm, bài làm chi tiết và nhận xét từ giáo viên.
+            Nhập Mã bài nộp (ID gồm 8 ký tự được cấp khi nộp bài) để xem điểm, bài làm tự luận/ảnh nộp và nhận xét từ giáo viên.
           </p>
         </div>
 
@@ -268,10 +488,17 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
           {/* Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <span className="text-xs font-mono font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-md border border-red-200">
-                Mã bài nộp: {result.id}
-              </span>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1.5">{result.name}</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-md border border-red-200">
+                  Mã bài nộp: {result.id}
+                </span>
+                {isHandwritingType && (
+                  <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200 flex items-center gap-1">
+                    <Pencil className="w-3.5 h-3.5 text-teal-600" /> Bài Chép Tay / Nộp Ảnh
+                  </span>
+                )}
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mt-2">{result.name}</h3>
               <p className="text-xs text-slate-500 font-medium">Lớp: {result.class} | Bài: {result.lesson}</p>
             </div>
 
@@ -288,265 +515,727 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
             </div>
           </div>
 
-          {/* Scores Overview Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Multiple Choice Card */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-slate-500 block">Điểm Phần Trắc Nghiệm</span>
-                <span className="text-2xl font-bold text-slate-800">{result.percent}%</span>
-                <span className="text-xs text-slate-500 block">
-                  Đúng {result.correct}/{result.total} câu
-                </span>
+          {/* DẠNG BÀI NỘP ẢNH / BÀI VIẾT CHÉP TAY */}
+          {isHandwritingType ? (
+            <div className="space-y-6">
+              {/* 1. Score & Grading Status Card */}
+              <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border-2 border-teal-200 rounded-2xl p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-teal-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-teal-600" />
+                    Điểm Số & Trạng Thái Đánh Giá
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-teal-950">
+                      {result.speakScore
+                        ? result.speakScore
+                        : result.status === 'Đã chấm'
+                        ? 'Đã Chấm'
+                        : 'Chờ Chấm'}
+                    </span>
+                    {result.status === 'Đã chấm' && (
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                        ✓ Đã hoàn thành
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-teal-700 font-medium">
+                    {result.status === 'Đã chấm'
+                      ? 'Bài tập nộp ảnh / chép từ mới đã được giáo viên kiểm tra và cho nhận xét'
+                      : 'Bài làm đang trong hàng đợi chờ giáo viên chấm chữa'}
+                  </p>
+                </div>
+
+                <div className="shrink-0 flex items-center justify-center w-14 h-14 bg-teal-600 text-white rounded-2xl shadow-sm">
+                  <Pencil className="w-7 h-7" />
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center text-sm shadow-2xs">
-                {result.percent}%
+
+              {/* 2. Teacher Comment Box */}
+              <div className="p-5 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-amber-900 flex items-center gap-2 uppercase tracking-wide">
+                    <MessageSquare className="w-4.5 h-4.5 text-amber-700" /> Nhận Xét Của Giáo Viên:
+                  </span>
+                  {result.status === 'Đã chấm' && (
+                    <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md border border-amber-200">
+                      Chính thức
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-semibold text-amber-950 italic leading-relaxed pl-1">
+                  {displayTeacherComment
+                    ? `"${displayTeacherComment}"`
+                    : Object.keys(itemComments).length > 0
+                    ? '"Đã có nhận xét chi tiết ở bên dưới."'
+                    : 'Giáo viên chưa nhập nhận xét chung hoặc bài tập đang chờ chấm.'}
+                </p>
               </div>
-            </div>
 
-            {/* Speaking Score Card */}
-            <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-indigo-900 block">Điểm Luyện Nói (GV chấm)</span>
-                <span className="text-2xl font-bold text-indigo-900">
-                  {result.speakScore || (result.status === 'Đã chấm' ? 'Đã duyệt' : 'Chờ chấm')}
-                </span>
-                <span className="text-xs text-indigo-700 block font-medium">Kỹ năng khẩu ngữ & phát âm</span>
-              </div>
-              <Award className="w-10 h-10 text-indigo-600 opacity-80" />
-            </div>
-          </div>
-
-          {/* General Teacher Comment Box */}
-          <div className="p-4 bg-amber-50/90 border-2 border-amber-200 rounded-xl space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide">
-                <MessageSquare className="w-4 h-4 text-amber-700" /> Nhận Xét Chung Của Giáo Viên:
-              </span>
-            </div>
-            <p className="text-sm font-semibold text-amber-950 italic leading-relaxed">
-              {generalComment
-                ? `"${generalComment}"`
-                : Object.keys(itemComments).length > 0
-                ? '"Đã có nhận xét chi tiết từng câu ở bên dưới."'
-                : 'Giáo viên chưa nhập nhận xét chung hoặc bài tập đang chờ chấm.'}
-            </p>
-          </div>
-
-          {/* Detailed Wrong Questions */}
-          {wrongList.length > 0 && (
-            <div className="space-y-3 pt-2">
-              <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wide flex items-center gap-1.5">
-                <XCircle className="w-4 h-4 text-rose-600" /> Chi Tiết Các Câu Làm Sai (Trắc nghiệm / Điền từ / Sắp xếp):
-              </h4>
-              <div className="space-y-3">
-                {wrongList.map((wrongLine, idx) => {
-                  const item = parseWrongLineItem(wrongLine);
-                  return (
-                    <div
-                      key={idx}
-                      className="p-4 bg-white border border-rose-200 rounded-xl shadow-2xs space-y-2.5"
-                    >
-                      {/* Header Badge & Title */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-100 pb-2">
-                        <span className="font-bold text-white bg-rose-600 px-2.5 py-0.5 rounded-md text-[11px] shrink-0 uppercase tracking-wide">
-                          Câu sai #{idx + 1} • {item.title}
-                        </span>
-                      </div>
-
-                      {/* Question Prompt */}
-                      {item.prompt ? (
-                        <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-lg text-sm text-slate-900 font-bold leading-snug">
-                          <span className="text-red-700 font-extrabold mr-1.5">[Câu hỏi gốc]:</span>
-                          <span>{item.prompt}</span>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-700 font-medium p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-                          {item.raw}
-                        </p>
-                      )}
-
-                      {/* Side-by-side Red & Green Answer Cards */}
-                      {(item.userAns || item.correctAns) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                          {/* Student Answer Box (Red) */}
-                          <div className="p-3 bg-rose-50/90 border border-rose-200 rounded-lg text-xs space-y-1">
-                            <span className="font-bold text-rose-800 flex items-center gap-1">
-                              <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                              Học sinh chọn / nhập:
-                            </span>
-                            <p className="font-bold text-rose-950 text-xs sm:text-sm pl-4 leading-normal">
-                              {item.userAns || 'Không chọn / Để trống'}
-                            </p>
-                          </div>
-
-                          {/* Correct Answer Box (Green) */}
-                          <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-lg text-xs space-y-1">
-                            <span className="font-bold text-emerald-800 flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              Đáp án đúng chính xác:
-                            </span>
-                            <p className="font-bold text-emerald-950 text-xs sm:text-sm pl-4 leading-normal">
-                              {item.correctAns || '—'}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+              {/* 3. Handwriting / Photo Submission Content */}
+              <div className="space-y-5 pt-2">
+                {/* Student Submitted Images */}
+                {submissionImgs.length > 0 && (
+                  <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-teal-600" />
+                        Ảnh Bài Làm Đã Nộp ({submissionImgs.length} trang):
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          submissionImgs.forEach((url, idx) => {
+                            setTimeout(() => handleOpenNewTab(url, `Bài nộp - Trang ${idx + 1}`), idx * 200);
+                          });
+                        }}
+                        className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-teal-700" /> Mở tất cả thẻ mới
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Detailed Essay Answers with Immediate Per-Item Teacher Comments */}
-          {essayList.length > 0 && (
-            <div className="space-y-3 pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-amber-600" /> Chi Tiết Bài Làm Tự Luận Của Bạn:
-                </h4>
-              </div>
-
-              <div className="space-y-4">
-                {essayList.map((item, idx) => {
-                  const teacherItemComment = itemComments[`essay_${idx}`];
-
-                  return (
-                    <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
-                      {/* Question Prompt */}
-                      <div className="flex items-start justify-between gap-2 border-b border-slate-200/80 pb-2">
-                        <span className="text-xs font-bold text-slate-800">
-                          Câu {idx + 1}: {item.prompt}
-                        </span>
-                      </div>
-
-                      {/* Student Answer */}
-                      <div className="space-y-1">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                          Bài làm của bạn:
-                        </span>
-                        <div className="p-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono whitespace-pre-wrap leading-relaxed">
-                          {item.answer || '(Chưa làm)'}
-                        </div>
-                      </div>
-
-                      {/* Immediate Teacher Comment for this Essay Question */}
-                      {teacherItemComment ? (
-                        <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg text-xs text-amber-950 space-y-1 animate-in fade-in duration-150">
-                          <span className="font-bold text-amber-900 flex items-center gap-1">
-                            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                            Nhận xét của Giáo viên cho câu này:
-                          </span>
-                          <p className="font-semibold italic text-amber-900 pl-4 border-l-2 border-amber-400">
-                            "{teacherItemComment}"
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 italic">
-                          (Chưa có nhận xét riêng cho câu này)
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Detailed Recorded Audios with Immediate Per-Item Teacher Comments */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-              <Mic className="w-4 h-4 text-indigo-600" /> Bản Ghi Âm Luyện Nói Của Bạn:
-            </h4>
-
-            {result.audios && result.audios.length > 0 ? (
-              <div className="space-y-4">
-                {result.audios.map((aud, idx) => {
-                  const audioSrc = aud.url || `data:${aud.mime || 'audio/webm'};base64,${aud.data}`;
-                  const teacherItemComment = itemComments[`audio_${idx}`];
-
-                  return (
-                    <div key={idx} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3 shadow-2xs">
-                      {/* Audio Title / Question Prompt */}
-                      <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-                        <span className="text-xs font-bold text-indigo-950">
-                          {aud.label || `Ghi âm câu ${idx + 1}`}
-                        </span>
-                      </div>
-
-                      {/* Audio Player */}
-                      <audio controls src={audioSrc} className="w-full h-9" />
-
-                      {/* Immediate Teacher Comment for this Audio Recording */}
-                      {teacherItemComment ? (
-                        <div className="p-3 bg-indigo-100/80 border-2 border-indigo-300 rounded-lg text-xs text-indigo-950 space-y-1 animate-in fade-in duration-150">
-                          <span className="font-bold text-indigo-900 flex items-center gap-1">
-                            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                            Nhận xét của Giáo viên cho bài ghi âm này:
-                          </span>
-                          <p className="font-semibold italic text-indigo-950 pl-4 border-l-2 border-indigo-400">
-                            "{teacherItemComment}"
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 italic">
-                          (Chưa có nhận xét riêng cho file ghi âm này)
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : result.driveLinks ? (
-              <div className="space-y-4">
-                <span className="text-slate-500 font-sans text-xs block font-medium">
-                  File ghi âm đã lưu trên Google Drive:
-                </span>
-                {result.driveLinks.split('\n').filter(Boolean).map((link, idx) => {
-                  const teacherItemComment = itemComments[`audio_${idx}`];
-
-                  return (
-                    <div key={idx} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-indigo-950">
-                          Ghi âm câu {idx + 1}:
-                        </span>
-                        <a
-                          href={link.substring(link.indexOf('http'))}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-indigo-700 hover:underline font-bold"
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {submissionImgs.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          className="flex flex-col rounded-xl overflow-hidden border-2 border-teal-200 bg-slate-950 shadow-sm hover:border-teal-500 transition"
                         >
-                          Mở link Google Drive <ExternalLink className="w-3 h-3" />
-                        </a>
+                          <div
+                            className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                            onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={`Submission ${idx + 1}`}
+                              className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
+                            />
+                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-slate-900/90 text-teal-300 font-extrabold text-[11px] shadow-sm border border-teal-500/40">
+                              Trang {idx + 1}
+                            </div>
+                          </div>
+
+                          <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
+                              className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-teal-600 shrink-0" /> Xem
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenNewTab(imgUrl, `Bài nộp - Trang ${idx + 1}`)}
+                              className="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold text-xs rounded-lg border border-slate-700 shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                              title="Mở ảnh bài nộp trong thẻ mới"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Thẻ mới
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadImage(imgUrl, `Bai_nop_trang_${idx + 1}.png`)}
+                              className="py-1.5 px-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                              title="Tải ảnh bài nộp về máy"
+                            >
+                              <Download className="w-3.5 h-3.5 shrink-0" /> Tải
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Teacher Corrected Images */}
+                {correctedImgs.length > 0 && (
+                  <div className="space-y-3 p-4 bg-emerald-50/90 border-2 border-emerald-300 rounded-2xl shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200 pb-2.5">
+                      <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-emerald-700" />
+                        Ảnh Bài Đã Được Giáo Viên Chấm Chữa ({correctedImgs.length} ảnh):
+                      </h4>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            correctedImgs.forEach((url, idx) => {
+                              setTimeout(() => handleOpenNewTab(url, `Ảnh bài chữa - Trang ${idx + 1}`), idx * 200);
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          title="Mở tất cả ảnh bài chữa trong các thẻ mới"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-sky-400" /> Mở tất cả thẻ mới
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            correctedImgs.forEach((url, idx) => {
+                              setTimeout(() => handleDownloadImage(url, `Bai_chua_trang_${idx + 1}.png`), idx * 300);
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Tải tất cả ({correctedImgs.length})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
+                      {correctedImgs.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          className="flex flex-col rounded-xl overflow-hidden border-2 border-emerald-400 bg-slate-950 shadow-md transition hover:border-emerald-600"
+                        >
+                          <div
+                            className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                            onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={`Corrected ${idx + 1}`}
+                              className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
+                            />
+                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-emerald-950/90 text-emerald-200 font-extrabold text-[11px] shadow-sm border border-emerald-600/50">
+                              Trang chữa {idx + 1}
+                            </div>
+                          </div>
+
+                          <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
+                              className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Phóng to
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenNewTab(imgUrl, `Ảnh bài chữa - Trang ${idx + 1}`)}
+                              className="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold text-xs rounded-lg border border-slate-700 shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                              title="Mở ảnh trong thẻ mới để xem kích thước gốc"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Thẻ mới
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadImage(imgUrl, `Bai_chua_trang_${idx + 1}.png`)}
+                              className="py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                              title="Tải ảnh bài chữa này về máy"
+                            >
+                              <Download className="w-3.5 h-3.5 shrink-0" /> Tải
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Text Essays / Topics if present */}
+                {essayListFiltered.length > 0 && (
+                  <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-amber-600" />
+                      Nội Dung Bài Làm Tự Luận:
+                    </h4>
+                    <div className="space-y-3">
+                      {essayListFiltered.map((item, idx) => {
+                        const teacherItemComment = itemComments[`essay_${idx}`];
+                        const cleanAnswer = cleanImageTagsFromText(item.answer);
+                        return (
+                          <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2">
+                            <span className="text-xs font-bold text-slate-800 block">
+                              {item.prompt}
+                            </span>
+                            {cleanAnswer && (
+                              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-mono whitespace-pre-wrap leading-relaxed">
+                                {cleanAnswer}
+                              </div>
+                            )}
+                            {teacherItemComment && (
+                              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-950 space-y-1">
+                                <span className="font-bold text-amber-900 flex items-center gap-1">
+                                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                                  Nhận xét riêng:
+                                </span>
+                                <p className="font-semibold italic text-amber-900 pl-3">
+                                  "{teacherItemComment}"
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* DẠNG BÀI TRẮC NGHIỆM / LUYỆN NÓI KẾT HỢP CHUẨN */
+            <>
+              {/* Scores Overview Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Multiple Choice Card */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 block">Điểm Phần Trắc Nghiệm</span>
+                    <span className="text-2xl font-bold text-slate-800">{displayPercent}%</span>
+                    <span className="text-xs text-slate-500 block">
+                      Đúng {result.correct}/{result.total} câu
+                    </span>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center text-sm shadow-2xs">
+                    {displayPercent}%
+                  </div>
+                </div>
+
+                {/* Speaking Score Card */}
+                <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-indigo-900 block">Điểm Luyện Nói (GV chấm)</span>
+                    <span className="text-2xl font-bold text-indigo-900">
+                      {result.speakScore || (result.status === 'Đã chấm' ? 'Đã duyệt' : 'Chờ chấm')}
+                    </span>
+                    <span className="text-xs text-indigo-700 block font-medium">Kỹ năng khẩu ngữ & phát âm</span>
+                  </div>
+                  <Award className="w-10 h-10 text-indigo-600 opacity-80" />
+                </div>
+              </div>
+
+              {/* General Teacher Comment Box */}
+              <div className="p-4 bg-amber-50/90 border-2 border-amber-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide">
+                    <MessageSquare className="w-4 h-4 text-amber-700" /> Nhận Xét Của Giáo Viên:
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-amber-950 italic leading-relaxed">
+                  {result.teacherComment || generalComment
+                    ? `"${result.teacherComment || generalComment}"`
+                    : Object.keys(itemComments).length > 0
+                    ? '"Đã có nhận xét chi tiết từng câu ở bên dưới."'
+                    : 'Giáo viên chưa nhập nhận xét chung hoặc bài tập đang chờ chấm.'}
+                </p>
+              </div>
+
+              {/* HANDWRITING SUBMISSION DETAILS / IMAGES */}
+              {(isHandwritingType || submissionImgs.length > 0 || correctedImgs.length > 0) && (
+                <div className="space-y-5 pt-3 border-t border-slate-200">
+                  {/* Student Submitted Images */}
+                  {submissionImgs.length > 0 && (
+                    <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <ImageIcon className="w-4 h-4 text-teal-600" />
+                          Ảnh Bài Làm Học Sinh Đã Nộp ({submissionImgs.length} trang):
+                        </h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              submissionImgs.forEach((url, idx) => {
+                                setTimeout(() => handleOpenNewTab(url, `Bài nộp - Trang ${idx + 1}`), idx * 200);
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            title="Mở tất cả ảnh bài nộp trong các thẻ mới"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-teal-400" /> Mở tất cả thẻ mới
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              submissionImgs.forEach((url, idx) => {
+                                setTimeout(() => handleDownloadImage(url, `Bai_nop_trang_${idx + 1}.png`), idx * 300);
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Tải tất cả ({submissionImgs.length})
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Immediate Teacher Comment for this Drive Audio */}
-                      {teacherItemComment ? (
-                        <div className="p-3 bg-indigo-100/80 border-2 border-indigo-300 rounded-lg text-xs text-indigo-950 space-y-1">
-                          <span className="font-bold text-indigo-900 flex items-center gap-1">
-                            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                            Nhận xét của Giáo viên cho bài ghi âm này:
-                          </span>
-                          <p className="font-semibold italic text-indigo-950 pl-4 border-l-2 border-indigo-400">
-                            "{teacherItemComment}"
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 italic">
-                          (Chưa có nhận xét riêng cho file ghi âm này)
-                        </div>
-                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
+                        {submissionImgs.map((imgUrl, idx) => (
+                          <div
+                            key={idx}
+                            className="flex flex-col rounded-xl overflow-hidden border-2 border-teal-200 bg-slate-950 shadow-sm hover:border-teal-500 transition"
+                          >
+                            <div
+                              className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                              onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Submission ${idx + 1}`}
+                                className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
+                              />
+                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-slate-900/90 text-teal-300 font-extrabold text-[11px] shadow-sm border border-teal-500/40">
+                                Trang {idx + 1}
+                              </div>
+                            </div>
+
+                            <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
+                                className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-teal-600 shrink-0" /> Xem
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenNewTab(imgUrl, `Bài nộp - Trang ${idx + 1}`)}
+                                className="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold text-xs rounded-lg border border-slate-700 shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Mở ảnh bài nộp trong thẻ mới"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Thẻ mới
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadImage(imgUrl, `Bai_nop_trang_${idx + 1}.png`)}
+                                className="py-1.5 px-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Tải ảnh bài nộp về máy"
+                              >
+                                <Download className="w-3.5 h-3.5 shrink-0" /> Tải
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  );
-                })}
+                  )}
+
+                  {/* Teacher Corrected Images */}
+                  {correctedImgs.length > 0 && (
+                    <div className="space-y-3 p-4 bg-emerald-50/90 border-2 border-emerald-300 rounded-2xl shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200 pb-2.5">
+                        <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-emerald-700" />
+                          Ảnh Bài Đã Được Giáo Viên Chấm Chữa ({correctedImgs.length} ảnh):
+                        </h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              correctedImgs.forEach((url, idx) => {
+                                setTimeout(() => handleOpenNewTab(url, `Ảnh bài chữa - Trang ${idx + 1}`), idx * 200);
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            title="Mở tất cả ảnh bài chữa trong các thẻ mới"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-sky-400" /> Mở tất cả thẻ mới
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              correctedImgs.forEach((url, idx) => {
+                                setTimeout(() => handleDownloadImage(url, `Bai_chua_trang_${idx + 1}.png`), idx * 300);
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Tải tất cả ({correctedImgs.length})
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
+                        {correctedImgs.map((imgUrl, idx) => (
+                          <div
+                            key={idx}
+                            className="flex flex-col rounded-xl overflow-hidden border-2 border-emerald-400 bg-slate-950 shadow-md transition hover:border-emerald-600"
+                          >
+                            <div
+                              className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                              onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Corrected ${idx + 1}`}
+                                className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
+                              />
+                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-emerald-950/90 text-emerald-200 font-extrabold text-[11px] shadow-sm border border-emerald-600/50">
+                                Trang chữa {idx + 1}
+                              </div>
+                            </div>
+
+                            <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
+                                className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Phóng to
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenNewTab(imgUrl, `Ảnh bài chữa - Trang ${idx + 1}`)}
+                                className="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold text-xs rounded-lg border border-slate-700 shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Mở ảnh trong thẻ mới để xem kích thước gốc"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Thẻ mới
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadImage(imgUrl, `Bai_chua_trang_${idx + 1}.png`)}
+                                className="py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Tải ảnh bài chữa này về máy"
+                              >
+                                <Download className="w-3.5 h-3.5 shrink-0" /> Tải
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Detailed Wrong Questions */}
+              {wrongList.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <XCircle className="w-4 h-4 text-rose-600" /> Chi Tiết Các Câu Làm Sai (Trắc nghiệm / Điền từ / Sắp xếp):
+                  </h4>
+                  <div className="space-y-3">
+                    {wrongList.map((wrongLine, idx) => {
+                      const item = parseWrongLineItem(wrongLine);
+                      return (
+                        <div
+                          key={idx}
+                          className="p-4 bg-white border border-rose-200 rounded-xl shadow-2xs space-y-2.5"
+                        >
+                          {/* Header Badge & Title */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-100 pb-2">
+                            <span className="font-bold text-white bg-rose-600 px-2.5 py-0.5 rounded-md text-[11px] shrink-0 uppercase tracking-wide">
+                              Câu sai #{idx + 1} • {item.title}
+                            </span>
+                          </div>
+
+                          {/* Question Prompt */}
+                          {item.prompt ? (
+                            <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-lg text-sm text-slate-900 font-bold leading-snug">
+                              <span className="text-red-700 font-extrabold mr-1.5">[Câu hỏi gốc]:</span>
+                              <span>{item.prompt}</span>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-700 font-medium p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                              {item.raw}
+                            </p>
+                          )}
+
+                          {/* Side-by-side Red & Green Answer Cards */}
+                          {(item.userAns || item.correctAns) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                              {/* Student Answer Box (Red) */}
+                              <div className="p-3 bg-rose-50/90 border border-rose-200 rounded-lg text-xs space-y-1">
+                                <span className="font-bold text-rose-800 flex items-center gap-1">
+                                  <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                  Học sinh chọn / nhập:
+                                </span>
+                                <p className="font-bold text-rose-950 text-xs sm:text-sm pl-4 leading-normal">
+                                  {item.userAns || 'Không chọn / Để trống'}
+                                </p>
+                              </div>
+
+                              {/* Correct Answer Box (Green) */}
+                              <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-lg text-xs space-y-1">
+                                <span className="font-bold text-emerald-800 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  Đáp án đúng chính xác:
+                                </span>
+                                <p className="font-bold text-emerald-950 text-xs sm:text-sm pl-4 leading-normal">
+                                  {item.correctAns || '—'}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Essay Answers with Immediate Per-Item Teacher Comments */}
+              {essayList.length > 0 && (
+                <div className="space-y-3 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-amber-600" /> Chi Tiết Bài Làm Tự Luận Của Bạn:
+                    </h4>
+                  </div>
+
+                  <div className="space-y-4">
+                    {essayList.map((item, idx) => {
+                      const teacherItemComment = itemComments[`essay_${idx}`];
+
+                      return (
+                        <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
+                          {/* Question Prompt */}
+                          <div className="flex items-start justify-between gap-2 border-b border-slate-200/80 pb-2">
+                            <span className="text-xs font-bold text-slate-800">
+                              Câu {idx + 1}: {item.prompt}
+                            </span>
+                          </div>
+
+                          {/* Student Answer */}
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Bài làm của bạn:
+                            </span>
+                            <div className="p-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono whitespace-pre-wrap leading-relaxed">
+                              {item.answer || '(Chưa làm)'}
+                            </div>
+                          </div>
+
+                          {/* Immediate Teacher Comment for this Essay Question */}
+                          {teacherItemComment ? (
+                            <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg text-xs text-amber-950 space-y-1 animate-in fade-in duration-150">
+                              <span className="font-bold text-amber-900 flex items-center gap-1">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                                Nhận xét của Giáo viên cho câu này:
+                              </span>
+                              <p className="font-semibold italic text-amber-900 pl-4 border-l-2 border-amber-400">
+                                "{teacherItemComment}"
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-400 italic">
+                              (Chưa có nhận xét riêng cho câu này)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Recorded Audios with Immediate Per-Item Teacher Comments */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <Mic className="w-4 h-4 text-indigo-600" /> Bản Ghi Âm Luyện Nói Của Bạn:
+                </h4>
+
+                {result.audios && result.audios.length > 0 ? (
+                  <div className="space-y-4">
+                    {result.audios.map((aud, idx) => {
+                      const audioSrc = getAudioSrcFromObject(aud);
+                      const teacherItemComment = itemComments[`audio_${idx}`];
+
+                      return (
+                        <div key={idx} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3 shadow-2xs">
+                          {/* Audio Title / Question Prompt */}
+                          <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                            <span className="text-xs font-bold text-indigo-950">
+                              {aud.label || `Ghi âm câu ${idx + 1}`}
+                            </span>
+                          </div>
+
+                          {/* Audio Player */}
+                          {audioSrc ? (
+                            <audio controls src={audioSrc} className="w-full h-9" />
+                          ) : (
+                            <p className="text-xs text-rose-600 font-medium">Không thể tải file âm thanh ghi âm này.</p>
+                          )}
+
+                          {/* Immediate Teacher Comment for this Audio Recording */}
+                          {teacherItemComment ? (
+                            <div className="p-3 bg-indigo-100/80 border-2 border-indigo-300 rounded-lg text-xs text-indigo-950 space-y-1 animate-in fade-in duration-150">
+                              <span className="font-bold text-indigo-900 flex items-center gap-1">
+                                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                                Nhận xét của Giáo viên cho bài ghi âm này:
+                              </span>
+                              <p className="font-semibold italic text-indigo-950 pl-4 border-l-2 border-indigo-400">
+                                "{teacherItemComment}"
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-400 italic">
+                              (Chưa có nhận xét riêng cho file ghi âm này)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : result.driveLinks ? (
+                  <div className="space-y-4">
+                    <span className="text-slate-500 font-sans text-xs block font-medium">
+                      File ghi âm đã lưu trên Google Drive:
+                    </span>
+                    {result.driveLinks.split('\n').filter(Boolean).map((link, idx) => {
+                      const teacherItemComment = itemComments[`audio_${idx}`];
+                      const rawUrl = link.substring(link.indexOf('http'));
+                      const playableUrl = getDriveAudioPlayerUrl(link);
+
+                      return (
+                        <div key={idx} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-indigo-950">
+                              {link.split(':')[0] || `Ghi âm câu ${idx + 1}`}
+                            </span>
+                            {rawUrl && (
+                              <a
+                                href={rawUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-indigo-700 hover:underline font-bold"
+                              >
+                                Mở link Google Drive <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+
+                          {/* HTML5 Audio Player for Drive Audio */}
+                          {playableUrl && (
+                            <audio controls src={playableUrl} className="w-full h-9 rounded-lg border border-indigo-200" />
+                          )}
+
+                          {/* Immediate Teacher Comment for this Drive Audio */}
+                          {teacherItemComment ? (
+                            <div className="p-3 bg-indigo-100/80 border-2 border-indigo-300 rounded-lg text-xs text-indigo-950 space-y-1">
+                              <span className="font-bold text-indigo-900 flex items-center gap-1">
+                                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                                Nhận xét của Giáo viên cho bài ghi âm này:
+                              </span>
+                              <p className="font-semibold italic text-indigo-950 pl-4 border-l-2 border-indigo-400">
+                                "{teacherItemComment}"
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-400 italic">
+                              (Chưa có nhận xét riêng cho file ghi âm này)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">Bài nộp này không kèm file ghi âm.</p>
+                )}
               </div>
-            ) : (
-              <p className="text-xs text-slate-500 italic">Bài nộp này không kèm file ghi âm.</p>
-            )}
-          </div>
+            </>
+          )}
         </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {lightboxIndex !== null && (
+        <ImageLightboxModal
+          images={lightboxImages}
+          initialIndex={lightboxIndex}
+          isOpen={lightboxIndex !== null}
+          onClose={() => setLightboxIndex(null)}
+          title={lightboxTitle}
+        />
       )}
     </div>
   );

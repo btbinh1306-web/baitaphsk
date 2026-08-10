@@ -2,6 +2,229 @@ import { ExamLesson } from '../types';
 
 export const SAMPLE_EXAMS: ExamLesson[] = [
   {
+    id: 'hsk1-b1-ai-xiaoyu',
+    title: 'HSK 1 - Bài 1: 小语，你好！ (Đọc câu, Nối từ, Xếp câu & Dịch thuật)',
+    level: 'HSK 1',
+    description: 'Bài tập HSK 1 Bài 1 (小语，你好！): Luyện đọc 5 câu giao tiếp, Trắc nghiệm nối chữ Hán - nghĩa Việt, Sắp xếp từ thành câu hoàn chỉnh và Kỹ năng dịch thuật Việt - Trung.',
+    vocabList: [
+      { hanzi: '大家', pinyin: 'dàjiā', type: 'Đại từ', meaning: 'Mọi người', example: '大家好！' },
+      { hanzi: '王', pinyin: 'Wáng', type: 'Họ', meaning: 'Họ Vương', example: '王老师' },
+      { hanzi: '学生', pinyin: 'xuésheng', type: 'Danh từ', meaning: 'Học sinh', example: '我是学生。' },
+      { hanzi: '老师', pinyin: 'lǎoshī', type: 'Danh từ', meaning: 'Thầy, cô giáo', example: '谢谢老师。' },
+      { hanzi: '是', pinyin: 'shì', type: 'Động từ', meaning: 'Là', example: '我是学生。' },
+      { hanzi: '们', pinyin: 'men', type: 'Hậu tố', meaning: '(Trợ từ chỉ số nhiều)', example: '同学们' }
+    ],
+    mcQuestions: [
+      {
+        id: 'hsk1_xiaoyu_mc1',
+        type: 'mc',
+        tier: 'tier1',
+        prompt: 'II. NỐI TỪ CỘT A VỚI CỘT B:\nTừ "1. 大家" (dàjiā) nối với nghĩa Tiếng Việt nào ở Cột B?',
+        pinyin: 'dàjiā',
+        options: [
+          'a. Thầy, cô giáo',
+          'b. (Trợ từ chỉ số nhiều)',
+          'c. Mọi người',
+          'd. Là',
+          'e. Học sinh',
+          'f. Họ Vương'
+        ],
+        answer: 2,
+        explanation: '1. 大家 (dàjiā) ➔ c. Mọi người'
+      },
+      {
+        id: 'hsk1_xiaoyu_mc2',
+        type: 'mc',
+        tier: 'tier1',
+        prompt: 'Từ "2. 王" (Wáng) nối với nghĩa Tiếng Việt nào ở Cột B?',
+        pinyin: 'Wáng',
+        options: [
+          'a. Thầy, cô giáo',
+          'b. (Trợ từ chỉ số nhiều)',
+          'c. Mọi người',
+          'd. Là',
+          'e. Học sinh',
+          'f. Họ Vương'
+        ],
+        answer: 5,
+        explanation: '2. 王 (Wáng) ➔ f. Họ Vương'
+      },
+      {
+        id: 'hsk1_xiaoyu_mc3',
+        type: 'mc',
+        tier: 'tier1',
+        prompt: 'Từ "3. 学生" (xuésheng) nối với nghĩa Tiếng Việt nào ở Cột B?',
+        pinyin: 'xuésheng',
+        options: [
+          'a. Thầy, cô giáo',
+          'b. (Trợ từ chỉ số nhiều)',
+          'c. Mọi người',
+          'd. Là',
+          'e. Học sinh',
+          'f. Họ Vương'
+        ],
+        answer: 4,
+        explanation: '3. 学生 (xuésheng) ➔ e. Học sinh'
+      },
+      {
+        id: 'hsk1_xiaoyu_mc4',
+        type: 'mc',
+        tier: 'tier1',
+        prompt: 'Từ "4. 老师" (lǎoshī) nối với nghĩa Tiếng Việt nào ở Cột B?',
+        pinyin: 'lǎoshī',
+        options: [
+          'a. Thầy, cô giáo',
+          'b. (Trợ từ chỉ số nhiều)',
+          'c. Mọi người',
+          'd. Là',
+          'e. Học sinh',
+          'f. Họ Vương'
+        ],
+        answer: 0,
+        explanation: '4. 老师 (lǎoshī) ➔ a. Thầy, cô giáo'
+      },
+      {
+        id: 'hsk1_xiaoyu_mc5',
+        type: 'mc',
+        tier: 'tier1',
+        prompt: 'Từ "5. 是" (shì) nối với nghĩa Tiếng Việt nào ở Cột B?',
+        pinyin: 'shì',
+        options: [
+          'a. Thầy, cô giáo',
+          'b. (Trợ từ chỉ số nhiều)',
+          'c. Mọi người',
+          'd. Là',
+          'e. Học sinh',
+          'f. Họ Vương'
+        ],
+        answer: 3,
+        explanation: '5. 是 (shì) ➔ d. Là'
+      },
+      {
+        id: 'hsk1_xiaoyu_mc6',
+        type: 'mc',
+        tier: 'tier1',
+        prompt: 'Từ "6. 们" (men) nối với nghĩa Tiếng Việt nào ở Cột B?',
+        pinyin: 'men',
+        options: [
+          'a. Thầy, cô giáo',
+          'b. (Trợ từ chỉ số nhiều)',
+          'c. Mọi người',
+          'd. Là',
+          'e. Học sinh',
+          'f. Họ Vương'
+        ],
+        answer: 1,
+        explanation: '6. 们 (men) ➔ b. (Trợ từ chỉ số nhiều)'
+      }
+    ],
+    arrangeQuestions: [
+      {
+        id: 'hsk1_xiaoyu_arr1',
+        type: 'arrange',
+        tier: 'tier2',
+        prompt: 'III. SẮP XẾP CÂU 1: 是 / 我 / 学生',
+        pinyin: 'Sắp xếp các từ sau thành câu hoàn chỉnh và thêm dấu câu',
+        wordChips: ['我', '是', '学生', '。'],
+        acceptableAnswers: '我是学生。|我是学生',
+        explanation: 'Đáp án: 我是学生。 (Tôi là học sinh.)'
+      },
+      {
+        id: 'hsk1_xiaoyu_arr2',
+        type: 'arrange',
+        tier: 'tier2',
+        prompt: 'III. SẮP XẾP CÂU 2: 老师 / 谢谢 / 王',
+        pinyin: 'Sắp xếp các từ sau thành câu hoàn chỉnh và thêm dấu câu',
+        wordChips: ['谢谢', '王', '老师', '。'],
+        acceptableAnswers: '谢谢王老师。|谢谢王老师',
+        explanation: 'Đáp án: 谢谢王老师。 (Cảm ơn thầy/cô Vương.)'
+      },
+      {
+        id: 'hsk1_xiaoyu_arr3',
+        type: 'arrange',
+        tier: 'tier2',
+        prompt: 'III. SẮP XẾP CÂU 3: 好 / 同学 / 们 / 大家',
+        pinyin: 'Sắp xếp các từ sau thành câu hoàn chỉnh và thêm dấu câu',
+        wordChips: ['同学们', '，', '大家好', '！'],
+        acceptableAnswers: '同学们，大家好！|大家好，同学们好！|同学们大家好！|大家好同学们好！|同学们,大家好！',
+        explanation: 'Đáp án: 同学们，大家好！ (Chào các bạn học sinh, chào mọi người!)'
+      },
+      {
+        id: 'hsk1_xiaoyu_arr4',
+        type: 'arrange',
+        tier: 'tier2',
+        prompt: 'III. SẮP XẾP CÂU 4: 不是 / 我 / 老师 / ， / 学生 / 是 / 我',
+        pinyin: 'Sắp xếp các từ sau thành câu hoàn chỉnh và thêm dấu câu',
+        wordChips: ['我', '不是', '老师', '，', '我', '是', '学生', '。'],
+        acceptableAnswers: '我不是老师，我是学生。|我不是老师, 我是学生。|我不是老师,我是学生|我不是老师，我是学生',
+        explanation: 'Đáp án: 我不是老师，我是学生。 (Tôi không phải là thầy giáo, tôi là học sinh.)'
+      }
+    ],
+    essayQuestions: [
+      {
+        id: 'hsk1_xiaoyu_tr1',
+        type: 'essay',
+        tier: 'tier3',
+        prompt: 'IV. KỸ NĂNG DỊCH (VIỆT - TRUNG)\nCâu 1: "Chào mọi người, tôi là học sinh."',
+        pinyin: 'Dịch sang chữ Hán',
+        suggestedAnswer: '大家好，我是学生。'
+      },
+      {
+        id: 'hsk1_xiaoyu_tr2',
+        type: 'essay',
+        tier: 'tier3',
+        prompt: 'Câu 2: "A: Cảm ơn thầy Vương! B: Đừng khách sáo!"',
+        pinyin: 'Dịch câu hội thoại sang chữ Hán',
+        suggestedAnswer: 'A: 谢谢王老师！ B: 不客气！ (Hoặc 谢谢王老师！不客气！)'
+      },
+      {
+        id: 'hsk1_xiaoyu_tr3',
+        type: 'essay',
+        tier: 'tier3',
+        prompt: 'Câu 3: "Các số: Sáu, Bảy, Tám, Chín, Mười."',
+        pinyin: 'Dịch các số sang chữ Hán',
+        suggestedAnswer: '六、七、八、九、十'
+      }
+    ],
+    speakingQuestions: [
+      {
+        id: 'hsk1_xiaoyu_spk1',
+        type: 'speaking',
+        tier: 'tier1',
+        prompt: 'I. ĐỌC CÂU (Luyện phát âm & ghi âm)\nCâu 1: "大家好！"',
+        pinyin: 'Dàjiā hǎo!'
+      },
+      {
+        id: 'hsk1_xiaoyu_spk2',
+        type: 'speaking',
+        tier: 'tier1',
+        prompt: 'Câu 2: "我是学生。"',
+        pinyin: 'Wǒ shì xuésheng.'
+      },
+      {
+        id: 'hsk1_xiaoyu_spk3',
+        type: 'speaking',
+        tier: 'tier1',
+        prompt: 'Câu 3: "谢谢老师。"',
+        pinyin: 'Xièxie lǎoshī.'
+      },
+      {
+        id: 'hsk1_xiaoyu_spk4',
+        type: 'speaking',
+        tier: 'tier1',
+        prompt: 'Câu 4: "不客气。"',
+        pinyin: 'Bú kèqi.'
+      },
+      {
+        id: 'hsk1_xiaoyu_spk5',
+        type: 'speaking',
+        tier: 'tier1',
+        prompt: 'Câu 5: "再见！"',
+        pinyin: 'Zàijiàn!'
+      }
+    ]
+  },
+  {
     id: 'hsk3-b1',
     title: 'HSK 3 - Bài 1: 周末你有什么打算？ (Dự định cuối tuần & Ôn tập toàn diện)',
     level: 'HSK 3',
@@ -206,6 +429,29 @@ export const SAMPLE_EXAMS: ExamLesson[] = [
         wordChips: ['吗', '一起', '你', '去', '跟', '？', '我', '能'],
         acceptableAnswers: '你能跟我一起去吗？|我能跟你一起去吗？',
         explanation: 'Đáp án đúng: 你能跟我一起去吗？'
+      }
+    ],
+    listeningQuestions: [
+      {
+        id: 'l1',
+        type: 'listening_mc',
+        tier: 'tier2',
+        prompt: 'Nghe đoạn âm thanh sau và chọn đáp án đúng nhất:',
+        pinyin: 'Zhè ge zhōumò nǐ yǒu shénme dǎsuàn?',
+        options: ['A. Mua sắm', 'B. Đi du lịch', 'C. Ở nhà làm bài tập', 'D. Xem phim'],
+        answer: 1,
+        explanation: 'Nội dung nghe: "这个周末 em 打算去北京旅游。" -> Đáp án B.',
+        audioPromptUrl: 'https://actions.google.com/sounds/v1/speech/person_speaking.ogg'
+      },
+      {
+        id: 'l2',
+        type: 'listening_tf',
+        tier: 'tier2',
+        prompt: 'Nghe câu sau và cho biết nhận định dưới đây là Đúng hay Sai: "Bạn nhỏ đã làm xong tất cả bài tập về nhà."',
+        pinyin: 'Nǐ zuòyè xiě wán le ma?',
+        options: ['Đúng (正确)', 'Sai (错误)'],
+        answer: 1,
+        explanation: 'Nội dung nghe: "我作业还没写完呢。" -> Chọn Sai (错误).'
       }
     ],
     readingPassages: [
@@ -507,6 +753,130 @@ export const SAMPLE_EXAMS: ExamLesson[] = [
         tier: 'tier3',
         prompt: 'Đọc ghi âm bài hội thoại: "左边那个苹果是我的，右边那个是你的。"',
         pinyin: 'Zuǒbiān nà gè píngguǒ shì wǒ de, yòubiān nà gè shì nǐ de.'
+      }
+    ]
+  },
+  {
+    id: 'hsk1-b1-phatam',
+    title: 'HSK 1 - Bài 1: Luyện Phát Âm (Thanh Mẫu, Vận Mẫu & Từ Đơn)',
+    level: 'HSK 1',
+    description: 'Bài luyện phát âm HSK 1 gồm các câu ghi âm thanh mẫu, vận mẫu, từ đơn, trắc nghiệm phát âm và phán đoán đúng sai.',
+    mcQuestions: [],
+    essayQuestions: [],
+    speakingQuestions: [
+      { id: 'tm_b', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: b', pinyin: 'b' },
+      { id: 'tm_p', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: p', pinyin: 'p' },
+      { id: 'tm_m', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: m', pinyin: 'm' },
+      { id: 'tm_f', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: f', pinyin: 'f' },
+      { id: 'tm_d', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: d', pinyin: 'd' },
+      { id: 'tm_t', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: t', pinyin: 't' },
+      { id: 'tm_n', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: n', pinyin: 'n' },
+      { id: 'tm_l', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: l', pinyin: 'l' },
+      { id: 'tm_g', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: g', pinyin: 'g' },
+      { id: 'tm_k', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: k', pinyin: 'k' },
+      { id: 'tm_h', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: h', pinyin: 'h' },
+      { id: 'tm_j', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: j', pinyin: 'j' },
+      { id: 'tm_q', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: q', pinyin: 'q' },
+      { id: 'tm_x', type: 'speaking_record', tier: 'tier3', prompt: 'Thanh mẫu: x', pinyin: 'x' },
+      { id: 'vm_a', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: a', pinyin: 'a' },
+      { id: 'vm_o', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: o', pinyin: 'o' },
+      { id: 'vm_e', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: e', pinyin: 'e' },
+      { id: 'vm_i', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: i', pinyin: 'i' },
+      { id: 'vm_u', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: u', pinyin: 'u' },
+      { id: 'vm_ai', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: ai', pinyin: 'ai' },
+      { id: 'vm_iao', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: iao', pinyin: 'iao' },
+      { id: 'vm_er', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: er', pinyin: 'er' },
+      { id: 'vm_v', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: ü', pinyin: 'ü' },
+      { id: 'vm_ei', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: ei', pinyin: 'ei' },
+      { id: 'vm_ao', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: ao', pinyin: 'ao' },
+      { id: 'vm_ia', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: ia', pinyin: 'ia' },
+      { id: 'vm_ie', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: ie', pinyin: 'ie' },
+      { id: 'vm_ua', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: ua', pinyin: 'ua' },
+      { id: 'vm_uo', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: uo', pinyin: 'uo' },
+      { id: 'vm_ue', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: üe', pinyin: 'üe' },
+      { id: 'vm_uai', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: uai', pinyin: 'uai' },
+      { id: 'vm_uei', type: 'speaking_record', tier: 'tier3', prompt: 'Vận mẫu: uei', pinyin: 'uei' },
+      { id: 'td_fei', type: 'speaking_record', tier: 'tier3', prompt: 'Từ đơn: fēi', pinyin: 'fēi' },
+      { id: 'td_hao', type: 'speaking_record', tier: 'tier3', prompt: 'Từ đơn: hǎo', pinyin: 'hǎo' },
+      { id: 'td_jia', type: 'speaking_record', tier: 'tier3', prompt: 'Từ đơn: jiā', pinyin: 'jiā' },
+      { id: 'td_yue', "type": 'speaking_record', tier: 'tier3', prompt: 'Từ đơn: yuè', pinyin: 'yuè' },
+      { id: 'td_shui', type: 'speaking_record', tier: 'tier3', prompt: 'Từ đơn: shuǐ', pinyin: 'shuǐ' }
+    ],
+    listeningQuestions: [
+      {
+        id: 'mc_1',
+        type: 'listening_multiple_choice',
+        tier: 'tier2',
+        prompt: 'Nghe và chọn cách phát âm đúng:',
+        options: ['tuī', 'duī'],
+        answer: 0,
+        explanation: 'Đáp án đúng là tuī'
+      },
+      {
+        id: 'mc_2',
+        type: 'listening_multiple_choice',
+        tier: 'tier2',
+        prompt: 'Nghe và chọn thanh điệu đúng:',
+        options: ['gē', 'gé', 'gě', 'gè'],
+        answer: 0,
+        explanation: 'Đáp án đúng là gē (thanh 1)'
+      },
+      {
+        id: 'mc_3',
+        type: 'listening_multiple_choice',
+        tier: 'tier2',
+        prompt: 'Nghe và chọn âm đúng:',
+        options: ['qǐ', 'qì', 'jǐ', 'jì'],
+        answer: 0,
+        explanation: 'Đáp án đúng là qǐ'
+      },
+      {
+        id: 'mc_4',
+        type: 'listening_multiple_choice',
+        tier: 'tier2',
+        prompt: 'Nghe và chọn thanh điệu đúng:',
+        options: ['māi', 'mái', 'mǎi', 'mài'],
+        answer: 3,
+        explanation: 'Đáp án đúng là mài (thanh 4)'
+      },
+      {
+        id: 'tf_1',
+        type: 'listening_true_false',
+        tier: 'tier2',
+        prompt: 'Từ vừa đọc có phải là: nǎ ?',
+        options: ['Đúng (正确)', 'Sai (错误)'],
+        answer: 0,
+        explanation: 'Đúng, phát âm là nǎ.'
+      },
+      {
+        id: 'tf_2',
+        type: 'listening_true_false',
+        tier: 'tier2',
+        prompt: 'Từ vừa đọc có phải là: bái ?',
+        options: ['Đúng (正确)', 'Sai (错误)'],
+        answer: 1,
+        explanation: 'Sai, phát âm không phải là bái.'
+      }
+    ]
+  },
+  {
+    id: 'hw_chep_tu_moi_chung',
+    title: 'Nộp bài chép từ mới chữ Hán',
+    level: 'HSK 1',
+    description: 'Dạng bài: Nộp ảnh bài chép từ mới chữ Hán',
+    type: 'handwriting_submission',
+    isHandwriting: true,
+    instruction: 'Chụp ảnh vở chép từ mới chữ Hán và nộp tại đây. Học sinh vui lòng ghi rõ tên bài / từ mới đã chép ở ô bên dưới.',
+    referenceImages: [],
+    mcQuestions: [],
+    essayQuestions: [],
+    speakingQuestions: [],
+    handwritingQuestions: [
+      {
+        id: 'hw_q_chep_tu_moi_chung',
+        type: 'handwriting_submission',
+        prompt: 'Nộp bài chép từ mới chữ Hán',
+        instruction: 'Chụp ảnh vở chép từ mới chữ Hán và nộp tại đây. Học sinh vui lòng ghi rõ tên bài / từ mới đã chép ở ô bên dưới.'
       }
     ]
   }

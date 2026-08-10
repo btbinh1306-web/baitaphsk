@@ -1,0 +1,143 @@
+{
+  "version": "1.0",
+  "lesson": {
+    "id": "hsk1_bai1_phat_am",
+    "title": "Bài Phát Âm 1 - HSK 1",
+    "level": "HSK 1",
+    "description": "Luyện tập thanh mẫu, vận mẫu, từ đơn, trắc nghiệm phát âm và phán đoán đúng sai."
+  },
+  "sections": [
+    {
+      "id": "sec_thanh_mau",
+      "title": "1. Bài Tập Ghi Âm Thanh Mẫu",
+      "type": "speaking",
+      "items": [
+        { "id": "tm_b", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: b", "pinyin": "b" } },
+        { "id": "tm_p", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: p", "pinyin": "p" } },
+        { "id": "tm_m", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: m", "pinyin": "m" } },
+        { "id": "tm_f", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: f", "pinyin": "f" } },
+        { "id": "tm_d", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: d", "pinyin": "d" } },
+        { "id": "tm_t", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: t", "pinyin": "t" } },
+        { "id": "tm_n", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: n", "pinyin": "n" } },
+        { "id": "tm_l", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: l", "pinyin": "l" } },
+        { "id": "tm_g", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: g", "pinyin": "g" } },
+        { "id": "tm_k", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: k", "pinyin": "k" } },
+        { "id": "tm_h", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: h", "pinyin": "h" } },
+        { "id": "tm_j", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: j", "pinyin": "j" } },
+        { "id": "tm_q", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: q", "pinyin": "q" } },
+        { "id": "tm_x", "type": "speaking_record", "data": { "prompt": "Thanh mẫu: x", "pinyin": "x" } }
+      ]
+    },
+    {
+      "id": "sec_van_mau",
+      "title": "2. Bài Tập Ghi Âm Vận Mẫu",
+      "type": "speaking",
+      "items": [
+        { "id": "vm_a", "type": "speaking_record", "data": { "prompt": "Vận mẫu: a", "pinyin": "a" } },
+        { "id": "vm_o", "type": "speaking_record", "data": { "prompt": "Vận mẫu: o", "pinyin": "o" } },
+        { "id": "vm_e", "type": "speaking_record", "data": { "prompt": "Vận mẫu: e", "pinyin": "e" } },
+        { "id": "vm_i", "type": "speaking_record", "data": { "prompt": "Vận mẫu: i", "pinyin": "i" } },
+        { "id": "vm_u", "type": "speaking_record", "data": { "prompt": "Vận mẫu: u", "pinyin": "u" } },
+        { "id": "vm_ai", "type": "speaking_record", "data": { "prompt": "Vận mẫu: ai", "pinyin": "ai" } },
+        { "id": "vm_iao", "type": "speaking_record", "data": { "prompt": "Vận mẫu: iao", "pinyin": "iao" } },
+        { "id": "vm_er", "type": "speaking_record", "data": { "prompt": "Vận mẫu: er", "pinyin": "er" } },
+        { "id": "vm_v", "type": "speaking_record", "data": { "prompt": "Vận mẫu: ü", "pinyin": "ü" } },
+        { "id": "vm_ei", "type": "speaking_record", "data": { "prompt": "Vận mẫu: ei", "pinyin": "ei" } },
+        { "id": "vm_ao", "type": "speaking_record", "data": { "prompt": "Vận mẫu: ao", "pinyin": "ao" } },
+        { "id": "vm_ia", "type": "speaking_record", "data": { "prompt": "Vận mẫu: ia", "pinyin": "ia" } },
+        { "id": "vm_ie", "type": "speaking_record", "data": { "prompt": "Vận mẫu: ie", "pinyin": "ie" } },
+        { "id": "vm_ua", "type": "speaking_record", "data": { "prompt": "Vận mẫu: ua", "pinyin": "ua" } },
+        { "id": "vm_uo", "type": "speaking_record", "data": { "prompt": "Vận mẫu: uo", "pinyin": "uo" } },
+        { "id": "vm_ue", "type": "speaking_record", "data": { "prompt": "Vận mẫu: üe", "pinyin": "üe" } },
+        { "id": "vm_uai", "type": "speaking_record", "data": { "prompt": "Vận mẫu: uai", "pinyin": "uai" } },
+        { "id": "vm_uei", "type": "speaking_record", "data": { "prompt": "Vận mẫu: uei", "pinyin": "uei" } }
+      ]
+    },
+    {
+      "id": "sec_tu_don",
+      "title": "3. Bài Tập Ghi Âm Từ Đơn",
+      "type": "speaking",
+      "items": [
+        { "id": "td_fei", "type": "speaking_record", "data": { "prompt": "Từ đơn: fēi", "pinyin": "fēi" } },
+        { "id": "td_hao", "type": "speaking_record", "data": { "prompt": "Từ đơn: hǎo", "pinyin": "hǎo" } },
+        { "id": "td_jia", "type": "speaking_record", "data": { "prompt": "Từ đơn: jiā", "pinyin": "jiā" } },
+        { "id": "td_yue", "type": "speaking_record", "data": { "prompt": "Từ đơn: yuè", "pinyin": "yuè" } },
+        { "id": "td_shui", "type": "speaking_record", "data": { "prompt": "Từ đơn: shuǐ", "pinyin": "shuǐ" } }
+      ]
+    },
+    {
+      "id": "sec_trac_nghiem",
+      "title": "4. Trắc Nghiệm Nghe & Chọn Phát Âm / Thanh Điệu",
+      "type": "listening",
+      "items": [
+        {
+          "id": "mc_1",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Nghe và chọn cách phát âm đúng:",
+            "options": ["tuī", "duī"],
+            "answer": 0,
+            "explanation": "Đáp án đúng là tuī"
+          }
+        },
+        {
+          "id": "mc_2",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Nghe và chọn thanh điệu đúng:",
+            "options": ["gē", "gé", "gě", "gè"],
+            "answer": 0,
+            "explanation": "Đáp án đúng là gē (thanh 1)"
+          }
+        },
+        {
+          "id": "mc_3",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Nghe và chọn âm đúng:",
+            "options": ["qǐ", "qì", "jǐ", "jì"],
+            "answer": 0,
+            "explanation": "Đáp án đúng là qǐ"
+          }
+        },
+        {
+          "id": "mc_4",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Nghe và chọn thanh điệu đúng:",
+            "options": ["māi", "mái", "mǎi", "mài"],
+            "answer": 3,
+            "explanation": "Đáp án đúng là mài (thanh 4)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sec_dung_sai",
+      "title": "5. Nghe & Phán Đoán Đúng / Sai",
+      "type": "listening",
+      "items": [
+        {
+          "id": "tf_1",
+          "type": "listening_tf",
+          "data": {
+            "prompt": "Từ vừa đọc có phải là: nǎ ?",
+            "options": ["Đúng (正确)", "Sai (错误)"],
+            "answer": 0,
+            "explanation": "Đúng, từ vừa đọc là nǎ."
+          }
+        },
+        {
+          "id": "tf_2",
+          "type": "listening_tf",
+          "data": {
+            "prompt": "Từ vừa đọc có phải là: bái ?",
+            "options": ["Đúng (正确)", "Sai (错误)"],
+            "answer": 1,
+            "explanation": "Sai, phát âm vừa đọc không phải là bái."
+          }
+        }
+      ]
+    }
+  ]
+}

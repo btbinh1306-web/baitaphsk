@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getGasConfig, saveGasConfig } from '../services/gasService';
-import { Settings, Copy, Check, Link2, Key, Database, Play, AlertCircle, HelpCircle, Code2, Server } from 'lucide-react';
+import { Settings, Copy, Check, Link2, Key, Database, Play, AlertCircle, HelpCircle, Code2, Server, Lock, Unlock } from 'lucide-react';
 
 const APPS_SCRIPT_CODE = `// ==== CẤU HÌNH ====
 var DRIVE_FOLDER_ID = "DÁN_ID_THƯ_MỤC_DRIVE";   // thư mục lưu ghi âm
@@ -86,11 +86,33 @@ export const GasSetupModal: React.FC = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
 
+  // Authentication state
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   useEffect(() => {
     const conf = getGasConfig();
     setSheetUrl(conf.sheetUrl || '');
     setTeacherPass(conf.teacherPass || 'tbtt123');
   }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    const conf = getGasConfig();
+    const currentPass = conf.teacherPass || 'tbtt123';
+    if (!passwordInput.trim()) {
+      setAuthError('Vui lòng nhập mật khẩu giáo viên');
+      return;
+    }
+    if (passwordInput.trim() === currentPass) {
+      setIsAuthenticated(true);
+      setPasswordInput('');
+    } else {
+      setAuthError('Mật khẩu giáo viên không chính xác. Vui lòng thử lại.');
+    }
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +157,52 @@ export const GasSetupModal: React.FC = () => {
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-md mx-auto my-12 bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+        <div className="text-center space-y-3">
+          <div className="w-14 h-14 bg-red-50 text-red-700 rounded-2xl flex items-center justify-center mx-auto border border-red-100">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Cấu Hình Google Sheet</h2>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Khu vực này dành riêng cho giáo viên. Vui lòng nhập mật khẩu giáo viên để truy cập.
+          </p>
+        </div>
+
+        <form onSubmit={handleLogin} className="mt-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Mật khẩu giáo viên
+            </label>
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="Nhập mật khẩu..."
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500 font-mono"
+              autoFocus
+            />
+          </div>
+
+          {authError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-sm cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Unlock className="w-4 h-4" /> Mở Cấu Hình
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -149,7 +217,7 @@ export const GasSetupModal: React.FC = () => {
           </p>
         </div>
 
-        <div className="shrink-0">
+        <div className="flex items-center gap-3">
           {sheetUrl ? (
             <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full">
               <Server className="w-3.5 h-3.5" /> Đã kết nối Google Sheet
@@ -159,6 +227,15 @@ export const GasSetupModal: React.FC = () => {
               <Database className="w-3.5 h-3.5" /> Chế độ dùng thử (Lưu Local)
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={() => setIsAuthenticated(false)}
+            className="text-xs font-semibold text-slate-500 hover:text-red-700 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
+            title="Khóa cấu hình"
+          >
+            <Lock className="w-3.5 h-3.5" /> Khóa
+          </button>
         </div>
       </div>
 
@@ -312,6 +389,17 @@ export const GasSetupModal: React.FC = () => {
               </li>
               <li>Copy liên kết Web App dạng <code className="bg-slate-200 text-red-700 px-1 py-0.5 rounded font-mono">.../exec</code> dán vào ô Cấu hình ở trên.</li>
             </ol>
+          </div>
+
+          {/* Drive Audio Note */}
+          <div className="p-4 bg-teal-50/80 border border-teal-200 rounded-xl space-y-2">
+            <h4 className="font-bold text-teal-900 text-sm flex items-center gap-1.5">
+              🎙️ Lưu trữ File Nghe & Bài Ghi Âm Luyện Nói Trên Google Drive:
+            </h4>
+            <ul className="list-disc list-inside text-xs text-teal-800 space-y-1 leading-relaxed">
+              <li><b>Bài làm ghi âm học sinh:</b> Mọi bài ghi âm nói của học sinh sẽ tự động được tải lên thư mục Google Drive của giáo viên và tạo liên kết nghe trực tiếp.</li>
+              <li><b>File âm thanh bài nghe của giáo viên:</b> Bạn chỉ cần tải file `.mp3` lên Google Drive, bật chia sẻ <i>"Bất kỳ ai có liên kết đều xem được"</i> rồi dán link Drive vào phần Sửa Cấu Hỏi / Tạo Bài Học. Hệ thống sẽ tự động phát trực tiếp trên mọi thiết bị và máy tính!</li>
+            </ul>
           </div>
         </div>
       </div>

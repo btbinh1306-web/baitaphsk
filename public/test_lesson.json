@@ -1,0 +1,93 @@
+{
+  "version": "1.0",
+  "lesson": {
+    "id": "lesson_test_4_types",
+    "title": "Bài kiểm tra 4 dạng bài tập mới",
+    "level": "HSK 3",
+    "description": "Bài học minh họa bao gồm 4 dạng bài tập mới: Matching, Dictation, Paragraph Order, Picture Writing."
+  },
+  "sections": [
+    {
+      "id": "sec_matching",
+      "title": "1. Bài tập Nối từ (Matching)",
+      "items": [
+        {
+          "id": "match_01",
+          "type": "matching",
+          "data": {
+            "instruction": "Nối từ tiếng Trung với nghĩa tiếng Việt tương ứng",
+            "left": ["老师", "学生", "苹果", "医生"],
+            "right": ["Học sinh", "Giáo viên", "Bác sĩ", "Quả táo"],
+            "answer": [
+              [0, 1],
+              [1, 0],
+              [2, 3],
+              [3, 2]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sec_dictation",
+      "title": "2. Bài tập Nghe & Chính tả (Dictation)",
+      "items": [
+        {
+          "id": "dict_01",
+          "type": "dictation",
+          "data": {
+            "instruction": "Nghe câu tiếng Trung và gõ lại chính xác",
+            "audio": "",
+            "answer": "我是学生",
+            "ignoreSpace": true,
+            "ignorePunctuation": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "sec_paragraph_order",
+      "title": "3. Bài tập Sắp xếp đoạn văn (Paragraph Order)",
+      "items": [
+        {
+          "id": "porder_01",
+          "type": "paragraph_order",
+          "data": {
+            "instruction": "Sắp xếp các đoạn văn theo thứ tự thời gian hợp lý",
+            "paragraphs": [
+              {
+                "id": "A",
+                "text": "今天星期天，天气很好。"
+              },
+              {
+                "id": "B",
+                "text": "早上八点, 我和朋友一起去公园。"
+              },
+              {
+                "id": "C",
+                "text": "下午 we 看了一部很有趣的电影。"
+              }
+            ],
+            "answer": ["A", "B", "C"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sec_picture_writing",
+      "title": "4. Bài tập Viết theo tranh (Picture Writing)",
+      "items": [
+        {
+          "id": "picwrite_01",
+          "type": "picture_writing",
+          "data": {
+            "instruction": "Quan sát bức tranh và viết câu miêu tả thích hợp",
+            "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80",
+            "minLength": 8,
+            "sample": "这是一个苹果，颜色红红的，非常甜。"
+          }
+        }
+      ]
+    }
+  ]
+}
