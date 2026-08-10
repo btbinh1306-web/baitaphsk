@@ -1,82 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getGasConfig, saveGasConfig } from '../services/gasService';
 import { Settings, Copy, Check, Link2, Key, Database, Play, AlertCircle, HelpCircle, Code2, Server, Lock, Unlock } from 'lucide-react';
+import appsScriptCode from '../../google-apps-script/Code.gs?raw';
 
-const APPS_SCRIPT_CODE = `// ==== CẤU HÌNH ====
-var DRIVE_FOLDER_ID = "DÁN_ID_THƯ_MỤC_DRIVE";   // thư mục lưu ghi âm
-var GV_PASSWORD     = "tbtt123";                  // mật khẩu giáo viên (đổi tùy ý)
-
-function sheet_(){ return SpreadsheetApp.getActiveSpreadsheet().getActiveSheet(); }
-var HEADERS = ["ID","Thời gian","Họ tên","Lớp","Bài","Số câu đúng","Đã làm","Tổng","Phần trăm",
-               "Số câu sai","Chưa làm","Chi tiết câu sai","Bài tự luận","Link ghi âm",
-               "Điểm nói (GV)","Nhận xét (GV)","Trạng thái"];
-
-function ensureHeader_(sh){ if(sh.getLastRow()===0) sh.appendRow(HEADERS); }
-
-// ---- Học sinh NỘP bài ----
-function doPost(e){
-  var sh = sheet_(); ensureHeader_(sh);
-  var d = JSON.parse(e.postData.contents);
-
-  if(d.action === "grade"){ return gradeSubmission_(sh, d); }  // giáo viên chấm
-
-  // lưu các file ghi âm (mảng base64) vào Drive
-  var links = [];
-  if(d.audios && d.audios.length && DRIVE_FOLDER_ID && DRIVE_FOLDER_ID.indexOf("DÁN")<0){
-    var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-    d.audios.forEach(function(a,i){
-      try{
-        var bytes = Utilities.base64Decode(a.data);
-        var blob = Utilities.newBlob(bytes, a.mime||"audio/webm", (d.name||"hs")+"_"+(i+1)+".webm");
-        var f = folder.createFile(blob);
-        f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        links.push((a.label||("Câu "+(i+1)))+": "+f.getUrl());
-      }catch(err){ links.push("(lỗi lưu ghi âm "+(i+1)+")"); }
-    });
-  }
-  var id = Utilities.getUuid().slice(0,8);
-  sh.appendRow([id, d.time, d.name, d.class, d.lesson, d.correct, d.done, d.total,
-                d.percent+"%", d.wrongCount, d.notDone, d.wrong, d.essays,
-                links.join("\\n"), "", "", "Chờ chấm"]);
-  return json_({ok:true, id:id});
-}
-
-// ---- Giáo viên hoặc Học sinh ĐỌC dữ liệu ----
-function doGet(e){
-  var sh = sheet_(); ensureHeader_(sh);
-  var p = e.parameter;
-  var rows = sh.getDataRange().getValues();
-  var head = rows.shift();
-
-  if(p.mode === "teacher"){
-    if(p.pass !== GV_PASSWORD) return json_({ok:false, error:"Sai mật khẩu"});
-    var list = rows.map(function(r){ var o={}; head.forEach(function(h,i){o[h]=r[i];}); return o; });
-    return json_({ok:true, rows:list});
-  }
-  if(p.mode === "result"){   // học sinh xem kết quả theo ID
-    var found = null;
-    rows.forEach(function(r){ if(String(r[0])===String(p.id)){ var o={}; head.forEach(function(h,i){o[h]=r[i];}); found=o; } });
-    return json_(found ? {ok:true, row:found} : {ok:false, error:"Không tìm thấy mã này"});
-  }
-  return json_({ok:true, msg:"HSK submit endpoint"});
-}
-
-// ---- Giáo viên chấm: ghi điểm nói + nhận xét theo ID ----
-function gradeSubmission_(sh, d){
-  if(d.pass !== GV_PASSWORD) return json_({ok:false, error:"Sai mật khẩu"});
-  var rows = sh.getDataRange().getValues();
-  for(var i=1;i<rows.length;i++){
-    if(String(rows[i][0])===String(d.id)){
-      sh.getRange(i+1, 15).setValue(d.speakScore||"");  // cột "Điểm nói (GV)"
-      sh.getRange(i+1, 16).setValue(d.comment||"");      // cột "Nhận xét (GV)"
-      sh.getRange(i+1, 17).setValue("Đã chấm");          // cột "Trạng thái"
-      return json_({ok:true});
-    }
-  }
-  return json_({ok:false, error:"Không tìm thấy ID"});
-}
-
-function json_(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }`;
+const APPS_SCRIPT_CODE = appsScriptCode;
 
 export const GasSetupModal: React.FC = () => {
   const [sheetUrl, setSheetUrl] = useState('');
@@ -327,12 +254,13 @@ export const GasSetupModal: React.FC = () => {
         <div className="space-y-4 text-sm text-slate-700 leading-relaxed">
           {/* Step 1 */}
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-            <h4 className="font-bold text-slate-900 text-sm">Bước 1 — Tạo Google Sheet & Thư mục Google Drive</h4>
+            <h4 className="font-bold text-slate-900 text-sm">Bước 1 — Chuẩn bị Google Sheet & 2 thư mục Drive</h4>
             <ol className="list-decimal list-inside text-xs text-slate-600 space-y-1">
               <li>Tạo 1 Google Sheet mới (Đặt tên ví dụ: "HSK - Nộp Bài").</li>
-              <li>Tạo 1 thư mục trên Google Drive (Đặt tên ví dụ: "HSK - Ghi Âm").</li>
+              <li>Dùng thư mục <b>HSK_BAITAP</b> để lưu ảnh/audio học sinh nộp.</li>
+              <li>Dùng thư mục <b>HSK_SOANBAI</b> để lưu bài soạn và media bài tập.</li>
               <li>
-                Mở thư mục Drive, copy <b>ID thư mục</b> trong URL (phần sau <code className="bg-slate-200 px-1 py-0.5 rounded text-red-700 font-mono">folders/</code>).
+                Hai ID thư mục đã được điền sẵn trong mã Apps Script bên dưới.
               </li>
             </ol>
           </div>
@@ -362,7 +290,7 @@ export const GasSetupModal: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-500">
-              * Nhớ thay dòng <code className="bg-amber-100 text-amber-900 px-1 rounded font-mono">DRIVE_FOLDER_ID</code> thành ID thư mục Drive ở Bước 1 và đặt <code className="bg-amber-100 text-amber-900 px-1 rounded font-mono">GV_PASSWORD</code>.
+              * Mã đã cấu hình sẵn hai thư mục bạn cung cấp. Chỉ cần kiểm tra <code className="bg-amber-100 text-amber-900 px-1 rounded font-mono">GV_PASSWORD</code> rồi triển khai.
             </p>
 
             <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl text-xs font-mono max-h-48 overflow-y-auto overflow-x-auto leading-relaxed border border-slate-800">
@@ -398,7 +326,7 @@ export const GasSetupModal: React.FC = () => {
             </h4>
             <ul className="list-disc list-inside text-xs text-teal-800 space-y-1 leading-relaxed">
               <li><b>Bài làm ghi âm học sinh:</b> Mọi bài ghi âm nói của học sinh sẽ tự động được tải lên thư mục Google Drive của giáo viên và tạo liên kết nghe trực tiếp.</li>
-              <li><b>File âm thanh bài nghe của giáo viên:</b> Bạn chỉ cần tải file `.mp3` lên Google Drive, bật chia sẻ <i>"Bất kỳ ai có liên kết đều xem được"</i> rồi dán link Drive vào phần Sửa Cấu Hỏi / Tạo Bài Học. Hệ thống sẽ tự động phát trực tiếp trên mọi thiết bị và máy tính!</li>
+              <li><b>File âm thanh/ảnh bài tập của giáo viên:</b> Tải trực tiếp trong giao diện soạn bài; hệ thống tự lưu vào HSK_SOANBAI và học sinh mở bài sẽ xem/nghe được.</li>
             </ul>
           </div>
         </div>

@@ -58,7 +58,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
       const newImages: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const compressed = await fileToCompressedDataUrl(files[i]);
-        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type);
+        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type, 'correction');
         newImages.push(uploadedUrl || compressed);
       }
       setCorrectedImages((prev) => [...prev, ...newImages]);
@@ -83,6 +83,13 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
       correctedImages,
       teacherComment
     );
+    const updatedForCallback: HandwritingSubmission = updated || {
+      ...submission,
+      status: 'graded',
+      correctedImages,
+      teacherComment,
+      gradedAt: new Date().toLocaleString('vi-VN')
+    };
 
     // Sync grade to Google Sheet if configured
     const config = getGasConfig();
@@ -103,9 +110,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
 
     setTimeout(() => {
       setSaveSuccess(false);
-      if (updated) {
-        onGradingComplete(updated);
-      }
+      onGradingComplete(updatedForCallback);
     }, 800);
   };
 

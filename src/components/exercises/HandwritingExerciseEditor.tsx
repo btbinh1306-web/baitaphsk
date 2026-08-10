@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { HandwritingExercise } from '../../types/handwriting';
 import { fileToCompressedDataUrl } from '../../utils/imageUtils';
+import { uploadMediaFile } from '../../services/apiService';
 import { ImageLightboxModal } from '../ImageLightboxModal';
 import { Upload, X, Plus, Eye, Save, Sparkles, Image as ImageIcon, FileText } from 'lucide-react';
 
 interface HandwritingExerciseEditorProps {
   initialExercise?: HandwritingExercise;
-  onSave: (exercise: HandwritingExercise) => void;
+  onSave: (exercise: HandwritingExercise) => void | Promise<void>;
   onCancel?: () => void;
 }
 
@@ -23,6 +24,7 @@ export const HandwritingExerciseEditor: React.FC<HandwritingExerciseEditorProps>
     initialExercise?.referenceImages || []
   );
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,7 +36,8 @@ export const HandwritingExerciseEditor: React.FC<HandwritingExerciseEditorProps>
       const newImages: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const compressed = await fileToCompressedDataUrl(files[i]);
-        newImages.push(compressed);
+        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type);
+        newImages.push(uploadedUrl || compressed);
       }
       setReferenceImages((prev) => [...prev, ...newImages]);
     } catch (err) {
@@ -50,7 +53,7 @@ export const HandwritingExerciseEditor: React.FC<HandwritingExerciseEditorProps>
     setReferenceImages((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       alert('Vui lòng nhập Tên bài / Nội dung bài.');
@@ -68,7 +71,12 @@ export const HandwritingExerciseEditor: React.FC<HandwritingExerciseEditorProps>
       description: 'Dạng bài: Nộp ảnh bài viết'
     };
 
-    onSave(exercise);
+    setIsSaving(true);
+    try {
+      await onSave(exercise);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -184,7 +192,7 @@ export const HandwritingExerciseEditor: React.FC<HandwritingExerciseEditorProps>
               multiple
               onChange={handleImageUpload}
               className="hidden"
-              disabled={isUploading}
+              disabled={isUploading || isSaving}
             />
           </label>
         </div>
@@ -202,11 +210,11 @@ export const HandwritingExerciseEditor: React.FC<HandwritingExerciseEditorProps>
           )}
           <button
             type="submit"
-            disabled={isUploading}
+            disabled={isUploading || isSaving}
             className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm rounded-xl transition shadow-sm flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            Lưu bài tập
+            {isSaving ? 'Đang lưu...' : 'Lưu bài tập'}
           </button>
         </div>
       </form>

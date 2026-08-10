@@ -1,12 +1,15 @@
-import { SubmissionData, GasConfig, TeacherGradePayload } from '../types';
+import { AudioRecordItem, SubmissionData, GasConfig, TeacherGradePayload } from '../types';
 import { safeSetLocalStorage } from '../utils/storageUtils';
 import { getHandwritingSubmissions, saveHandwritingSubmission } from './handwritingService';
 import {
   saveServerSubmission,
   fetchServerSubmissions,
   fetchServerSubmissionById,
-  gradeServerSubmission
+  gradeServerSubmission,
+  uploadMediaFile
 } from './apiService';
+import { DEFAULT_GAS_WEB_APP_URL } from './gasConfig';
+import { clearGasCapabilitiesCache, getGasCapabilities } from './gasCloudService';
 
 const DEFAULT_CONFIG_KEY = 'hsk_gas_config';
 const LOCAL_SUBMISSIONS_KEY = 'hsk_local_submissions_v1';
@@ -21,7 +24,7 @@ export const getGasConfig = (): GasConfig => {
     console.warn('Failed to parse GasConfig from localStorage', e);
   }
   return {
-    sheetUrl: ((import.meta as any).env?.VITE_GAS_SHEET_URL as string) || '',
+    sheetUrl: ((import.meta as any).env?.VITE_GAS_SHEET_URL as string) || DEFAULT_GAS_WEB_APP_URL,
     teacherPass: 'tbtt123'
   };
 };
@@ -29,6 +32,7 @@ export const getGasConfig = (): GasConfig => {
 export const saveGasConfig = (config: GasConfig): void => {
   try {
     localStorage.setItem(DEFAULT_CONFIG_KEY, JSON.stringify(config));
+    clearGasCapabilitiesCache();
   } catch (e) {
     console.warn('Failed to save GAS config:', e);
   }
@@ -134,7 +138,7 @@ export const getLocalSubmissions = (): SubmissionData[] => {
   return [];
 };
 
-export const saveLocalSubmission = (sub: SubmissionData): void => {
+export const saveLocalSubmission = (sub: SubmissionData, syncServer = true): void => {
   const current = getLocalSubmissions();
   // Check if exists, update or prepend
   const idx = current.findIndex((item) => item.id === sub.id);
@@ -146,7 +150,7 @@ export const saveLocalSubmission = (sub: SubmissionData): void => {
   safeSetLocalStorage(LOCAL_SUBMISSIONS_KEY, current);
 
   // Sync with server DB for cross-device access
-  saveServerSubmission(sub);
+  if (syncServer) void saveServerSubmission(sub);
 };
 
 /**
@@ -161,6 +165,21 @@ export const submitToGas = async (
   const config = getGasConfig();
   const localId = Math.random().toString(36).substring(2, 10);
   const fullTime = new Date().toLocaleString('vi-VN');
+  const gasCapabilities = await getGasCapabilities();
+  const gasMediaEnabled = Boolean(gasCapabilities?.media);
+
+  const serverAudios: AudioRecordItem[] = await Promise.all(
+    (payload.audios || []).map(async (audio) => {
+      if (!gasMediaEnabled || !audio.data) return audio;
+      const dataUrl = audio.data.startsWith('data:')
+        ? audio.data
+        : `data:${audio.mime || 'audio/webm'};base64,${audio.data}`;
+      const uploadedUrl = await uploadMediaFile(dataUrl, undefined, audio.mime, 'submission');
+      return uploadedUrl && !uploadedUrl.startsWith('/api/')
+        ? { ...audio, data: '', url: uploadedUrl }
+        : audio;
+    })
+  );
 
   let essaysFormatted = payload.essays || '';
   if (payload.submissionImages && payload.submissionImages.length > 0) {
@@ -184,7 +203,7 @@ export const submitToGas = async (
     notDone: payload.notDone,
     wrong: payload.wrong,
     essays: essaysFormatted,
-    audios: payload.audios,
+    audios: serverAudios,
     submissionImages: payload.submissionImages,
     isHandwriting: payload.isHandwriting || (payload.submissionImages && payload.submissionImages.length > 0),
     speakScore: '',
@@ -193,7 +212,8 @@ export const submitToGas = async (
   };
 
   // Always save locally so it works even offline or without configured URL
-  saveLocalSubmission(newSubRecord);
+  saveLocalSubmission(newSubRecord, false);
+  await saveServerSubmission(newSubRecord);
 
   if (!config.sheetUrl || config.sheetUrl.trim() === '') {
     // Return local submission ID with success
@@ -218,7 +238,8 @@ export const submitToGas = async (
       notDone: payload.notDone,
       wrong: payload.wrong,
       essays: essaysFormatted,
-      audios: payload.audios || []
+      audios: gasMediaEnabled ? serverAudios : (payload.audios || []),
+      submissionImages: payload.submissionImages || []
     };
 
     const res = await fetch(config.sheetUrl.trim(), {
@@ -234,7 +255,8 @@ export const submitToGas = async (
       if (data.id) {
         // Update local ID if server assigned a different one
         newSubRecord.id = String(data.id);
-        saveLocalSubmission(newSubRecord);
+        saveLocalSubmission(newSubRecord, false);
+        await saveServerSubmission(newSubRecord);
       }
       return { ok: true, id: data.id || localId };
     } else {
@@ -266,6 +288,14 @@ export const fetchTeacherSubmissions = async (
   // 1. Fetch server database submissions
   const serverSubs = await fetchServerSubmissions();
   const localSubs = getLocalSubmissions();
+
+  // Migrate older local-only submissions without replacing newer server records.
+  const serverSubmissionIds = new Set(serverSubs.map((sub) => sub.id));
+  await Promise.all(
+    localSubs
+      .filter((sub) => !serverSubmissionIds.has(sub.id))
+      .map((sub) => saveServerSubmission(sub))
+  );
 
   const subMap = new Map<string, SubmissionData>();
   localSubs.forEach((s) => subMap.set(s.id, s));
@@ -345,6 +375,25 @@ export const fetchResultById = async (
   // Try local first
   const locals = getLocalSubmissions();
   let localMatch = locals.find((item) => String(item.id).trim().toLowerCase() === id.trim().toLowerCase());
+
+  const serverMatch = await fetchServerSubmissionById(id.trim());
+  if (serverMatch) {
+    localMatch = {
+      ...serverMatch,
+      audios: serverMatch.audios || localMatch?.audios,
+      submissionImages: Array.from(new Set([
+        ...(serverMatch.submissionImages || []),
+        ...(localMatch?.submissionImages || [])
+      ])),
+      correctedImages: Array.from(new Set([
+        ...(serverMatch.correctedImages || []),
+        ...(localMatch?.correctedImages || [])
+      ])),
+      comment: serverMatch.comment || localMatch?.comment,
+      teacherComment: serverMatch.teacherComment || localMatch?.teacherComment,
+      exerciseId: serverMatch.exerciseId || localMatch?.exerciseId
+    };
+  }
 
   const hwList = getHandwritingSubmissions();
   const hwMatch = hwList.find((item) => String(item.id).trim().toLowerCase() === id.trim().toLowerCase());
@@ -507,7 +556,7 @@ export const gradeSubmissionInGas = async (
     found.teacherComment = cleanCommentStr;
     found.correctedImages = imagesToSave;
     found.status = 'Đã chấm';
-    saveLocalSubmission(found);
+    saveLocalSubmission(found, false);
   }
 
   // Also update handwriting submission if exists
@@ -519,6 +568,18 @@ export const gradeSubmissionInGas = async (
     foundHw.correctedImages = imagesToSave;
     foundHw.gradedAt = new Date().toLocaleString('vi-VN');
     saveHandwritingSubmission(foundHw);
+  }
+
+  const serverGrade = await gradeServerSubmission({
+    id,
+    speakScore: String(speakScore),
+    comment: cleanCommentStr,
+    teacherComment: cleanCommentStr,
+    correctedImages: imagesToSave
+  });
+
+  if (!serverGrade.ok && !config.sheetUrl.trim()) {
+    return { ok: false, error: 'Không thể đồng bộ điểm và ảnh chữa lên máy chủ' };
   }
 
   if (!config.sheetUrl || config.sheetUrl.trim() === '') {

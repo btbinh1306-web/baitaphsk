@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { fetchTeacherSubmissions, gradeSubmissionInGas, getGasConfig } from '../services/gasService';
@@ -18,7 +18,11 @@ import {
   getHandwritingSubmissions,
   convertHandwritingToExamLesson
 } from '../services/handwritingService';
-import { uploadMediaFile } from '../services/apiService';
+import {
+  uploadMediaFile,
+  fetchServerHandwritingExercises,
+  saveServerHandwritingExercise
+} from '../services/apiService';
 import {
   Lock,
   Unlock,
@@ -73,6 +77,33 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [selectedHwSub, setSelectedHwSub] = useState<HandwritingSubmission | null>(null);
   const [editingHwExercise, setEditingHwExercise] = useState<HandwritingExercise | null>(null);
   const [showCreateHwModal, setShowCreateHwModal] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncHandwritingExercises = async () => {
+      const localExercises = getHandwritingExercises();
+      const serverExercises = await fetchServerHandwritingExercises();
+      const serverIds = new Set(serverExercises.map((exercise) => exercise.id));
+
+      await Promise.all(
+        localExercises
+          .filter((exercise) => !serverIds.has(exercise.id))
+          .map((exercise) => saveServerHandwritingExercise(exercise))
+      );
+
+      if (cancelled) return;
+      setHwExercises((current) => {
+        const merged = new Map(current.map((exercise) => [exercise.id, exercise]));
+        serverExercises.forEach((exercise) => merged.set(exercise.id, exercise));
+        return Array.from(merged.values());
+      });
+    };
+
+    void syncHandwritingExercises();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [submissions, setSubmissions] = useState<SubmissionData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -415,7 +446,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       const newImgs: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const compressed = await fileToCompressedDataUrl(files[i]);
-        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type);
+        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type, 'correction');
         newImgs.push(uploadedUrl || compressed);
       }
       setModalCorrectedImages((prev) => [...prev, ...newImgs]);
@@ -494,13 +525,13 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   };
 
   // Save changes to current exam
-  const handleSaveExamChanges = () => {
+  const handleSaveExamChanges = async () => {
     if (!editingExam.title) {
       alert('Vui lòng nhập Tên bài thi');
       return;
     }
     if (onSaveCustomExam) {
-      onSaveCustomExam(editingExam);
+      await onSaveCustomExam(editingExam);
       alert(`Đã lưu thành công bài thi: "${editingExam.title}"! Học sinh có thể làm bài ngay.`);
     }
   };
@@ -2593,10 +2624,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden my-auto p-5 space-y-4">
             <HandwritingExerciseEditor
               initialExercise={editingHwExercise || undefined}
-              onSave={(savedEx) => {
+              onSave={async (savedEx) => {
                 saveHandwritingExercise(savedEx);
+                await saveServerHandwritingExercise(savedEx);
                 if (onSaveCustomExam) {
-                  onSaveCustomExam(convertHandwritingToExamLesson(savedEx));
+                  await onSaveCustomExam(convertHandwritingToExamLesson(savedEx));
                 }
                 setHwExercises(getHandwritingExercises());
                 setShowCreateHwModal(false);

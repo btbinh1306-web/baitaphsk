@@ -5,7 +5,7 @@
 /**
  * Converts Google Drive view links or raw audio links to playable/embeddable streaming URLs.
  * Example Google Drive link: https://drive.google.com/file/d/1ABC123XYZ/view?usp=sharing
- * Playable output: https://lh3.googleusercontent.com/d/1ABC123XYZ
+ * Playable output: https://drive.google.com/uc?export=download&id=1ABC123XYZ
  */
 export const getDriveAudioPlayerUrl = (rawLink: string): string => {
   if (!rawLink) return '';
@@ -18,7 +18,7 @@ export const getDriveAudioPlayerUrl = (rawLink: string): string => {
 
   // If raw string is directly a Google Drive File ID (25-60 chars alphanumeric)
   if (/^[a-zA-Z0-9_-]{25,60}$/.test(trimmed)) {
-    return `https://lh3.googleusercontent.com/d/${trimmed}`;
+    return `https://drive.google.com/uc?export=download&id=${trimmed}`;
   }
 
   // Extract URL from string if embedded in text like "Câu 1: https://..."
@@ -30,7 +30,7 @@ export const getDriveAudioPlayerUrl = (rawLink: string): string => {
   if (idMatch) {
     const fileId = idMatch[1] || idMatch[2];
     if (fileId) {
-      return `https://lh3.googleusercontent.com/d/${fileId}`;
+      return `https://drive.google.com/uc?export=download&id=${fileId}`;
     }
   }
 

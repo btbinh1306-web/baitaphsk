@@ -55,6 +55,14 @@ export default function App() {
       localExams.forEach((e) => examMap.set(e.id, e));
       serverExams.forEach((e) => examMap.set(e.id, sanitizeExamSections(e)));
 
+      // Migrate older local-only exams without overwriting server versions.
+      const serverExamIds = new Set(serverExams.map((exam) => exam.id));
+      await Promise.all(
+        localExams
+          .filter((exam) => !serverExamIds.has(exam.id))
+          .map((exam) => saveServerCustomExam(exam))
+      );
+
       const mergedExams = Array.from(examMap.values());
       const mergedDeleted = Array.from(new Set([...serverDeleted, ...localDeleted]));
 
@@ -76,7 +84,7 @@ export default function App() {
     const newExam = sanitizeExamSections(rawExam);
 
     // Save to server
-    saveServerCustomExam(newExam);
+    await saveServerCustomExam(newExam);
 
     setCustomExams((prev) => {
       const idx = prev.findIndex((e) => e.id === newExam.id);
@@ -107,7 +115,7 @@ export default function App() {
 
   // Delete custom exam handler
   const handleDeleteCustomExam = async (examId: string) => {
-    deleteServerCustomExam(examId);
+    await deleteServerCustomExam(examId);
 
     setCustomExams((prev) => {
       const updated = prev.filter((e) => e.id !== examId);

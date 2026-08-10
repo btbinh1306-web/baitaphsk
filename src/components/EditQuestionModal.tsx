@@ -3,6 +3,7 @@ import { X, Save, Edit2, Volume2, Upload, Trash2, Image as ImageIcon, Link as Li
 import { Question } from '../types';
 import { speakText } from '../utils/tts';
 import { getDriveAudioPlayerUrl } from '../utils/audioUtils';
+import { uploadMediaFile } from '../services/apiService';
 
 interface EditQuestionModalProps {
   question: Question | null;
@@ -49,6 +50,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
   const [audioUrl, setAudioUrl] = useState<string>(question.audioUrl || question.audioPromptUrl || '');
   const [imageUrl, setImageUrl] = useState<string>(question.imageUrl || '');
   const [explanation, setExplanation] = useState<string>(question.explanation || '');
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   useEffect(() => {
     if (question) {
@@ -71,30 +73,54 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
     }
   }, [question]);
 
-  const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const base64Audio = uploadEvent.target?.result as string;
-      setAudioUrl(base64Audio);
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingMedia(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const uploadedUrl = await uploadMediaFile(dataUrl, file.name, file.type);
+      setAudioUrl(uploadedUrl || dataUrl);
+    } catch (err) {
+      console.error('Could not upload audio:', err);
+      alert('Không thể đọc file audio. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingMedia(false);
+      e.target.value = '';
+    }
   };
 
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const base64Img = uploadEvent.target?.result as string;
-      setImageUrl(base64Img);
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingMedia(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const uploadedUrl = await uploadMediaFile(dataUrl, file.name, file.type);
+      setImageUrl(uploadedUrl || dataUrl);
+    } catch (err) {
+      console.error('Could not upload image:', err);
+      alert('Không thể đọc file ảnh. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingMedia(false);
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploadingMedia) {
+      alert('Vui lòng chờ tải file hoàn tất.');
+      return;
+    }
     if (!prompt.trim()) {
       alert('Vui lòng nhập đề bài câu hỏi.');
       return;
@@ -410,7 +436,8 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
                 <input
                   type="file"
                   accept="audio/*"
-                  onChange={handleAudioFileUpload}
+                    onChange={handleAudioFileUpload}
+                    disabled={isUploadingMedia}
                   className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
                 />
               </div>
@@ -476,7 +503,8 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={handleImageFileUpload}
+                    onChange={handleImageFileUpload}
+                    disabled={isUploadingMedia}
                   className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer"
                 />
               </div>

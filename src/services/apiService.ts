@@ -1,4 +1,13 @@
 import { ExamLesson, SubmissionData } from '../types';
+import { HandwritingExercise } from '../types/handwriting';
+import {
+  deleteGasExam,
+  fetchGasExams,
+  fetchGasHandwritingExercises,
+  saveGasExam,
+  uploadMediaToGas
+} from './gasCloudService';
+import type { GasMediaFolder } from './gasCloudService';
 
 /**
  * Client service to communicate with full-stack Express backend server endpoints.
@@ -7,6 +16,9 @@ import { ExamLesson, SubmissionData } from '../types';
 
 // --- CUSTOM EXAMS ---
 export async function fetchServerCustomExams(): Promise<ExamLesson[]> {
+  const gasExams = await fetchGasExams();
+  if (gasExams !== null) return gasExams;
+
   try {
     const res = await fetch('/api/custom-exams');
     const data = await res.json();
@@ -20,6 +32,8 @@ export async function fetchServerCustomExams(): Promise<ExamLesson[]> {
 }
 
 export async function saveServerCustomExam(exam: ExamLesson): Promise<boolean> {
+  const gasSaved = await saveGasExam(exam);
+
   try {
     const res = await fetch('/api/custom-exams', {
       method: 'POST',
@@ -27,23 +41,27 @@ export async function saveServerCustomExam(exam: ExamLesson): Promise<boolean> {
       body: JSON.stringify(exam)
     });
     const data = await res.json();
-    return Boolean(data && data.ok);
+    const localSaved = Boolean(data && data.ok);
+    return gasSaved === true || localSaved;
   } catch (err) {
     console.warn('Failed to save custom exam on server', err);
-    return false;
+    return gasSaved === true;
   }
 }
 
 export async function deleteServerCustomExam(examId: string): Promise<boolean> {
+  const gasDeleted = await deleteGasExam(examId);
+
   try {
     const res = await fetch(`/api/custom-exams/${encodeURIComponent(examId)}`, {
       method: 'DELETE'
     });
     const data = await res.json();
-    return Boolean(data && data.ok);
+    const localDeleted = Boolean(data && data.ok);
+    return gasDeleted === true || localDeleted;
   } catch (err) {
     console.warn('Failed to delete custom exam on server', err);
-    return false;
+    return gasDeleted === true;
   }
 }
 
@@ -58,6 +76,57 @@ export async function fetchServerDeletedExamIds(): Promise<string[]> {
     console.warn('Failed to fetch deleted exam IDs from server', err);
   }
   return [];
+}
+
+// --- HANDWRITING EXERCISES ---
+export async function fetchServerHandwritingExercises(): Promise<HandwritingExercise[]> {
+  const gasExercises = await fetchGasHandwritingExercises();
+  if (gasExercises !== null) return gasExercises;
+
+  try {
+    const res = await fetch('/api/handwriting-exercises');
+    const data = await res.json();
+    if (data && data.ok && Array.isArray(data.exercises)) {
+      return data.exercises;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch server handwriting exercises', err);
+  }
+  return [];
+}
+
+export async function saveServerHandwritingExercise(exercise: HandwritingExercise): Promise<boolean> {
+  const gasSaved = await saveGasExam(exercise);
+
+  try {
+    const res = await fetch('/api/handwriting-exercises', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(exercise)
+    });
+    const data = await res.json();
+    const localSaved = Boolean(data && data.ok);
+    return gasSaved === true || localSaved;
+  } catch (err) {
+    console.warn('Failed to save handwriting exercise on server', err);
+    return gasSaved === true;
+  }
+}
+
+export async function deleteServerHandwritingExercise(exerciseId: string): Promise<boolean> {
+  const gasDeleted = await deleteGasExam(exerciseId);
+
+  try {
+    const res = await fetch(`/api/handwriting-exercises/${encodeURIComponent(exerciseId)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    const localDeleted = Boolean(data && data.ok);
+    return gasDeleted === true || localDeleted;
+  } catch (err) {
+    console.warn('Failed to delete handwriting exercise on server', err);
+    return gasDeleted === true;
+  }
 }
 
 // --- SUBMISSIONS ---
@@ -128,7 +197,15 @@ export async function gradeServerSubmission(payload: {
 }
 
 // --- MEDIA UPLOADS ---
-export async function uploadMediaFile(fileData: string, fileName?: string, mimeType?: string): Promise<string | null> {
+export async function uploadMediaFile(
+  fileData: string,
+  fileName?: string,
+  mimeType?: string,
+  folder: GasMediaFolder = 'lesson'
+): Promise<string | null> {
+  const gasUrl = await uploadMediaToGas(fileData, fileName, mimeType, folder);
+  if (gasUrl) return gasUrl;
+
   try {
     const res = await fetch('/api/media/upload', {
       method: 'POST',

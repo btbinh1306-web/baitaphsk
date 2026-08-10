@@ -12,16 +12,13 @@ import {
   Upload,
   Camera,
   X,
-  Plus,
   Eye,
   CheckCircle2,
   Clock,
   Sparkles,
   MessageSquare,
   Image as ImageIcon,
-  Send,
   FileCheck2,
-  RefreshCcw,
   Pencil,
   Download,
   ExternalLink
@@ -34,20 +31,25 @@ interface HandwritingExerciseViewProps {
   onSubmissionComplete?: (sub: HandwritingSubmission) => void;
 }
 
-export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = ({
-  exercise,
-  studentName = '',
-  studentClass = '',
-  onSubmissionComplete
-}) => {
+export interface HandwritingExerciseViewHandle {
+  submit: () => Promise<void>;
+}
+
+export const HandwritingExerciseView = React.forwardRef(
+  (
+    {
+      exercise,
+      studentName = '',
+      studentClass = '',
+      onSubmissionComplete
+    }: HandwritingExerciseViewProps,
+    ref: React.ForwardedRef<HandwritingExerciseViewHandle>
+  ) => {
   const [submissionImages, setSubmissionImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentSub, setCurrentSub] = useState<HandwritingSubmission | null>(null);
 
-  // Name and class override inputs if student name wasn't passed in prop
-  const [nameInput, setNameInput] = useState(studentName);
-  const [classInput, setClassInput] = useState(studentClass);
   const [lessonTopicInput, setLessonTopicInput] = useState('');
 
   // Lightbox Modal state
@@ -57,16 +59,11 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
 
   // Load existing submission or saved draft if available
   useEffect(() => {
-    setNameInput(studentName);
-    setClassInput(studentClass);
-
     try {
       const savedDraft = localStorage.getItem('hsk_hw_draft_v1');
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft);
         if (parsed.lessonTopicInput) setLessonTopicInput(parsed.lessonTopicInput);
-        if (parsed.nameInput && !studentName) setNameInput(parsed.nameInput);
-        if (parsed.classInput && !studentClass) setClassInput(parsed.classInput);
       }
     } catch (e) {}
 
@@ -108,8 +105,6 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
 
       setCurrentSub(subToSet);
       setSubmissionImages(subToSet.submissionImages);
-      if (subToSet.studentName) setNameInput(subToSet.studentName);
-      if (subToSet.studentClass) setClassInput(subToSet.studentClass);
       if (existing?.lessonTopic) setLessonTopicInput(existing.lessonTopic);
     }
   }, [exercise.id, exercise.title, studentName, studentClass]);
@@ -121,13 +116,11 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
       localStorage.setItem(
         'hsk_hw_draft_v1',
         JSON.stringify({
-          nameInput,
-          classInput,
           lessonTopicInput,
         })
       );
     } catch (e) {}
-  }, [nameInput, classInput, lessonTopicInput, currentSub]);
+  }, [lessonTopicInput, currentSub]);
 
   // Handle uploading photos (student)
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,7 +132,7 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
       const newImages: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const compressed = await fileToCompressedDataUrl(files[i]);
-        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type);
+        const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type, 'submission');
         newImages.push(uploadedUrl || compressed);
       }
       setSubmissionImages((prev) => [...prev, ...newImages]);
@@ -156,11 +149,9 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
     setSubmissionImages((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const finalName = nameInput.trim();
-    const finalClass = classInput.trim();
+  const handleSubmit = async () => {
+    const finalName = studentName.trim();
+    const finalClass = studentClass.trim();
     const finalTopic = lessonTopicInput.trim();
 
     if (!finalName) {
@@ -240,6 +231,8 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
       onSubmissionComplete(newSub);
     }
   };
+
+  React.useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
 
   const openLightbox = (images: string[], index: number, titleText: string) => {
     setLightboxImages(images);
@@ -565,36 +558,6 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
           </span>
         </div>
 
-        {/* Student Info Inputs if missing */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Họ và Tên học sinh <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              placeholder="Nhập họ và tên..."
-              className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-slate-50 text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Lớp học <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={classInput}
-              onChange={(e) => setClassInput(e.target.value)}
-              placeholder="Ví dụ: HSK 1.2, Tiếng Trung K1"
-              className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-slate-50 text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none transition"
-              required
-            />
-          </div>
-        </div>
-
         {/* Text Block for Lesson / Vocabulary Topic */}
         <div className="p-3.5 bg-teal-50/80 rounded-xl border border-teal-200/90 space-y-1.5 shadow-2xs">
           <label className="block text-xs font-bold text-teal-950 flex items-center justify-between">
@@ -697,32 +660,6 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
           </label>
         </div>
 
-        {/* SUBMIT BUTTON */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
-          {currentSub?.submittedAt && (
-            <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-              Lần nộp gần nhất: {currentSub.submittedAt}
-            </span>
-          )}
-
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e as any)}
-            disabled={isUploading || isSubmitting || submissionImages.length === 0}
-            className="w-full sm:w-auto ml-auto px-6 py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-extrabold text-sm rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {status === 'submitted' || status === 'graded' ? (
-              <>
-                <RefreshCcw className="w-4 h-4" /> Nộp lại bài viết
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" /> Nộp bài viết
-              </>
-            )}
-          </button>
-        </div>
       </div>
 
       {/* Lightbox Modal */}
@@ -737,4 +674,4 @@ export const HandwritingExerciseView: React.FC<HandwritingExerciseViewProps> = (
       )}
     </div>
   );
-};
+});

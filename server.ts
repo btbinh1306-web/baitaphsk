@@ -23,6 +23,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 
 const CUSTOM_EXAMS_FILE = path.join(DATA_DIR, 'custom_exams.json');
 const DELETED_EXAMS_FILE = path.join(DATA_DIR, 'deleted_exam_ids.json');
+const HANDWRITING_EXERCISES_FILE = path.join(DATA_DIR, 'handwriting_exercises.json');
 const SUBMISSIONS_FILE = path.join(DATA_DIR, 'submissions.json');
 
 // Helper functions for reading/writing JSON files
@@ -141,6 +142,57 @@ app.delete('/api/custom-exams/:id', (req, res) => {
 app.get('/api/deleted-exam-ids', (req, res) => {
   const deletedIds = readJsonFile<string[]>(DELETED_EXAMS_FILE, []);
   res.json({ ok: true, deletedIds });
+});
+
+// --- API ENDPOINTS FOR HANDWRITING EXERCISES ---
+app.get('/api/handwriting-exercises', (req, res) => {
+  const exercises = readJsonFile<any[]>(HANDWRITING_EXERCISES_FILE, []);
+  res.json({ ok: true, exercises });
+});
+
+app.post('/api/handwriting-exercises', (req, res) => {
+  try {
+    const exercise = req.body;
+    if (!exercise || !exercise.id) {
+      res.status(400).json({ ok: false, error: 'Invalid handwriting exercise payload' });
+      return;
+    }
+
+    const currentExercises = readJsonFile<any[]>(HANDWRITING_EXERCISES_FILE, []);
+    const index = currentExercises.findIndex((item) => String(item.id) === String(exercise.id));
+    if (index >= 0) {
+      currentExercises[index] = exercise;
+    } else {
+      currentExercises.unshift(exercise);
+    }
+
+    const saved = writeJsonFile(HANDWRITING_EXERCISES_FILE, currentExercises);
+    if (!saved) {
+      res.status(500).json({ ok: false, error: 'Could not save handwriting exercise' });
+      return;
+    }
+
+    res.json({ ok: true, exercise });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete('/api/handwriting-exercises/:id', (req, res) => {
+  try {
+    const exerciseId = req.params.id;
+    const currentExercises = readJsonFile<any[]>(HANDWRITING_EXERCISES_FILE, []);
+    const updatedExercises = currentExercises.filter((item) => String(item.id) !== String(exerciseId));
+    const saved = writeJsonFile(HANDWRITING_EXERCISES_FILE, updatedExercises);
+    if (!saved) {
+      res.status(500).json({ ok: false, error: 'Could not delete handwriting exercise' });
+      return;
+    }
+
+    res.json({ ok: true, deletedId: exerciseId, exercises: updatedExercises });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // --- API ENDPOINTS FOR SUBMISSIONS ---

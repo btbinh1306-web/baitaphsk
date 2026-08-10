@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { AudioRecorder } from './AudioRecorder';
 import { AudioRecordItem, ExamLesson } from '../types';
@@ -6,8 +6,9 @@ import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { sanitizeExamSections } from '../utils/lessonParser';
 import { ExerciseRenderer } from './ExerciseRenderer';
-import { HandwritingExerciseView } from './exercises/HandwritingExerciseView';
+import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
 import { getHandwritingExercises, convertHandwritingToExamLesson } from '../services/handwritingService';
+import { fetchServerHandwritingExercises } from '../services/apiService';
 import { loadFormDraft, useStudentFormDraft } from '../hooks/useStudentFormDraft';
 import {
   Send,
@@ -44,6 +45,20 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   deletedExamIds = [],
   onSuccessNavigateToResult
 }) => {
+  const [serverHwExamLessons, setServerHwExamLessons] = useState<ExamLesson[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchServerHandwritingExercises().then((exercises) => {
+      if (!cancelled) {
+        setServerHwExamLessons(exercises.map(convertHandwritingToExamLesson));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Load handwriting exercises from handwritingService
   const hwExamLessons = useMemo(() => {
     try {
@@ -56,6 +71,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   // Combine custom exams, handwriting exercises, and sample exams
   const rawExams = useMemo(() => {
     const list: ExamLesson[] = [...customExams];
+
+    serverHwExamLessons.forEach((hw) => {
+      if (!list.some((e) => e.id === hw.id)) {
+        list.push(hw);
+      }
+    });
 
     // Add handwriting exercises if not already in customExams
     hwExamLessons.forEach((hw) => {
@@ -127,6 +148,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const [subError, setSubError] = useState<string | null>(null);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
+  const handwritingViewRef = useRef<HandwritingExerciseViewHandle>(null);
 
   // Persist form draft automatically in localStorage
   const { clearDraft } = useStudentFormDraft(
@@ -244,6 +266,24 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     }
     if (!studentClass.trim()) {
       setSubError('Vui lòng nhập Tên Lớp học.');
+      return;
+    }
+
+    if (currentExam.isHandwriting || currentExam.type === 'handwriting_submission') {
+      if (!handwritingViewRef.current) {
+        setSubError('Không thể mở phần nộp ảnh bài viết. Vui lòng tải lại trang và thử lại.');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        await handwritingViewRef.current.submit();
+      } catch (err) {
+        console.error('Handwriting submit error:', err);
+        setSubError('Có lỗi xảy ra khi gửi ảnh bài viết. Vui lòng thử lại.');
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -680,6 +720,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         ) : currentExam.isHandwriting || currentExam.type === 'handwriting_submission' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
             <HandwritingExerciseView
+              ref={handwritingViewRef}
               exercise={{
                 id: currentExam.id,
                 type: 'handwriting_submission',
