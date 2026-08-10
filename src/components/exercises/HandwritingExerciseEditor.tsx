@@ -3,6 +3,7 @@ import { HandwritingExercise } from '../../types/handwriting';
 import { fileToCompressedDataUrl } from '../../utils/imageUtils';
 import { uploadMediaFile } from '../../services/apiService';
 import { ImageLightboxModal } from '../ImageLightboxModal';
+import { getDriveMediaPlayerUrl } from '../../utils/audioUtils';
 import { Upload, X, Plus, Eye, Save, Sparkles, Image as ImageIcon, FileText } from 'lucide-react';
 
 interface HandwritingExerciseEditorProps {
@@ -150,7 +151,7 @@ export const HandwritingExerciseEditor: React.FC<HandwritingExerciseEditorProps>
                   className="relative group rounded-lg overflow-hidden border border-slate-300 bg-white aspect-4/3 shadow-xs"
                 >
                   <img
-                    src={imgUrl}
+                    src={getDriveMediaPlayerUrl(imgUrl)}
                     alt={`Reference ${idx + 1}`}
                     className="w-full h-full object-cover"
                   />

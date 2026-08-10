@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Edit2, Volume2, Upload, Trash2, Image as ImageIcon, Link as LinkIcon, HardDrive } from 'lucide-react';
 import { Question } from '../types';
 import { speakText } from '../utils/tts';
-import { getDriveAudioPlayerUrl } from '../utils/audioUtils';
+import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { uploadMediaFile } from '../services/apiService';
 
 interface EditQuestionModalProps {
@@ -528,7 +528,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
               <div className="pt-2 border-t border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div className="flex-1">
                   <span className="text-[10px] font-bold text-emerald-700 block mb-1">✓ Xem trước hình ảnh đính kèm:</span>
-                  <img src={imageUrl} alt="Đề bài" className="h-28 rounded-lg border border-slate-200 object-contain bg-white shadow-2xs" />
+                  <img src={getDriveMediaPlayerUrl(imageUrl)} alt="Đề bài" className="h-28 rounded-lg border border-slate-200 object-contain bg-white shadow-2xs" />
                 </div>
                 <button
                   type="button"

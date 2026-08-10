@@ -5,6 +5,7 @@ import { gradeSubmissionInGas, getGasConfig } from '../../services/gasService';
 import { fileToCompressedDataUrl } from '../../utils/imageUtils';
 import { uploadMediaFile } from '../../services/apiService';
 import { ImageLightboxModal } from '../ImageLightboxModal';
+import { getDriveMediaPlayerUrl } from '../../utils/audioUtils';
 import {
   Upload,
   X,
@@ -207,7 +208,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
                 className="relative group rounded-xl overflow-hidden border-2 border-slate-300 bg-slate-900 aspect-4/3 cursor-pointer shadow-sm hover:border-teal-500 transition"
               >
                 <img
-                  src={imgUrl}
+                  src={getDriveMediaPlayerUrl(imgUrl)}
                   alt={`Student page ${idx + 1}`}
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                 />
@@ -234,7 +235,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
                     onClick={(e) => {
                       e.stopPropagation();
                       const link = document.createElement('a');
-                      link.href = imgUrl;
+                      link.href = getDriveMediaPlayerUrl(imgUrl);
                       const studentClean = submission.studentName.replace(/[^a-zA-Z0-9_\-]/g, '_');
                       link.download = `hoc_sinh_${studentClean}_trang_${idx + 1}.png`;
                       document.body.appendChild(link);
@@ -277,7 +278,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
                 className="relative group rounded-xl overflow-hidden border border-indigo-300 bg-white aspect-4/3 shadow-2xs"
               >
                 <img
-                  src={imgUrl}
+                  src={getDriveMediaPlayerUrl(imgUrl)}
                   alt={`Corrected page ${idx + 1}`}
                   className="w-full h-full object-cover"
                 />

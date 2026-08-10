@@ -14,6 +14,7 @@ interface AudioRecorderProps {
 
 export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   label,
+  pinyin,
   comment,
   onCommentChange,
   onAudioRecorded,
@@ -165,7 +166,14 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-800 text-sm sm:text-base">{label}</span>
+            <div>
+              <span className="font-semibold text-slate-800 text-sm sm:text-base">{label}</span>
+              {pinyin && (
+                <p className="mt-1 text-sm sm:text-base font-mono font-medium text-indigo-600 whitespace-pre-line">
+                  Pinyin: {pinyin}
+                </p>
+              )}
+            </div>
             {showAudioSample && (
               <button
                 type="button"
@@ -307,4 +315,3 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
     </div>
   );
 };
-

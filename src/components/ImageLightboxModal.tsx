@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, ExternalLink } from 'lucide-react';
+import { getDriveMediaPlayerUrl } from '../utils/audioUtils';
 
 interface ImageLightboxModalProps {
   images: string[];
@@ -37,7 +38,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
 
   if (!isOpen || images.length === 0) return null;
 
-  const currentImage = images[currentIndex] || images[0];
+  const currentImage = getDriveMediaPlayerUrl(images[currentIndex] || images[0]);
 
   const handlePrev = () => {
     setZoomLevel(1);
@@ -195,7 +196,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
                 idx === currentIndex ? 'border-teal-400 ring-2 ring-teal-400/50 scale-105' : 'border-slate-700 opacity-60 hover:opacity-100'
               }`}
             >
-              <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
+          <img src={getDriveMediaPlayerUrl(img)} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

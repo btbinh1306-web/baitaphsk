@@ -75,8 +75,44 @@ function safeFileName_(name) {
   return String(name || 'file').replace(/[\\/:*?"<>|#%{}]/g, '_').slice(0, 140);
 }
 
-function downloadUrl_(fileId) {
-  return 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(fileId);
+function downloadUrl_(fileId, resourceKey) {
+  var url = 'https://drive.google.com/uc?export=media&id=' + encodeURIComponent(fileId);
+  if (resourceKey) url += '&resourcekey=' + encodeURIComponent(resourceKey);
+  return url;
+}
+
+function driveFileId_(value) {
+  var match = String(value || '').match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
+  return match ? (match[1] || match[2]) : '';
+}
+
+function resolveDriveMediaUrl_(value) {
+  var fileId = driveFileId_(value);
+  if (!fileId) return value;
+
+  var resourceKey = '';
+  try {
+    resourceKey = DriveApp.getFileById(fileId).getResourceKey() || '';
+  } catch (error) {
+    // Keep the file ID URL when the file is no longer accessible to the script owner.
+  }
+  return downloadUrl_(fileId, resourceKey);
+}
+
+function normalizeDriveLinks_(value) {
+  if (Array.isArray(value)) return value.map(normalizeDriveLinks_);
+  if (value && typeof value === 'object') {
+    var copy = {};
+    Object.keys(value).forEach(function(key) {
+      copy[key] = normalizeDriveLinks_(value[key]);
+    });
+    return copy;
+  }
+  if (typeof value !== 'string') return value;
+
+  return value.replace(/https?:\/\/(?:drive\.google\.com|drive\.usercontent\.google\.com)\/[^\s"'\\]+/g, function(url) {
+    return resolveDriveMediaUrl_(url);
+  });
 }
 
 function makeDriveFile_(folderId, fileData, fileName, mimeType) {
@@ -99,10 +135,18 @@ function makeDriveFile_(folderId, fileData, fileName, mimeType) {
     // Domain policies may reject public sharing; keep the file and report its Drive URL.
   }
 
+  var resourceKey = '';
+  try {
+    resourceKey = file.getResourceKey() || '';
+  } catch (resourceKeyError) {
+    // Older files or restricted domains may not expose a resource key.
+  }
+
   return {
     fileId: file.getId(),
     fileName: file.getName(),
-    url: downloadUrl_(file.getId()),
+    resourceKey: resourceKey,
+    url: downloadUrl_(file.getId(), resourceKey),
     driveUrl: file.getUrl()
   };
 }
@@ -122,6 +166,8 @@ function saveExam_(exam) {
   if (!exam || !exam.id) return json_({ ok: false, error: 'Thiếu ID bài soạn' });
   var folder = getFolder_(LESSON_FOLDER_ID);
   if (!folder) return json_({ ok: false, error: 'Chưa cấu hình thư mục HSK_SOANBAI' });
+
+  exam = normalizeDriveLinks_(exam);
 
   var fileName = 'exam_' + safeFileName_(exam.id) + '.json';
   var files = folder.getFilesByName(fileName);
@@ -161,7 +207,7 @@ function listExams_() {
     if (!/\.json$/i.test(file.getName())) continue;
     try {
       var exam = JSON.parse(file.getBlob().getDataAsString());
-      if (exam && exam.id) exams.push(exam);
+      if (exam && exam.id) exams.push(normalizeDriveLinks_(exam));
     } catch (error) {
       // Ignore unrelated or malformed files in the lesson folder.
     }
@@ -242,7 +288,7 @@ function listTeacherSubmissions_(pass) {
   var head = rows.shift() || HEADERS;
   var list = rows.map(function(row) {
     var item = {};
-    head.forEach(function(key, index) { item[key] = row[index]; });
+    head.forEach(function(key, index) { item[key] = normalizeDriveLinks_(row[index]); });
     return item;
   });
   return json_({ ok: true, rows: list });
@@ -256,7 +302,7 @@ function findResult_(id) {
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i][0]) === String(id)) {
       var item = {};
-      head.forEach(function(key, index) { item[key] = rows[i][index]; });
+      head.forEach(function(key, index) { item[key] = normalizeDriveLinks_(rows[i][index]); });
       return json_({ ok: true, row: item });
     }
   }

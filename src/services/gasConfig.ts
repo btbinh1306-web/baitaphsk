@@ -1,5 +1,5 @@
 export const DEFAULT_GAS_WEB_APP_URL =
-  'https://script.google.com/macros/s/AKfycbxSo6VoTPGaNaolINc5wPEiV-UJUjKJX9VOcOuBhNqu4V4T8EOw5pRZ2cjt8J8wLt68/exec';
+  'https://script.google.com/macros/s/AKfycbyaB0n2M2wstStKGHE7KH4MlvXhb6Z4bYggs952KXUw6VwtexlGm6358eDumo8wPPYp/exec';
 
 export function getConfiguredGasWebAppUrl(): string {
   try {

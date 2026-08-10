@@ -4,7 +4,7 @@ import { AudioRecorder } from './AudioRecorder';
 import { AudioRecordItem, ExamLesson } from '../types';
 import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
-import { getDriveAudioPlayerUrl } from '../utils/audioUtils';
+import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { sanitizeExamSections } from '../utils/lessonParser';
 import { ExerciseRenderer } from './ExerciseRenderer';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
@@ -1212,7 +1212,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         {q.imageUrl && (
                           <div className="my-2">
                             <img
-                              src={q.imageUrl}
+                              src={getDriveMediaPlayerUrl(q.imageUrl)}
                               alt={`Hình ảnh đề bài câu ${idx + 1}`}
                               className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
                             />
@@ -1254,7 +1254,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       {q.imageUrl && (
                         <div className="mb-2">
                           <img
-                            src={q.imageUrl}
+                            src={getDriveMediaPlayerUrl(q.imageUrl)}
                             alt={`Hình ảnh luyện nói câu ${idx + 1}`}
                             className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
                           />
@@ -1262,6 +1262,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       )}
                       <AudioRecorder
                         label={`Câu ${idx + 1}: ${q.prompt}`}
+                        pinyin={q.pinyin}
                         onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
                       />
                     </div>

@@ -3,7 +3,7 @@ import { SubmissionData } from '../types';
 import { fetchResultById, cleanImageTagsFromText, getLocalSubmissions } from '../services/gasService';
 import { getHandwritingSubmissions } from '../services/handwritingService';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
-import { getAudioSrcFromObject, getDriveAudioPlayerUrl } from '../utils/audioUtils';
+import { getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { ImageLightboxModal } from './ImageLightboxModal';
 import {
   Search,
@@ -46,6 +46,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   };
 
   const handleOpenNewTab = (url: string, title = 'Xem ảnh bài chữa') => {
+    const mediaUrl = getDriveMediaPlayerUrl(url);
     try {
       const win = window.open();
       if (win) {
@@ -60,16 +61,16 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               </style>
             </head>
             <body>
-              <img src="${url}" alt="Full Image" />
+              <img src="${mediaUrl}" alt="Full Image" />
             </body>
           </html>
         `);
         win.document.close();
       } else {
-        window.open(url, '_blank');
+        window.open(mediaUrl, '_blank');
       }
     } catch (e) {
-      window.open(url, '_blank');
+      window.open(mediaUrl, '_blank');
     }
   };
 
@@ -80,7 +81,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       if (!url || typeof url !== 'string') return;
       const trimmed = url.trim().replace(/^["'\\]+|["'\\]+$/g, '');
       if (trimmed.length > 10 && !trimmed.startsWith('[') && !resultUrls.includes(trimmed)) {
-        resultUrls.push(trimmed);
+        resultUrls.push(getDriveMediaPlayerUrl(trimmed));
       }
     };
 
@@ -134,7 +135,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   const handleDownloadImage = (url: string, filename: string) => {
     try {
       const a = document.createElement('a');
-      a.href = url;
+      a.href = getDriveMediaPlayerUrl(url);
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -1240,4 +1241,3 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     </div>
   );
 };
-

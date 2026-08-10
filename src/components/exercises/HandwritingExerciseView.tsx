@@ -8,6 +8,7 @@ import { submitToGas, getLocalSubmissions, cleanImageTagsFromText } from '../../
 import { fileToCompressedDataUrl } from '../../utils/imageUtils';
 import { uploadMediaFile } from '../../services/apiService';
 import { ImageLightboxModal } from '../ImageLightboxModal';
+import { getDriveMediaPlayerUrl } from '../../utils/audioUtils';
 import {
   Upload,
   Camera,
@@ -241,6 +242,7 @@ export const HandwritingExerciseView = React.forwardRef(
   };
 
   const handleOpenNewTab = (url: string, title = 'Xem ảnh bài chữa') => {
+    const mediaUrl = getDriveMediaPlayerUrl(url);
     try {
       const win = window.open();
       if (win) {
@@ -255,16 +257,16 @@ export const HandwritingExerciseView = React.forwardRef(
               </style>
             </head>
             <body>
-              <img src="${url}" alt="Full Image" />
+              <img src="${mediaUrl}" alt="Full Image" />
             </body>
           </html>
         `);
         win.document.close();
       } else {
-        window.open(url, '_blank');
+        window.open(mediaUrl, '_blank');
       }
     } catch (e) {
-      window.open(url, '_blank');
+      window.open(mediaUrl, '_blank');
     }
   };
 
@@ -275,7 +277,7 @@ export const HandwritingExerciseView = React.forwardRef(
       if (!url || typeof url !== 'string') return;
       const trimmed = url.trim();
       if (trimmed.length > 10 && !trimmed.startsWith('[') && !resultUrls.includes(trimmed)) {
-        resultUrls.push(trimmed);
+        resultUrls.push(getDriveMediaPlayerUrl(trimmed));
       }
     };
 
@@ -315,7 +317,7 @@ export const HandwritingExerciseView = React.forwardRef(
   const handleDownloadImage = (url: string, filename: string) => {
     try {
       const a = document.createElement('a');
-      a.href = url;
+      a.href = getDriveMediaPlayerUrl(url);
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -407,7 +409,7 @@ export const HandwritingExerciseView = React.forwardRef(
                   className="relative group rounded-xl overflow-hidden border-2 border-indigo-100 bg-slate-900 aspect-4/3 cursor-pointer shadow-xs hover:border-indigo-400 transition"
                 >
                   <img
-                    src={imgUrl}
+                    src={getDriveMediaPlayerUrl(imgUrl)}
                     alt={`Mẫu ${idx + 1}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                   />
@@ -502,7 +504,7 @@ export const HandwritingExerciseView = React.forwardRef(
                         onClick={() => openLightbox(validCorrected, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
                       >
                         <img
-                          src={imgUrl}
+                          src={getDriveMediaPlayerUrl(imgUrl)}
                           alt={`Corrected ${idx + 1}`}
                           className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
                         />
@@ -592,7 +594,7 @@ export const HandwritingExerciseView = React.forwardRef(
                   className="relative group rounded-xl overflow-hidden border border-slate-300 bg-white aspect-4/3 shadow-2xs"
                 >
                   <img
-                    src={imgUrl}
+                    src={getDriveMediaPlayerUrl(imgUrl)}
                     alt={`Bài làm ${idx + 1}`}
                     className="w-full h-full object-cover"
                   />
@@ -618,7 +620,7 @@ export const HandwritingExerciseView = React.forwardRef(
                       type="button"
                       onClick={() => {
                         const link = document.createElement('a');
-                        link.href = imgUrl;
+                      link.href = getDriveMediaPlayerUrl(imgUrl);
                         link.download = `bai_lam_trang_${idx + 1}.png`;
                         document.body.appendChild(link);
                         link.click();

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Image as ImageIcon, Send, CheckCircle2 } from 'lucide-react';
+import { getDriveMediaPlayerUrl } from '../../utils/audioUtils';
 
 interface PictureWritingProps {
   data: Record<string, unknown>;
@@ -36,7 +37,7 @@ export const PictureWriting: React.FC<PictureWritingProps> = ({ data }) => {
       <div className="rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center min-h-[160px] max-h-[300px]">
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={getDriveMediaPlayerUrl(imageUrl)}
             alt="Picture Writing Prompt"
             className="w-full h-auto max-h-[280px] object-contain rounded-lg"
             onError={(e) => {
