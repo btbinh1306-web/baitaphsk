@@ -153,7 +153,8 @@ export const ImportLesson: React.FC<ImportLessonProps> = ({ onSaveCustomExam, on
           <h2 className="text-xl font-bold text-slate-800">Nhập Bài Học Từ File JSON (Import System)</h2>
         </div>
         <p className="text-xs text-slate-500">
-          Nhập giáo trình, từ vựng và ngân hàng câu hỏi bằng file JSON tiêu chuẩn. Hệ thống sẽ tự động kiểm tra cú pháp, hiển thị bản xem trước (Preview) và đưa bài học vào danh sách giảng dạy.
+        Nhập giáo trình, từ vựng và ngân hàng câu hỏi bằng file JSON tiêu chuẩn. Hệ thống sẽ tự động kiểm tra cú pháp, hiển thị bản xem trước (Preview) và đưa bài học vào danh sách giảng dạy.
+        Bạn cũng có thể nhập JSON bài thi đã export từ Cổng Giáo Viên.
         </p>
       </div>
 

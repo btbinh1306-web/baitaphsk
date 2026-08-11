@@ -1,4 +1,5 @@
 import { LessonData, ValidationError, ValidationResult } from '../types/lesson';
+import { convertExamLessonToLessonData, isExamLessonExport } from './lessonParser';
 
 export function validateLesson(jsonString: string): ValidationResult {
   const errors: ValidationError[] = [];
@@ -44,6 +45,15 @@ export function validateLesson(jsonString: string): ValidationResult {
   }
 
   const record = data as Record<string, unknown>;
+
+  // Also accept JSON exported from the teacher portal (ExamLesson shape).
+  if (isExamLessonExport(record)) {
+    return {
+      isValid: true,
+      errors: [],
+      parsedData: convertExamLessonToLessonData(record)
+    };
+  }
 
   // Check version
   if (record.version === undefined || record.version === null || record.version === '') {

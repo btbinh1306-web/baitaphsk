@@ -1,4 +1,4 @@
-import { LessonData, LessonItem } from '../types/lesson';
+import { LessonData, LessonItem, LessonSection } from '../types/lesson';
 import { ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
 
 export const STANDARD_CONVERTED_TYPES = new Set([
@@ -29,6 +29,107 @@ export const STANDARD_CONVERTED_TYPES = new Set([
   'translate_vi_zh',
   'handwriting_submission'
 ]);
+
+export function isExamLessonExport(value: unknown): value is ExamLesson {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === 'string' &&
+    typeof record.title === 'string' &&
+    Array.isArray(record.mcQuestions) &&
+    Array.isArray(record.essayQuestions) &&
+    Array.isArray(record.speakingQuestions)
+  );
+}
+
+function questionToLessonItem(question: Question, type: string): LessonItem {
+  const { id, ...data } = question;
+  return {
+    id,
+    type,
+    data: data as Record<string, unknown>
+  };
+}
+
+function listeningQuestionToLessonItem(question: Question): LessonItem {
+  const { id, subQuestions, ...data } = question;
+  return {
+    id,
+    type: question.type,
+    data: {
+      ...data,
+      questions: subQuestions?.length ? subQuestions : data.questions
+    } as Record<string, unknown>
+  };
+}
+
+export function convertExamLessonToLessonData(exam: ExamLesson): LessonData {
+  const sections: LessonSection[] = [];
+  const addSection = (id: string, title: string, items: LessonItem[]) => {
+    if (items.length > 0) sections.push({ id, title, items });
+  };
+
+  addSection(
+    'imported-vocab-mc',
+    'Từ vựng & Trắc nghiệm',
+    [
+      ...(exam.vocabList || []).map((vocab, index) => ({
+        id: `vocab_${index + 1}`,
+        type: 'vocab',
+        data: vocab as unknown as Record<string, unknown>
+      })),
+      ...exam.mcQuestions.map((question) => questionToLessonItem(question, 'mc'))
+    ]
+  );
+  addSection(
+    'imported-fill-arrange',
+    'Điền từ & Sắp xếp câu',
+    [
+      ...(exam.fillQuestions || []).map((question) => questionToLessonItem(question, 'fill')),
+      ...(exam.arrangeQuestions || []).map((question) => questionToLessonItem(question, 'arrange'))
+    ]
+  );
+  addSection(
+    'imported-reading',
+    'Đọc hiểu',
+    (exam.readingPassages || []).map((passage) => ({
+      id: passage.id,
+      type: 'reading',
+      data: {
+        title: passage.title,
+        content: passage.content,
+        questions: passage.questions
+      }
+    }))
+  );
+  addSection(
+    'imported-listening',
+    'Luyện nghe',
+    (exam.listeningQuestions || []).map(listeningQuestionToLessonItem)
+  );
+  addSection(
+    'imported-writing-speaking',
+    'Viết, nói & dịch',
+    [
+      ...(exam.essayQuestions || []).map((question) => questionToLessonItem(question, 'essay')),
+      ...(exam.speakingQuestions || []).map((question) => questionToLessonItem(question, 'speaking')),
+      ...(exam.translationQuestions || []).map((question) => questionToLessonItem(question, 'translation')),
+      ...(exam.handwritingQuestions || []).map((question) => questionToLessonItem(question, 'handwriting_submission'))
+    ]
+  );
+
+  return {
+    version: 'exam-export-1.0',
+    lesson: {
+      id: exam.id,
+      title: exam.title,
+      level: exam.level,
+      description: exam.description
+    },
+    sections
+  };
+}
 
 function parseWordBankFromPrompt(prompt?: string): { wordBank: string[]; prompt: string } | undefined {
   if (!prompt) return undefined;
