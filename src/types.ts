@@ -81,6 +81,8 @@ export interface AudioRecordItem {
   mime: string;
   duration?: number;
   url?: string; // local blob URL for instant preview
+  teacherFeedbackUrl?: string; // Shared URL of the teacher's pronunciation correction
+  teacherFeedbackLabel?: string;
 }
 
 export interface SubmissionData {
@@ -99,7 +101,7 @@ export interface SubmissionData {
   essays: string; // Essay answers formatted
   audios?: AudioRecordItem[];
   driveLinks?: string; // Links returned or parsed
-  speakScore?: string | number; // Teacher's speaking score
+  speakScore?: string | number; // Overall exercise score entered by the teacher
   comment?: string; // Teacher's feedback
   status: 'Chờ chấm' | 'Đã chấm';
   // Handwriting submission fields

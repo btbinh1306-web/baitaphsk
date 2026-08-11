@@ -52,6 +52,11 @@ export const normalizePercent = (rawPercent: any, correct: number, total: number
   return parsed;
 };
 
+const getTeacherExerciseScore = (row: any, fallback: string | number = ''): string | number => {
+  const value = row?.['Điểm bài tập (GV)'] ?? row?.['Điểm Bài Tập (GV)'] ?? row?.['Điểm nói (GV)'];
+  return value !== undefined && value !== null && String(value).trim() !== '' ? value : fallback;
+};
+
 export const extractImagesFromRawText = (text?: string): string[] => {
   if (!text || typeof text !== 'string') return [];
   const urls: string[] = [];
@@ -107,6 +112,76 @@ export const extractImagesFromRawText = (text?: string): string[] => {
   return urls;
 };
 
+export const extractTeacherFeedbackAudiosFromRawText = (text?: string): AudioRecordItem[] => {
+  if (!text || typeof text !== 'string') return [];
+
+  const normalizedText = text
+    .replace(/\\"/g, '"')
+    .replace(/\\\//g, '/');
+  const tagMatch = normalizedText.match(/\[TEACHER_FEEDBACK_AUDIOS\]:\s*(\[.*?\])/s);
+  if (!tagMatch?.[1]) return [];
+
+  try {
+    const parsed = JSON.parse(tagMatch[1]);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.reduce<AudioRecordItem[]>((items, item, index) => {
+      if (!item || typeof item !== 'object') return items;
+      const record = item as Partial<AudioRecordItem>;
+      if (!record.teacherFeedbackUrl) return items;
+      items.push({
+        label: String(record.label || `Ghi âm câu ${index + 1}`),
+        data: '',
+        mime: 'audio/webm',
+        teacherFeedbackUrl: String(record.teacherFeedbackUrl),
+        teacherFeedbackLabel: record.teacherFeedbackLabel ? String(record.teacherFeedbackLabel) : undefined
+      });
+      return items;
+    }, []);
+  } catch (error) {
+    console.warn('Không thể đọc file chữa ghi âm từ nhận xét:', error);
+    return [];
+  }
+};
+
+export const mergeAudioRecords = (
+  primary?: AudioRecordItem[],
+  fallback?: AudioRecordItem[]
+): AudioRecordItem[] | undefined => {
+  if ((!primary || primary.length === 0) && (!fallback || fallback.length === 0)) return undefined;
+
+  const length = Math.max(primary?.length || 0, fallback?.length || 0);
+  return Array.from({ length }, (_, index) => {
+    const preferred = primary?.[index];
+    const backup = fallback?.[index];
+    const merged = { ...(backup || {}), ...(preferred || {}) } as AudioRecordItem;
+
+    // A remote record may intentionally omit local base64 data after upload.
+    if (!preferred?.data && backup?.data) merged.data = backup.data;
+    if (!preferred?.url && backup?.url) merged.url = backup.url;
+    if (!preferred?.teacherFeedbackUrl && backup?.teacherFeedbackUrl) {
+      merged.teacherFeedbackUrl = backup.teacherFeedbackUrl;
+    }
+    if (!preferred?.teacherFeedbackLabel && backup?.teacherFeedbackLabel) {
+      merged.teacherFeedbackLabel = backup.teacherFeedbackLabel;
+    }
+
+    return merged;
+  });
+};
+
+const extractAudioRecordsFromDriveLinks = (rawLinks?: string): AudioRecordItem[] => {
+  return String(rawLinks || '')
+    .split('\n')
+    .filter(Boolean)
+    .map((link, index) => ({
+      label: link.split(':')[0] || `Ghi âm câu ${index + 1}`,
+      data: '',
+      mime: 'audio/webm',
+      url: link.substring(link.indexOf('http'))
+    }));
+};
+
 export const cleanImageTagsFromText = (text?: string): string => {
   if (!text) return '';
   return text
@@ -114,6 +189,7 @@ export const cleanImageTagsFromText = (text?: string): string => {
     .replace(/\\\//g, '/')
     .replace(/\[CORRECTED_IMAGES\]:\s*\[.*?\]/gs, '')
     .replace(/\[SUBMISSION_IMAGES\]:\s*\[.*?\]/gs, '')
+    .replace(/\[TEACHER_FEEDBACK_AUDIOS\]:\s*\[.*?\]/gs, '')
     .replace(/\[CORRECTED_IMAGES\]:\s*".*?"/gs, '')
     .replace(/\[SUBMISSION_IMAGES\]:\s*".*?"/gs, '')
     .replace(/data:image\/[a-zA-Z0-9]+;base64,[a-zA-Z0-9+/=]+/g, '')
@@ -299,7 +375,14 @@ export const fetchTeacherSubmissions = async (
 
   const subMap = new Map<string, SubmissionData>();
   localSubs.forEach((s) => subMap.set(s.id, s));
-  serverSubs.forEach((s) => subMap.set(s.id, s));
+  serverSubs.forEach((s) => {
+    const existing = subMap.get(s.id);
+    subMap.set(s.id, {
+      ...existing,
+      ...s,
+      audios: mergeAudioRecords(s.audios, existing?.audios)
+    });
+  });
 
   // 2. Fetch Google Sheets remote submissions if URL configured
   if (config.sheetUrl && config.sheetUrl.trim() !== '') {
@@ -322,6 +405,8 @@ export const fetchTeacherSubmissions = async (
 
           const extractedSubImgs = extractImagesFromRawText(rawEssays);
           const extractedCorrImgs = extractImagesFromRawText(rawComment);
+          const extractedFeedbackAudios = extractTeacherFeedbackAudiosFromRawText(rawComment);
+          const driveAudios = extractAudioRecordsFromDriveLinks(String(r['Link ghi âm'] || ''));
           const cleanedComment = cleanImageTagsFromText(rawComment);
           const id = String(r['ID'] || r['id'] || '');
 
@@ -342,13 +427,16 @@ export const fetchTeacherSubmissions = async (
               wrong: String(r['Chi tiết câu sai'] || ''),
               essays: rawEssays || existing?.essays || '',
               driveLinks: String(r['Link ghi âm'] || ''),
-              speakScore: r['Điểm nói (GV)'] || existing?.speakScore || '',
+              speakScore: getTeacherExerciseScore(r, existing?.speakScore || ''),
               comment: cleanedComment || existing?.comment || '',
               teacherComment: cleanedComment || existing?.teacherComment || '',
               submissionImages: extractedSubImgs.length > 0 ? extractedSubImgs : existing?.submissionImages,
               correctedImages: extractedCorrImgs.length > 0 ? extractedCorrImgs : existing?.correctedImages,
               status: (r['Trạng thái'] === 'Đã chấm' || existing?.status === 'Đã chấm') ? 'Đã chấm' : 'Chờ chấm',
-              audios: existing?.audios,
+              audios: mergeAudioRecords(
+                extractedFeedbackAudios,
+                mergeAudioRecords(driveAudios, existing?.audios)
+              ),
               isHandwriting: existing?.isHandwriting
             };
             subMap.set(id, mapped);
@@ -380,7 +468,7 @@ export const fetchResultById = async (
   if (serverMatch) {
     localMatch = {
       ...serverMatch,
-      audios: serverMatch.audios || localMatch?.audios,
+      audios: mergeAudioRecords(serverMatch.audios, localMatch?.audios),
       submissionImages: Array.from(new Set([
         ...(serverMatch.submissionImages || []),
         ...(localMatch?.submissionImages || [])
@@ -450,6 +538,8 @@ export const fetchResultById = async (
 
       const extractedSubImgs = extractImagesFromRawText(rawEssays);
       const extractedCorrImgs = extractImagesFromRawText(rawComment);
+      const extractedFeedbackAudios = extractTeacherFeedbackAudiosFromRawText(rawComment);
+      const driveAudios = extractAudioRecordsFromDriveLinks(String(r['Link ghi âm'] || ''));
       const cleanedComment = cleanImageTagsFromText(rawComment);
 
       const mapped: SubmissionData = {
@@ -467,11 +557,15 @@ export const fetchResultById = async (
         wrong: String(r['Chi tiết câu sai'] || ''),
         essays: rawEssays,
         driveLinks: String(r['Link ghi âm'] || ''),
-        speakScore: r['Điểm nói (GV)'] || '',
+        speakScore: getTeacherExerciseScore(r),
         comment: cleanedComment,
         teacherComment: cleanedComment,
         submissionImages: extractedSubImgs.length > 0 ? extractedSubImgs : undefined,
         correctedImages: extractedCorrImgs.length > 0 ? extractedCorrImgs : undefined,
+        audios: mergeAudioRecords(
+          extractedFeedbackAudios,
+          mergeAudioRecords(driveAudios, localMatch?.audios)
+        ),
         status: r['Trạng thái'] === 'Đã chấm' ? 'Đã chấm' : 'Chờ chấm'
       };
 
@@ -492,7 +586,7 @@ export const fetchResultById = async (
       }
 
       if (localMatch) {
-        if (localMatch.audios) mapped.audios = localMatch.audios;
+        mapped.audios = mergeAudioRecords(localMatch.audios, mapped.audios);
         if (localMatch.isHandwriting) mapped.isHandwriting = true;
         if (localMatch.submissionImages && localMatch.submissionImages.length > 0) {
           mapped.submissionImages = Array.from(new Set([...(mapped.submissionImages || []), ...localMatch.submissionImages]));
@@ -531,7 +625,8 @@ export const gradeSubmissionInGas = async (
   speakScore: string | number,
   comment: string,
   pass: string,
-  correctedImages?: string[]
+  correctedImages?: string[],
+  audios?: AudioRecordItem[]
 ): Promise<{ ok: boolean; error?: string }> => {
   const config = getGasConfig();
 
@@ -542,19 +637,32 @@ export const gradeSubmissionInGas = async (
   const imagesToSave = (correctedImages && correctedImages.length > 0)
     ? correctedImages
     : (found?.correctedImages || []);
+  const audiosToSave = mergeAudioRecords(audios, found?.audios) || [];
+  const feedbackAudiosToSave = audiosToSave
+    .filter((audio) => Boolean(audio.teacherFeedbackUrl))
+    .map((audio) => ({
+      label: audio.label,
+      teacherFeedbackUrl: audio.teacherFeedbackUrl,
+      teacherFeedbackLabel: audio.teacherFeedbackLabel
+    }));
 
   const cleanCommentStr = cleanImageTagsFromText(comment);
 
-  let commentForSheet = cleanCommentStr;
+  const sheetCommentParts = [cleanCommentStr];
   if (imagesToSave.length > 0) {
-    commentForSheet = `${cleanCommentStr}\n[CORRECTED_IMAGES]: ${JSON.stringify(imagesToSave)}`;
+    sheetCommentParts.push(`[CORRECTED_IMAGES]: ${JSON.stringify(imagesToSave)}`);
   }
+  if (feedbackAudiosToSave.length > 0) {
+    sheetCommentParts.push(`[TEACHER_FEEDBACK_AUDIOS]: ${JSON.stringify(feedbackAudiosToSave)}`);
+  }
+  const commentForSheet = sheetCommentParts.filter(Boolean).join('\n');
 
   if (found) {
     found.speakScore = speakScore;
     found.comment = cleanCommentStr;
     found.teacherComment = cleanCommentStr;
     found.correctedImages = imagesToSave;
+    if (audiosToSave.length > 0) found.audios = audiosToSave;
     found.status = 'Đã chấm';
     saveLocalSubmission(found, false);
   }
@@ -575,7 +683,8 @@ export const gradeSubmissionInGas = async (
     speakScore: String(speakScore),
     comment: cleanCommentStr,
     teacherComment: cleanCommentStr,
-    correctedImages: imagesToSave
+    correctedImages: imagesToSave,
+    audios: audiosToSave.length > 0 ? audiosToSave : undefined
   });
 
   if (!serverGrade.ok && !config.sheetUrl.trim()) {

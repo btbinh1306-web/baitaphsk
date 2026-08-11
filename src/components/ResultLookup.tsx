@@ -11,7 +11,6 @@ import {
   Clock,
   AlertCircle,
   Award,
-  MessageSquare,
   BookOpen,
   ExternalLink,
   FileText,
@@ -185,13 +184,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     handleSearch();
   };
 
-  // Helper: Parse teacher's comment into general comment & per-item comments
+  // Helper: Parse only per-item teacher comments for the result details.
   const parseTeacherComment = (commentStr?: string) => {
-    if (!commentStr) return { itemComments: {} as Record<string, string>, generalComment: '' };
+    if (!commentStr) return { itemComments: {} as Record<string, string> };
 
     const parts = commentStr.split(' | ');
     const itemComments: Record<string, string> = {};
-    const generalParts: string[] = [];
 
     parts.forEach((part) => {
       const trimmed = part.trim();
@@ -203,15 +201,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         if (text) {
           itemComments[`${type}_${num}`] = text;
         }
-      } else {
-        generalParts.push(trimmed);
       }
     });
 
-    return {
-      itemComments,
-      generalComment: generalParts.join(' | ').trim(),
-    };
+    return { itemComments };
   };
 
   // Helper: Parse essay string into individual questions & answers
@@ -411,7 +404,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         essaysLower.includes('chép từ'))
   );
 
-  const { itemComments, generalComment } = parseTeacherComment(
+  const { itemComments } = parseTeacherComment(
     result?.comment || hwMatchForLookup?.teacherComment || localMatchForLookup?.comment
   );
   const essayList = parseEssays(result?.essays);
@@ -423,15 +416,6 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   });
 
   const wrongList = parseWrongDetails(result?.wrong);
-
-  const displayTeacherComment = cleanImageTagsFromText(
-    result?.teacherComment ||
-    result?.comment ||
-    hwMatchForLookup?.teacherComment ||
-    localMatchForLookup?.teacherComment ||
-    localMatchForLookup?.comment ||
-    generalComment
-  );
 
   const displayPercent = result
     ? (result.total > 0
@@ -552,28 +536,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                 </div>
               </div>
 
-              {/* 2. Teacher Comment Box */}
-              <div className="p-5 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-amber-900 flex items-center gap-2 uppercase tracking-wide">
-                    <MessageSquare className="w-4.5 h-4.5 text-amber-700" /> Nhận Xét Của Giáo Viên:
-                  </span>
-                  {result.status === 'Đã chấm' && (
-                    <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md border border-amber-200">
-                      Chính thức
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm font-semibold text-amber-950 italic leading-relaxed pl-1">
-                  {displayTeacherComment
-                    ? `"${displayTeacherComment}"`
-                    : Object.keys(itemComments).length > 0
-                    ? '"Đã có nhận xét chi tiết ở bên dưới."'
-                    : 'Giáo viên chưa nhập nhận xét chung hoặc bài tập đang chờ chấm.'}
-                </p>
-              </div>
-
-              {/* 3. Handwriting / Photo Submission Content */}
+              {/* 2. Handwriting / Photo Submission Content */}
               <div className="space-y-5 pt-2">
                 {/* Student Submitted Images */}
                 {submissionImgs.length > 0 && (
@@ -791,33 +754,17 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                   </div>
                 </div>
 
-                {/* Speaking Score Card */}
+                {/* Overall Exercise Score Card */}
                 <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-4 flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-bold text-indigo-900 block">Điểm Luyện Nói (GV chấm)</span>
+                    <span className="text-xs font-bold text-indigo-900 block">Điểm Bài Tập Chung (GV chấm)</span>
                     <span className="text-2xl font-bold text-indigo-900">
                       {result.speakScore || (result.status === 'Đã chấm' ? 'Đã duyệt' : 'Chờ chấm')}
                     </span>
-                    <span className="text-xs text-indigo-700 block font-medium">Kỹ năng khẩu ngữ & phát âm</span>
+                    <span className="text-xs text-indigo-700 block font-medium">Kết quả tổng thể do giáo viên chấm</span>
                   </div>
                   <Award className="w-10 h-10 text-indigo-600 opacity-80" />
                 </div>
-              </div>
-
-              {/* General Teacher Comment Box */}
-              <div className="p-4 bg-amber-50/90 border-2 border-amber-200 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide">
-                    <MessageSquare className="w-4 h-4 text-amber-700" /> Nhận Xét Của Giáo Viên:
-                  </span>
-                </div>
-                <p className="text-sm font-semibold text-amber-950 italic leading-relaxed">
-                  {result.teacherComment || generalComment
-                    ? `"${result.teacherComment || generalComment}"`
-                    : Object.keys(itemComments).length > 0
-                    ? '"Đã có nhận xét chi tiết từng câu ở bên dưới."'
-                    : 'Giáo viên chưa nhập nhận xét chung hoặc bài tập đang chờ chấm.'}
-                </p>
               </div>
 
               {/* HANDWRITING SUBMISSION DETAILS / IMAGES */}
@@ -1144,6 +1091,23 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                             <audio controls src={audioSrc} className="w-full h-9" />
                           ) : (
                             <p className="text-xs text-rose-600 font-medium">Không thể tải file âm thanh ghi âm này.</p>
+                          )}
+
+                          {aud.teacherFeedbackUrl && (
+                            <div className="p-3 bg-emerald-50 border-2 border-emerald-200 rounded-lg space-y-1.5">
+                              <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                                <Mic className="w-3.5 h-3.5 text-emerald-700" />
+                                File chữa phát âm của giáo viên:
+                              </span>
+                              <audio
+                                controls
+                                src={getDriveAudioPlayerUrl(aud.teacherFeedbackUrl)}
+                                className="w-full h-9"
+                              />
+                              <p className="text-[11px] text-emerald-800 italic">
+                                Hãy nghe lại giọng mẫu của giáo viên và đọc theo.
+                              </p>
+                            </div>
                           )}
 
                           {/* Immediate Teacher Comment for this Audio Recording */}

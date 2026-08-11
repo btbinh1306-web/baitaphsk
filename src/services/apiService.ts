@@ -1,4 +1,4 @@
-import { ExamLesson, SubmissionData } from '../types';
+import { AudioRecordItem, ExamLesson, SubmissionData } from '../types';
 import { HandwritingExercise } from '../types/handwriting';
 import {
   deleteGasExam,
@@ -179,6 +179,7 @@ export async function gradeServerSubmission(payload: {
   comment?: string;
   teacherComment?: string;
   correctedImages?: string[];
+  audios?: AudioRecordItem[];
 }): Promise<{ ok: boolean; submission?: SubmissionData }> {
   try {
     const res = await fetch('/api/submissions/grade', {

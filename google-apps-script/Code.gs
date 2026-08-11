@@ -8,7 +8,7 @@ var GV_PASSWORD = 'tbtt123';
 var HEADERS = [
   'ID', 'Thời gian', 'Họ tên', 'Lớp', 'Bài', 'Số câu đúng', 'Đã làm', 'Tổng', 'Phần trăm',
   'Số câu sai', 'Chưa làm', 'Chi tiết câu sai', 'Bài tự luận', 'Link ghi âm',
-  'Điểm nói (GV)', 'Nhận xét (GV)', 'Trạng thái'
+  'Điểm bài tập (GV)', 'Nhận xét (GV)', 'Trạng thái'
 ];
 
 function sheet_() {

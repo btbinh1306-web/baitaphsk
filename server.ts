@@ -241,7 +241,7 @@ app.post('/api/submissions', (req, res) => {
 
 app.post('/api/submissions/grade', (req, res) => {
   try {
-    const { id, speakScore, comment, teacherComment, correctedImages } = req.body;
+    const { id, speakScore, comment, teacherComment, correctedImages, audios } = req.body;
     if (!id) {
       res.status(400).json({ ok: false, error: 'Missing submission ID' });
       return;
@@ -257,6 +257,9 @@ app.post('/api/submissions/grade', (req, res) => {
       sub.teacherComment = teacherComment !== undefined ? teacherComment : (comment || sub.teacherComment);
       if (correctedImages && Array.isArray(correctedImages)) {
         sub.correctedImages = Array.from(new Set([...(sub.correctedImages || []), ...correctedImages]));
+      }
+      if (audios && Array.isArray(audios)) {
+        sub.audios = audios;
       }
       sub.status = 'Đã chấm';
 

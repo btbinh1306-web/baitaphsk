@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
+import { AudioRecordItem, SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
-import { fetchTeacherSubmissions, gradeSubmissionInGas, getGasConfig } from '../services/gasService';
+import { fetchTeacherSubmissions, gradeSubmissionInGas, getGasConfig, saveLocalSubmission } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { sanitizeExamSections } from '../utils/lessonParser';
 import { getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { fileToCompressedDataUrl } from '../utils/imageUtils';
 import { ImportLesson } from './ImportLesson';
 import { EditQuestionModal } from './EditQuestionModal';
+import { AudioRecorder } from './AudioRecorder';
 import { HandwritingExerciseEditor } from './exercises/HandwritingExerciseEditor';
 import { HandwritingGradingPanel } from './exercises/HandwritingGradingPanel';
 import { HandwritingExercise, HandwritingSubmission } from '../types/handwriting';
@@ -121,6 +122,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [itemComments, setItemComments] = useState<Record<string, string>>({});
   const [modalCorrectedImages, setModalCorrectedImages] = useState<string[]>([]);
   const [isUploadingCorrected, setIsUploadingCorrected] = useState(false);
+  const [uploadingFeedbackAudio, setUploadingFeedbackAudio] = useState<string | null>(null);
   const [isGrading, setIsGrading] = useState(false);
   const [gradeSuccess, setGradeSuccess] = useState(false);
 
@@ -459,6 +461,63 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     }
   };
 
+  const getAudioRecordsForFeedback = (sub: SubmissionData): AudioRecordItem[] => {
+    if (sub.audios && sub.audios.length > 0) return sub.audios;
+    return (sub.driveLinks || '')
+      .split('\n')
+      .filter(Boolean)
+      .map((link, index) => ({
+        label: link.split(':')[0] || `Ghi âm câu ${index + 1}`,
+        data: '',
+        mime: 'audio/webm',
+        url: getDriveAudioPlayerUrl(link)
+      }));
+  };
+
+  const handleTeacherFeedbackRecorded = async (audioIndex: number, record: AudioRecordItem | null) => {
+    if (!selectedSub || !record) return;
+
+    const feedbackKey = `audio_${audioIndex}`;
+    setUploadingFeedbackAudio(feedbackKey);
+    try {
+      const dataUrl = record.data.startsWith('data:')
+        ? record.data
+        : `data:${record.mime || 'audio/webm'};base64,${record.data}`;
+      const extension = record.mime.includes('mpeg') ? 'mp3' : record.mime.includes('mp4') ? 'm4a' : 'webm';
+      const uploadedUrl = await uploadMediaFile(
+        dataUrl,
+        `giao_vien_chua_${selectedSub.id}_${audioIndex + 1}.${extension}`,
+        record.mime || 'audio/webm',
+        'correction'
+      );
+
+      if (!uploadedUrl) throw new Error('Không nhận được liên kết file chữa');
+
+      const currentAudios = getAudioRecordsForFeedback(selectedSub);
+      const updatedAudios = currentAudios.map((audio, index) =>
+        index === audioIndex
+          ? {
+              ...audio,
+              teacherFeedbackUrl: uploadedUrl,
+              teacherFeedbackLabel: 'Ghi âm chữa phát âm của giáo viên'
+            }
+          : audio
+      );
+      const updatedSub: SubmissionData = { ...selectedSub, audios: updatedAudios };
+
+      setSelectedSub(updatedSub);
+      setSubmissions((prev) => prev.map((item) => (item.id === updatedSub.id ? updatedSub : item)));
+      // Keep a local copy and sync the shared server immediately. The GAS marker is
+      // written when the teacher presses "Lưu Điểm Chấm & Nhận Xét" below.
+      saveLocalSubmission(updatedSub);
+    } catch (error) {
+      console.error('Lỗi khi lưu file chữa phát âm:', error);
+      alert('Không thể lưu file chữa phát âm. Vui lòng thử lại.');
+    } finally {
+      setUploadingFeedbackAudio(null);
+    }
+  };
+
   const handleSaveGrade = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSub) return;
@@ -487,7 +546,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       speakScoreInput,
       finalComment,
       passwordInput || config.teacherPass,
-      modalCorrectedImages
+      modalCorrectedImages,
+      selectedSub.audios
     );
 
     if (res.ok) {
@@ -866,7 +926,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               <h2 className="text-xl font-bold text-slate-800">Cổng Quản Lý, Chấm Bài & Quản Lý Giáo Trình</h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Nghe ghi âm phát âm, chấm điểm khẩu ngữ, đưa ra nhận xét và nhập giáo trình bằng file JSON.
+              Nghe ghi âm phát âm, chấm điểm bài tập, đưa ra nhận xét và nhập giáo trình bằng file JSON.
             </p>
           </div>
 
@@ -2472,6 +2532,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                           <p className="text-xs text-rose-600 font-medium">Không thể tải file âm thanh ghi âm này.</p>
                         )}
 
+                        {aud.teacherFeedbackUrl && (
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg space-y-1.5">
+                            <p className="text-xs font-bold text-emerald-900">File chữa phát âm của giáo viên:</p>
+                            <audio
+                              controls
+                              src={getDriveAudioPlayerUrl(aud.teacherFeedbackUrl)}
+                              className="w-full h-8"
+                            />
+                          </div>
+                        )}
+
                         {/* Per-audio comment input for teacher */}
                         <div className="pt-2 border-t border-indigo-100 space-y-1">
                           <label className="block text-xs font-semibold text-indigo-900">
@@ -2483,6 +2554,19 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                             onChange={(e) => setItemComments((prev) => ({ ...prev, [`audio_${idx}`]: e.target.value }))}
                             placeholder="Nhập nhận xét riêng cho bài ghi âm này (ví dụ: phát âm chuẩn, chú ý thanh 3/thanh 4...)..."
                             className="w-full px-3 py-1.5 border border-indigo-300 rounded-lg text-xs bg-indigo-50/50 text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                        </div>
+
+                        <div className="pt-2 border-t border-indigo-100 space-y-2">
+                          <p className="text-xs font-semibold text-emerald-900">
+                            🎙️ Ghi âm lời chữa phát âm cho học sinh:
+                          </p>
+                          {uploadingFeedbackAudio === `audio_${idx}` && (
+                            <p className="text-[11px] text-emerald-700 font-semibold">Đang lưu file chữa lên bộ nhớ dùng chung...</p>
+                          )}
+                          <AudioRecorder
+                            label="Ghi âm mẫu để học sinh nghe lại"
+                            onAudioRecorded={(record) => void handleTeacherFeedbackRecorded(idx, record)}
                           />
                         </div>
                       </div>
@@ -2517,6 +2601,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                           <audio controls src={playableUrl} className="w-full h-8 rounded-md" />
                         )}
 
+                        {selectedSub.audios?.[idx]?.teacherFeedbackUrl && (
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg space-y-1.5">
+                            <p className="text-xs font-bold text-emerald-900">File chữa phát âm của giáo viên:</p>
+                            <audio
+                              controls
+                              src={getDriveAudioPlayerUrl(selectedSub.audios[idx].teacherFeedbackUrl || '')}
+                              className="w-full h-8"
+                            />
+                          </div>
+                        )}
+
                         {/* Per-audio comment input for teacher */}
                         <div className="pt-2 border-t border-indigo-100 space-y-1">
                           <label className="block text-xs font-semibold text-indigo-900">
@@ -2528,6 +2623,19 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                             onChange={(e) => setItemComments((prev) => ({ ...prev, [`audio_${idx}`]: e.target.value }))}
                             placeholder="Nhập nhận xét riêng cho bài ghi âm này..."
                             className="w-full px-3 py-1.5 border border-indigo-300 rounded-lg text-xs bg-indigo-50/50 text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                        </div>
+
+                        <div className="pt-2 border-t border-indigo-100 space-y-2">
+                          <p className="text-xs font-semibold text-emerald-900">
+                            🎙️ Ghi âm lời chữa phát âm cho học sinh:
+                          </p>
+                          {uploadingFeedbackAudio === `audio_${idx}` && (
+                            <p className="text-[11px] text-emerald-700 font-semibold">Đang lưu file chữa lên bộ nhớ dùng chung...</p>
+                          )}
+                          <AudioRecorder
+                            label="Ghi âm mẫu để học sinh nghe lại"
+                            onAudioRecorded={(record) => void handleTeacherFeedbackRecorded(idx, record)}
                           />
                         </div>
                       </div>
@@ -2546,7 +2654,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Điểm phần Nói (Khẩu ngữ)
+                    Điểm bài tập chung
                   </label>
                   <input
                     type="text"
@@ -2615,7 +2723,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               {gradeSuccess && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Đã cập nhật điểm nói và nhận xét thành công!</span>
+                  <span>Đã cập nhật điểm bài tập và nhận xét thành công!</span>
                 </div>
               )}
 
