@@ -204,14 +204,21 @@ export async function uploadMediaFile(
   mimeType?: string,
   folder: GasMediaFolder = 'lesson'
 ): Promise<string | null> {
-  const gasUrl = await uploadMediaToGas(fileData, fileName, mimeType, folder);
+  const dataMimeType = fileData.match(/^data:([^;,]+)/i)?.[1];
+  const effectiveMimeType = dataMimeType || mimeType;
+  const effectiveFileName =
+    effectiveMimeType === 'image/jpeg' && fileName && !/\.jpe?g$/i.test(fileName)
+      ? `${fileName.replace(/\.[^.]+$/, '')}.jpg`
+      : fileName;
+
+  const gasUrl = await uploadMediaToGas(fileData, effectiveFileName, effectiveMimeType, folder);
   if (gasUrl) return gasUrl;
 
   try {
     const res = await fetch('/api/media/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileData, fileName, mimeType })
+      body: JSON.stringify({ fileData, fileName: effectiveFileName, mimeType: effectiveMimeType })
     });
     const data = await res.json();
     if (data && data.ok && data.url) {
