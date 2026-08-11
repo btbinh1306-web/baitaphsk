@@ -1637,7 +1637,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             <h4 className="font-bold text-slate-800 text-sm flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-indigo-900 font-extrabold">
                 <Headphones className="w-4 h-4 text-indigo-600" />
-                Quản Lý Bài Tập Luyện Nghe ({(editingExam.listeningQuestions || []).length} câu)
+                Quản Lý Bài Tập Luyện Nghe ({(editingExam.listeningQuestions || []).reduce((total, question) => total + (question.subQuestions?.length || 1), 0)} câu)
               </span>
             </h4>
 
@@ -1658,7 +1658,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                             ? 'bg-purple-100 text-purple-900'
                             : 'bg-indigo-100 text-indigo-900'
                         }`}>
-                          {q.type === 'listening_tf' || q.type === 'listening_true_false'
+                          {q.subQuestions?.length
+                            ? q.subQuestions.length > 1 ? '🎧 Nghe hội thoại - trả lời nhiều câu' : '🎧 Nghe hội thoại'
+                            : q.type === 'listening_tf' || q.type === 'listening_true_false'
                             ? '🎧 Nghe Phán Đoán Đúng / Sai'
                             : q.type === 'listening_fill' || q.type === 'listening_fill_in_blank'
                             ? '🎧 Nghe Điền Tự Luận'
@@ -1666,6 +1668,26 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                         </span>
                       </div>
                       {q.pinyin && <p className="text-indigo-600 font-mono">Pinyin: {q.pinyin}</p>}
+
+                      {q.subQuestions?.length ? (
+                        <div className="space-y-1.5 pt-1">
+                          {q.subQuestions.map((subQuestion, subIdx) => (
+                            <div key={subQuestion.id} className="rounded-lg bg-white border border-indigo-100 p-2">
+                              <p className="font-semibold text-slate-800">
+                                Câu {subIdx + 1}: {subQuestion.prompt}
+                              </p>
+                              {subQuestion.options && (
+                                <p className="text-slate-600 mt-0.5">
+                                  Lựa chọn: {subQuestion.options.join(' | ')}
+                                  <span className="font-bold text-emerald-700 ml-2">
+                                    (Đáp án đúng: {subQuestion.options[subQuestion.answer as number] || subQuestion.answer})
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                       
                       {q.options && q.options.length > 0 && (
                         <div className="text-slate-600 pt-0.5">

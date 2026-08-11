@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { AudioRecorder } from './AudioRecorder';
-import { AudioRecordItem, ExamLesson } from '../types';
+import { AudioRecordItem, ExamLesson, Question } from '../types';
 import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
@@ -173,6 +173,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
   const currentExam: ExamLesson = useMemo(() => sanitizeExamSections(rawCurrentExam), [rawCurrentExam]);
 
+  const listeningQuestionItems = useMemo(
+    () => currentExam.listeningQuestions.flatMap((question) => question.subQuestions?.length ? question.subQuestions : [question]),
+    [currentExam.listeningQuestions]
+  );
+
   const groupedFillQuestions = useMemo(() => {
     if (!currentExam.fillQuestions) return [];
     const groups: { tier: string; wordBank?: string[]; questions: typeof currentExam.fillQuestions }[] = [];
@@ -312,9 +317,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       });
 
       // 2. Grade Reading Passage Questions
+      const readingEssayParts: string[] = [];
       if (currentExam.readingPassages) {
         currentExam.readingPassages.forEach((passage, pIdx) => {
           passage.questions.forEach((q, qIdx) => {
+            if (!q.options || q.options.length === 0) {
+              const ans = essayAnswers[q.id] || '(Chưa làm)';
+              readingEssayParts.push(`【${q.prompt}】\nBài làm: ${ans}`);
+              return;
+            }
+
             const userAns = mcAnswers[q.id];
             if (userAns === undefined) {
               notDoneCount++;
@@ -375,7 +387,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
       // 5. Grade Listening Questions (Nghe tích trắc nghiệm / Nghe chọn đúng sai / Nghe điền tự luận)
       if (currentExam.listeningQuestions) {
-        currentExam.listeningQuestions.forEach((q, idx) => {
+        listeningQuestionItems.forEach((q, idx) => {
           if (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') {
             const userText = (fillAnswers[q.id] || '').trim();
             if (!userText) {
@@ -420,11 +432,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         currentExam.mcQuestions.length +
         (currentExam.fillQuestions?.length || 0) +
         (currentExam.arrangeQuestions?.length || 0) +
-        (currentExam.listeningQuestions?.length || 0);
+        listeningQuestionItems.length;
 
       if (currentExam.readingPassages) {
         currentExam.readingPassages.forEach(p => {
-          totalMc += p.questions.length;
+          totalMc += p.questions.filter((q) => q.options && q.options.length > 0).length;
         });
       }
 
@@ -432,10 +444,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       const percent = totalMc > 0 ? Math.round((correctCount / totalMc) * 100) : 100;
 
       // Format Essay & Text Translation Answers
-      const essayParts = currentExam.essayQuestions.map((q) => {
+      const essayParts = [
+        ...readingEssayParts,
+        ...currentExam.essayQuestions.map((q) => {
         const ans = essayAnswers[q.id] || '(Chưa làm)';
         return `【${q.prompt}】\nBài làm: ${ans}`;
-      });
+        })
+      ];
 
       if (currentExam.translationQuestions) {
         currentExam.translationQuestions.forEach((q, idx) => {
@@ -529,6 +544,58 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       return <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-rose-100 text-rose-800 rounded">Cấp 3: Giao tiếp tự do</span>;
     }
     return null;
+  };
+
+  const renderListeningAnswer = (question: Question) => {
+    const isFillType = question.type === 'listening_fill' || question.type === 'listening_fill_in_blank';
+
+    if (isFillType) {
+      return (
+        <div className="pt-2">
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            Nhập câu trả lời / từ điền tự luận:
+          </label>
+          <input
+            type="text"
+            value={fillAnswers[question.id] || ''}
+            onChange={(e) => handleFillChange(question.id, e.target.value)}
+            placeholder="Gõ đáp án của bạn vào đây..."
+            className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs font-medium"
+          />
+        </div>
+      );
+    }
+
+    if (!question.options) return null;
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+        {question.options.map((option, optionIdx) => {
+          const isSelected = mcAnswers[question.id] === optionIdx;
+          return (
+            <button
+              type="button"
+              key={optionIdx}
+              onClick={() => handleMcSelect(question.id, optionIdx)}
+              className={`text-left text-sm p-3 rounded-lg border transition cursor-pointer flex items-center gap-2.5 ${
+                isSelected
+                  ? 'bg-indigo-50 border-indigo-500 text-indigo-950 font-bold ring-1 ring-indigo-500'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <span
+                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                  isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'
+                }`}
+              >
+                {isSelected ? '✓' : ''}
+              </span>
+              <span>{option}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
@@ -1007,20 +1074,21 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     <h3 className="font-bold text-slate-800 text-lg">Phần Luyện Nghe</h3>
                   </div>
                   <span className="text-xs font-medium bg-indigo-50 text-indigo-900 px-2.5 py-1 rounded-full border border-indigo-200">
-                    {currentExam.listeningQuestions.filter(q => (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') ? !!fillAnswers[q.id]?.trim() : mcAnswers[q.id] !== undefined).length}/{currentExam.listeningQuestions.length} đã làm
+                    {listeningQuestionItems.filter(q => (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') ? !!fillAnswers[q.id]?.trim() : mcAnswers[q.id] !== undefined).length}/{listeningQuestionItems.length} đã làm
                   </span>
                 </div>
 
                 <div className="space-y-6">
                   {currentExam.listeningQuestions.map((q, idx) => {
-                    const isFillType = q.type === 'listening_fill' || q.type === 'listening_fill_in_blank';
+                    const subQuestions = q.subQuestions?.length ? q.subQuestions : [q];
+                    const isConversation = !!q.subQuestions?.length;
                     const isTfType = q.type === 'listening_tf' || q.type === 'listening_true_false';
 
                     return (
                       <div key={q.id} className="p-4 rounded-xl bg-indigo-50/40 border border-indigo-100 space-y-3.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2">
-                            <span className="font-bold text-indigo-700 text-sm mt-0.5">Câu nghe {idx + 1}:</span>
+                            <span className="font-bold text-indigo-700 text-sm mt-0.5">{isConversation ? `Bài nghe ${idx + 1}:` : `Câu nghe ${idx + 1}:`}</span>
                             <div>
                               <p className="text-sm font-bold text-slate-900">{q.prompt}</p>
                               {q.pinyin && <p className="text-xs text-indigo-600 font-mono mt-0.5">Pinyin / Phiên âm: {q.pinyin}</p>}
@@ -1029,11 +1097,17 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                             isTfType
                               ? 'bg-amber-100 text-amber-900'
-                              : isFillType
+                              : q.type === 'listening_fill' || q.type === 'listening_fill_in_blank'
                               ? 'bg-purple-100 text-purple-900'
                               : 'bg-indigo-100 text-indigo-900'
                           }`}>
-                            {isTfType ? 'Nghe Phán Đoán Đúng / Sai' : isFillType ? 'Nghe Điền Tự Luận' : 'Nghe Tích Trắc Nghiệm ABCD'}
+                            {isConversation
+                              ? subQuestions.length > 1 ? 'Nghe hội thoại - trả lời nhiều câu' : 'Nghe hội thoại'
+                              : isTfType
+                              ? 'Nghe Phán Đoán Đúng / Sai'
+                              : q.type === 'listening_fill' || q.type === 'listening_fill_in_blank'
+                              ? 'Nghe Điền Tự Luận'
+                              : 'Nghe Tích Trắc Nghiệm ABCD'}
                           </span>
                         </div>
 
@@ -1061,48 +1135,26 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           )}
                         </div>
 
-                        {/* Fill in blank answer input or Multiple choice / True False options */}
-                        {isFillType ? (
-                          <div className="pt-2">
-                            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                              Nhập câu trả lời / từ điền tự luận:
-                            </label>
-                            <input
-                              type="text"
-                              value={fillAnswers[q.id] || ''}
-                              onChange={(e) => setFillAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                              placeholder="Gõ đáp án của bạn vào đây..."
-                              className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs font-medium"
-                            />
-                          </div>
-                        ) : q.options ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                            {q.options.map((opt, optIdx) => {
-                              const isSelected = mcAnswers[q.id] === optIdx;
-                              return (
-                                <button
-                                  type="button"
-                                  key={optIdx}
-                                  onClick={() => handleMcSelect(q.id, optIdx)}
-                                  className={`text-left text-sm p-3 rounded-lg border transition cursor-pointer flex items-center gap-2.5 ${
-                                    isSelected
-                                      ? 'bg-indigo-50 border-indigo-500 text-indigo-950 font-bold ring-1 ring-indigo-500'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  <span
-                                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold ${
-                                      isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'
-                                    }`}
-                                  >
-                                    {isSelected ? '✓' : ''}
-                                  </span>
-                                  <span>{opt}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : null}
+                        <div className={isConversation ? 'space-y-3 pt-1' : ''}>
+                          {subQuestions.map((subQuestion, subIdx) => (
+                            <div
+                              key={subQuestion.id}
+                              className={isConversation ? 'p-3 bg-white/80 rounded-xl border border-indigo-100 space-y-2' : ''}
+                            >
+                              {isConversation && (
+                                <div className="text-sm font-bold text-slate-900">
+                                  Câu {subIdx + 1}: {subQuestion.prompt}
+                                  {subQuestion.pinyin && (
+                                    <p className="text-xs text-indigo-600 font-mono mt-0.5">
+                                      Pinyin / Phiên âm: {subQuestion.pinyin}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              {renderListeningAnswer(subQuestion)}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     );
                   })}
@@ -1149,7 +1201,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                             <p className="text-xs font-bold text-slate-700">
                               Câu {qIdx + 1}: {q.prompt}
                             </p>
-                            {q.options && (
+                            {q.options && q.options.length > 0 ? (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                                 {q.options.map((opt, optIdx) => {
                                   const isSelected = mcAnswers[q.id] === optIdx;
@@ -1176,6 +1228,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                                   );
                                 })}
                               </div>
+                            ) : (
+                              <textarea
+                                rows={2}
+                                value={essayAnswers[q.id] || ''}
+                                onChange={(e) => handleEssayChange(q.id, e.target.value)}
+                                placeholder="Nhập câu trả lời bằng chữ Hán..."
+                                className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
+                              />
                             )}
                           </div>
                         ))}

@@ -1,0 +1,691 @@
+{
+  "version": "1.0",
+  "lesson": {
+    "id": "hsk1-de-tong-hop-bai1-5-5-ky-nang",
+    "title": "Đề kiểm tra tổng hợp HSK1 Bài 1-5 (Đủ 5 kỹ năng)",
+    "level": "HSK 1",
+    "description": "Đề kiểm tra tổng hợp cuối kỳ HSK1 3.0, phạm vi Bài 1 đến Bài 5. Thời gian 70 phút làm bài trên giấy và phần nói ghi âm. Tổng điểm 115.",
+    "durationMinutes": 70,
+    "totalPoints": 115
+  },
+  "scoring": {
+    "part1": { "title": "Từ vựng - Ngữ pháp", "points": 30 },
+    "part2": { "title": "Đọc hiểu", "points": 25 },
+    "part3": { "title": "Nghe", "points": 30 },
+    "part4": { "title": "Viết", "points": 15 },
+    "part5": { "title": "Nói", "points": 15 },
+    "total": 115,
+    "note": "Bảng biểu điểm trong file Word ghi 100 điểm, nhưng tổng điểm các phần và phần đầu đề là 115 điểm. JSON giữ theo tổng điểm 115 của đề."
+  },
+  "sections": [
+    {
+      "id": "part1-vocab-grammar",
+      "title": "PHẦN I. TỪ VỰNG - NGỮ PHÁP (30 điểm)",
+      "items": [
+        {
+          "id": "q01",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 1. Nối từ với nghĩa phù hợp: 老师",
+            "options": ["A. nghỉ ngơi", "B. giáo viên", "C. tên", "D. bạn bè", "E. sủi cảo"],
+            "answer": 1,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q02",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 2. Nối từ với nghĩa phù hợp: 名字",
+            "options": ["A. nghỉ ngơi", "B. giáo viên", "C. tên", "D. bạn bè", "E. sủi cảo"],
+            "answer": 2,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q03",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 3. Nối từ với nghĩa phù hợp: 朋友",
+            "options": ["A. nghỉ ngơi", "B. giáo viên", "C. tên", "D. bạn bè", "E. sủi cảo"],
+            "answer": 3,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q04",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 4. Nối từ với nghĩa phù hợp: 休息",
+            "options": ["A. nghỉ ngơi", "B. giáo viên", "C. tên", "D. bạn bè", "E. sủi cảo"],
+            "answer": 0,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q05",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 5. Nối từ với nghĩa phù hợp: 饺子",
+            "options": ["A. nghỉ ngơi", "B. giáo viên", "C. tên", "D. bạn bè", "E. sủi cảo"],
+            "answer": 4,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q06",
+          "type": "fill",
+          "data": {
+            "prompt": "Câu 6. 你家有几口人？——我家有（    ）口人。",
+            "wordBank": ["谁", "没有", "会", "两", "星期"],
+            "answer": "两",
+            "acceptableAnswers": "两",
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q07",
+          "type": "fill",
+          "data": {
+            "prompt": "Câu 7. 今天是（    ）三。",
+            "wordBank": ["谁", "没有", "会", "两", "星期"],
+            "answer": "星期",
+            "acceptableAnswers": "星期",
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q08",
+          "type": "fill",
+          "data": {
+            "prompt": "Câu 8. 他（    ）说汉语。",
+            "wordBank": ["谁", "没有", "会", "两", "星期"],
+            "answer": "会",
+            "acceptableAnswers": "会",
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q09",
+          "type": "fill",
+          "data": {
+            "prompt": "Câu 9. 她是（    ）？——她是我的中文老师。",
+            "wordBank": ["谁", "没有", "会", "两", "星期"],
+            "answer": "谁",
+            "acceptableAnswers": "谁",
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q10",
+          "type": "fill",
+          "data": {
+            "prompt": "Câu 10. 我（    ）哥哥，我有一个妹妹。",
+            "wordBank": ["谁", "没有", "会", "两", "星期"],
+            "answer": "没有",
+            "acceptableAnswers": "没有",
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q11",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 11. “Tôi là học sinh” nói thế nào?",
+            "options": ["我是学生。", "我叫学生。", "我有学生。"],
+            "answer": 0,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q12",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 12. A：谢谢您！ B：______",
+            "options": ["对不起！", "不客气！", "没事吗？"],
+            "answer": 1,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q13",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 13. 你______名字？",
+            "options": ["什么叫", "叫什么", "叫谁"],
+            "answer": 1,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q14",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 14. 王老师______中国人。",
+            "options": ["有", "是", "会"],
+            "answer": 1,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q15",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 15. “Giáo viên tiếng Trung của tôi” là：",
+            "options": ["我中文老师", "我的中文老师", "中文我的老师"],
+            "answer": 1,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q16",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 16. 你是哪______人？",
+            "options": ["个", "国", "口"],
+            "answer": 1,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q17",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 17. 你家有______人？",
+            "options": ["几口", "多少口个", "几个口"],
+            "answer": 0,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q18",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 18. 我有______姐姐。",
+            "options": ["二个", "两个", "两"],
+            "answer": 1,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q19",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 19. 今天______8月12号。",
+            "options": ["有", "叫", "是"],
+            "answer": 2,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q20",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 20. 我喜欢______中国菜。",
+            "options": ["吃", "叫", "是"],
+            "answer": 0,
+            "tier": "tier1"
+          }
+        },
+        {
+          "id": "q21",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 21. Sắp xếp từ thành câu đúng: 是 / 我 / 越南人",
+            "wordChips": ["是", "我", "越南人", "。"],
+            "acceptableAnswers": "我是越南人。|我是越南人",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q22",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 22. Sắp xếp từ thành câu đúng: 你 / 什么 / 名字 / 叫",
+            "wordChips": ["你", "什么", "名字", "叫", "？"],
+            "acceptableAnswers": "你叫什么名字？|你叫什么名字",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q23",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 23. Sắp xếp từ thành câu đúng: 有 / 几 / 你家 / 口 / 人",
+            "wordChips": ["有", "几", "你家", "口", "人", "？"],
+            "acceptableAnswers": "你家有几口人？|你家有几口人",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q24",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 24. Sắp xếp từ thành câu đúng: 明天 / 我 / 会 / 学 / 汉语",
+            "wordChips": ["明天", "我", "会", "学", "汉语", "。"],
+            "acceptableAnswers": "明天我会学汉语。|明天我会学汉语",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q25",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 25. Sắp xếp từ thành câu đúng: 今天 / 星期 / 是 / 几",
+            "wordChips": ["今天", "星期", "是", "几", "？"],
+            "acceptableAnswers": "今天是星期几？|今天是星期几",
+            "tier": "tier2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "part2-reading",
+      "title": "PHẦN II. ĐỌC HIỂU (25 điểm)",
+      "items": [
+        {
+          "id": "q26",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 26. 你叫什么名字？",
+            "options": ["A. 今天是八月十二号。", "B. 我叫李文。", "C. 会，我会说汉语。", "D. 我是越南人。", "E. 我家有四口人。"],
+            "answer": 1,
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q27",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 27. 你是哪国人？",
+            "options": ["A. 今天是八月十二号。", "B. 我叫李文。", "C. 会，我会说汉语。", "D. 我是越南人。", "E. 我家有四口人。"],
+            "answer": 3,
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q28",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 28. 你家有几口人？",
+            "options": ["A. 今天是八月十二号。", "B. 我叫李文。", "C. 会，我会说汉语。", "D. 我是越南人。", "E. 我家有四口人。"],
+            "answer": 4,
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q29",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 29. 今天是几月几号？",
+            "options": ["A. 今天是八月十二号。", "B. 我叫李文。", "C. 会，我会说汉语。", "D. 我是越南人。", "E. 我家有四口人。"],
+            "answer": 0,
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q30",
+          "type": "mc",
+          "data": {
+            "prompt": "Câu 30. 你会说汉语吗？",
+            "options": ["A. 今天是八月十二号。", "B. 我叫李文。", "C. 会，我会说汉语。", "D. 我是越南人。", "E. 我家有四口人。"],
+            "answer": 2,
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "reading-annie",
+          "type": "reading",
+          "data": {
+            "title": "Đoạn đọc 1",
+            "content": "我叫安妮，是法国人。我是学生，也是李老师的学生。我有一个中国朋友，她叫王月。王月今年二十岁。今天是星期五，我们休息，吃中国菜。",
+            "questions": [
+              { "id": "q31", "prompt": "Câu 31. 安妮是中国人。", "options": ["✓", "✗"], "answer": 1 },
+              { "id": "q32", "prompt": "Câu 32. 安妮是学生。", "options": ["✓", "✗"], "answer": 0 },
+              { "id": "q33", "prompt": "Câu 33. 李老师是安妮的老师。", "options": ["✓", "✗"], "answer": 0 },
+              { "id": "q34", "prompt": "Câu 34. 王月今年二十岁。", "options": ["✓", "✗"], "answer": 0 },
+              { "id": "q35", "prompt": "Câu 35. 今天她们上课。", "options": ["✓", "✗"], "answer": 1 }
+            ]
+          }
+        },
+        {
+          "id": "reading-chen",
+          "type": "reading",
+          "data": {
+            "title": "Đoạn đọc 2",
+            "content": "我叫陈天中。我家有五口人：爸爸、妈妈、哥哥、妹妹和我。爸爸妈妈工作很忙。哥哥会说中文，他喜欢中国菜。妹妹今年八岁。今天是8月12号，星期三。明天我休息，我想看书。",
+            "questions": [
+              { "id": "q36", "type": "essay", "prompt": "Câu 36. 陈天中家有几口人？", "suggestedAnswer": "五口人。|他家有五口人。" },
+              { "id": "q37", "type": "essay", "prompt": "Câu 37. 谁会说中文？", "suggestedAnswer": "哥哥。|哥哥会说中文。" },
+              { "id": "q38", "type": "essay", "prompt": "Câu 38. 妹妹今年几岁？", "suggestedAnswer": "八岁。|妹妹今年八岁。" },
+              { "id": "q39", "type": "essay", "prompt": "Câu 39. 今天是星期几？", "suggestedAnswer": "星期三。|今天是星期三。" },
+              { "id": "q40", "type": "essay", "prompt": "Câu 40. 陈天中明天想做什么？", "suggestedAnswer": "他想看书。" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "part3-listening",
+      "title": "PHẦN III. NGHE (30 điểm)",
+      "items": [
+        {
+          "id": "q41",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 41. Bạn nghe thấy số nào?",
+            "options": ["12", "20", "22"],
+            "answer": 2,
+            "teacherScript": "二十二。",
+            "instruction": "Giáo viên đọc 2 lần. Khi có file audio, thêm audioUrl vào data."
+          }
+        },
+        {
+          "id": "q42",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 42. Bạn nghe thấy ngày nào?",
+            "options": ["8月8号", "8月18号", "9月8号"],
+            "answer": 1,
+            "teacherScript": "今天是八月十八号。"
+          }
+        },
+        {
+          "id": "q43",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 43. Người nói là ai?",
+            "options": ["老师", "学生", "朋友"],
+            "answer": 1,
+            "teacherScript": "我是学生。"
+          }
+        },
+        {
+          "id": "q44",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 44. Người nói có anh trai không?",
+            "options": ["有", "没有", "Không nói"],
+            "answer": 1,
+            "teacherScript": "我没有哥哥，我有一个妹妹。"
+          }
+        },
+        {
+          "id": "q45",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 45. Hôm nay là thứ mấy?",
+            "options": ["星期一", "星期三", "星期五"],
+            "answer": 1,
+            "teacherScript": "今天是星期三。"
+          }
+        },
+        {
+          "id": "q46",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 46. Chọn câu trả lời đúng.",
+            "options": ["我叫白家月。", "我是越南人。", "我二十岁。"],
+            "answer": 0,
+            "teacherScript": "你叫什么名字？"
+          }
+        },
+        {
+          "id": "q47",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 47. Chọn câu trả lời đúng.",
+            "options": ["她是我姐姐。", "她叫安妮。", "她二十岁。"],
+            "answer": 0,
+            "teacherScript": "她是谁？"
+          }
+        },
+        {
+          "id": "q48",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 48. Chọn câu trả lời đúng.",
+            "options": ["我家有四口人。", "我有四本书。", "我叫李文。"],
+            "answer": 0,
+            "teacherScript": "你家有几口人？"
+          }
+        },
+        {
+          "id": "q49",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 49. Chọn câu trả lời đúng.",
+            "options": ["今天是8月12号。", "今天星期三吗？", "明天我休息。"],
+            "answer": 0,
+            "teacherScript": "今天是几月几号？"
+          }
+        },
+        {
+          "id": "q50",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 50. Chọn câu trả lời đúng.",
+            "options": ["会，我会说一点儿汉语。", "我是汉语老师。", "我喜欢汉语。"],
+            "answer": 0,
+            "teacherScript": "你会说汉语吗？"
+          }
+        },
+        {
+          "id": "q51-52",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Nghe đoạn hội thoại và trả lời câu 51-52.",
+            "teacherScript": "男：你好！我叫李文，是越南人。你叫什么名字？女：我叫王月，是中国人。",
+            "questions": [
+              {
+                "id": "q51",
+                "prompt": "Câu 51. 男的是哪国人？",
+                "options": ["中国人", "越南人", "法国人"],
+                "answer": 1
+              },
+              {
+                "id": "q52",
+                "prompt": "Câu 52. 女的叫什么名字？",
+                "options": ["李文", "安妮", "王月"],
+                "answer": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "q53",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Câu 53. 王月家有几口人？",
+            "options": ["三口人", "四口人", "五口人"],
+            "answer": 1,
+            "teacherScript": "男：你家有几口人？女：我家有四口人：爸爸、妈妈、姐姐和我。"
+          }
+        },
+        {
+          "id": "q54-55",
+          "type": "listening_mc",
+          "data": {
+            "prompt": "Nghe đoạn hội thoại và trả lời câu 54-55.",
+            "teacherScript": "男：今天星期六，明天你工作吗？女：不工作，明天我休息。男：我也休息。明天我们吃中国菜。女：好！",
+            "questions": [
+              {
+                "id": "q54",
+                "prompt": "Câu 54. 明天是星期几？",
+                "options": ["星期六", "星期日", "星期一"],
+                "answer": 1
+              },
+              {
+                "id": "q55",
+                "prompt": "Câu 55. 他们明天做什么？",
+                "options": ["工作", "学习汉语", "休息、吃中国菜"],
+                "answer": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "part4-writing",
+      "title": "PHẦN IV. VIẾT (15 điểm)",
+      "items": [
+        {
+          "id": "q56",
+          "type": "essay",
+          "data": {
+            "prompt": "Câu 56. Viết chữ Hán theo pinyin: lǎoshī (giáo viên)",
+            "suggestedAnswer": "老师",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q57",
+          "type": "essay",
+          "data": {
+            "prompt": "Câu 57. Viết chữ Hán theo pinyin: míngzi (tên)",
+            "suggestedAnswer": "名字",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q58",
+          "type": "essay",
+          "data": {
+            "prompt": "Câu 58. Viết chữ Hán theo pinyin: Zhōngguó (Trung Quốc)",
+            "suggestedAnswer": "中国",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q59",
+          "type": "essay",
+          "data": {
+            "prompt": "Câu 59. Viết chữ Hán theo pinyin: péngyou (bạn bè)",
+            "suggestedAnswer": "朋友",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q60",
+          "type": "essay",
+          "data": {
+            "prompt": "Câu 60. Viết chữ Hán theo pinyin: jīntiān (hôm nay)",
+            "suggestedAnswer": "今天",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q61",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 61. Sắp xếp và chép lại thành câu hoàn chỉnh: 我的 / 她 / 中文老师 / 是",
+            "wordChips": ["我的", "她", "中文老师", "是", "。"],
+            "acceptableAnswers": "她是我的中文老师。|她是我的中文老师",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q62",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 62. Sắp xếp và chép lại thành câu hoàn chỉnh: 你 / 有 / 几个 / 朋友",
+            "wordChips": ["你", "有", "几个", "朋友", "？"],
+            "acceptableAnswers": "你有几个朋友？|你有几个朋友",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q63",
+          "type": "arrange",
+          "data": {
+            "prompt": "Câu 63. Sắp xếp và chép lại thành câu hoàn chỉnh: 星期天 / 我 / 不 / 工作",
+            "wordChips": ["星期天", "我", "不", "工作", "。"],
+            "acceptableAnswers": "星期天我不工作。|星期天我不工作",
+            "tier": "tier2"
+          }
+        },
+        {
+          "id": "q64",
+          "type": "essay",
+          "data": {
+            "prompt": "Câu 64. Trả lời bằng câu tiếng Trung hoàn chỉnh: 你叫什么名字？",
+            "suggestedAnswer": "我叫安妮。",
+            "tier": "tier3"
+          }
+        },
+        {
+          "id": "q65",
+          "type": "essay",
+          "data": {
+            "prompt": "Câu 65. Trả lời bằng câu tiếng Trung hoàn chỉnh: 你家有几口人？",
+            "suggestedAnswer": "我家有四口人。",
+            "tier": "tier3"
+          }
+        }
+      ]
+    },
+    {
+      "id": "part5-speaking",
+      "title": "PHẦN V. NÓI (15 điểm)",
+      "items": [
+        {
+          "id": "q66",
+          "type": "speaking",
+          "data": { "prompt": "Câu 66. Đọc thành tiếng: 大家好！我是学生。", "pinyin": "Dàjiā hǎo! Wǒ shì xuésheng.", "tier": "tier1" }
+        },
+        {
+          "id": "q67",
+          "type": "speaking",
+          "data": { "prompt": "Câu 67. Đọc thành tiếng: 你叫什么名字？", "pinyin": "Nǐ jiào shénme míngzi?", "tier": "tier1" }
+        },
+        {
+          "id": "q68",
+          "type": "speaking",
+          "data": { "prompt": "Câu 68. Đọc thành tiếng: 她是我的中文老师。", "pinyin": "Tā shì wǒ de Zhōngwén lǎoshī.", "tier": "tier1" }
+        },
+        {
+          "id": "q69",
+          "type": "speaking",
+          "data": { "prompt": "Câu 69. Đọc thành tiếng: 我家有四口人。", "pinyin": "Wǒ jiā yǒu sì kǒu rén.", "tier": "tier1" }
+        },
+        {
+          "id": "q70",
+          "type": "speaking",
+          "data": { "prompt": "Câu 70. Đọc thành tiếng: 今天是星期三，明天我休息。", "pinyin": "Jīntiān shì xīngqīsān, míngtiān wǒ xiūxi.", "tier": "tier1" }
+        },
+        {
+          "id": "q71",
+          "type": "translation",
+          "data": { "prompt": "Câu 71. Tôi tên là Lý Văn.", "translationType": "vi_to_zh_audio", "suggestedAnswer": "我叫李文。", "tier": "tier2" }
+        },
+        {
+          "id": "q72",
+          "type": "translation",
+          "data": { "prompt": "Câu 72. Cô ấy là người Việt Nam.", "translationType": "vi_to_zh_audio", "suggestedAnswer": "她是越南人。", "tier": "tier2" }
+        },
+        {
+          "id": "q73",
+          "type": "translation",
+          "data": { "prompt": "Câu 73. Nhà bạn có mấy người?", "translationType": "vi_to_zh_audio", "suggestedAnswer": "你家有几口人？", "tier": "tier2" }
+        },
+        {
+          "id": "q74",
+          "type": "translation",
+          "data": { "prompt": "Câu 74. Hôm nay là ngày 12 tháng 8.", "translationType": "vi_to_zh_audio", "suggestedAnswer": "今天是八月十二号。|今天是八月十二日。", "tier": "tier2" }
+        },
+        {
+          "id": "q75",
+          "type": "translation",
+          "data": { "prompt": "Câu 75. Ngày mai tôi sẽ học tiếng Trung.", "translationType": "vi_to_zh_audio", "suggestedAnswer": "明天我会学汉语。|明天我会学中文。", "tier": "tier2" }
+        }
+      ]
+    }
+  ],
+  "teacherNotes": {
+    "instructions": "Phần nghe: mỗi câu/đoạn nghe 2 lần. Phần nói: học sinh ghi âm từng câu riêng và nói số câu trước khi trả lời.",
+    "listeningAudio": "DOCX không có file audio nhúng. Các trường teacherScript là kịch bản để giáo viên tạo/upload audio sau.",
+    "listeningGroups": "Một item type listening_mc/listening_tf/listening_fill có thể có data.questions. audioUrl đặt ở item cha để dùng chung cho toàn bộ câu hỏi con; mỗi câu con có id, prompt, options và answer riêng.",
+    "knowledgeScope": "Bài 1: chào hỏi, 是/不是, số 1-10; Bài 2: 叫、名字、什么、很、高兴、认识、也; Bài 3: quốc tịch, 的, 谁、这、那、哪, 个; Bài 4: 有/没有, 几/多少, 个/口, 两/二, gia đình, 岁; Bài 5: ngày tháng, 星期, 昨天/明天, 休息, 会, 吃, 喜欢."
+  }
+}

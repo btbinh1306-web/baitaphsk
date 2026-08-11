@@ -43,6 +43,7 @@ export interface Question {
   imageUrl?: string; // Attached image file data/URL for questions
   items?: (string | Record<string, unknown>)[];
   questions?: Record<string, unknown>[];
+  subQuestions?: Question[]; // Multiple questions sharing one listening/audio prompt
 }
 
 export interface ReadingPassage {

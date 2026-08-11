@@ -50,16 +50,117 @@ function parseWordBankFromPrompt(prompt?: string): { wordBank: string[]; prompt:
 
 function normalizeFillQuestions(questions: Question[]): Question[] {
   return questions.map((question) => {
-    const parsedPrompt = parseWordBankFromPrompt(question.prompt);
+    const normalizedPrompt = stripLeadingQuestionNumber(question.prompt) || question.prompt;
+    const parsedPrompt = parseWordBankFromPrompt(normalizedPrompt);
     const wordBank = question.wordBank?.length
       ? question.wordBank
       : parsedPrompt?.wordBank;
 
     return {
       ...question,
-      prompt: parsedPrompt?.prompt || question.prompt,
+      prompt: parsedPrompt?.prompt || normalizedPrompt,
       wordBank,
       tier: wordBank?.length && !question.wordBank ? 'tier1' : (question.tier || (wordBank?.length ? 'tier1' : 'tier2'))
+    };
+  });
+}
+
+export function stripLeadingQuestionNumber(prompt?: string): string | undefined {
+  if (!prompt) return prompt;
+
+  return prompt
+    .trim()
+    .replace(
+      /^\s*(?:(?:phần\s+[ivxlcdm\d]+\s*[-–—:]\s*)?câu\s+(?:nghe\s+)?(?:số\s+)?\d+\s*[:.)\-–—]?\s*)+/iu,
+      ''
+    )
+    .trim();
+}
+
+function normalizeQuestionPrompts(questions: Question[]): Question[] {
+  return questions.map((question) => ({
+    ...question,
+    prompt: stripLeadingQuestionNumber(question.prompt) || question.prompt
+  }));
+}
+
+function normalizeTranslationQuestions(questions: Question[]): Question[] {
+  return questions.map((question) => (
+    question.translationType === 'vi_to_zh_audio'
+      ? { ...question, pinyin: undefined }
+      : question
+  ));
+}
+
+function isVietnameseToChineseAudioPrompt(prompt: string): boolean {
+  return /dịch\s+sang\s+tiếng\s+trung[\s\S]*ghi\s+âm/iu.test(prompt);
+}
+
+function normalizeListeningQuestionType(type: unknown, parentType: string): Question['type'] {
+  const normalizedType = typeof type === 'string' ? type.toLowerCase().trim() : parentType;
+  if (normalizedType === 'listening_fill' || normalizedType === 'listening_fill_in_blank' || normalizedType === 'fill' || normalizedType === 'fill_in_blank') {
+    return normalizedType === 'fill' || normalizedType === 'fill_in_blank' ? 'listening_fill' : normalizedType;
+  }
+  if (normalizedType === 'listening_tf' || normalizedType === 'listening_true_false' || normalizedType === 'true_false' || normalizedType === 'tf') {
+    return normalizedType === 'tf' || normalizedType === 'true_false' ? 'listening_tf' : normalizedType;
+  }
+  return normalizedType === 'listening_multiple_choice' || normalizedType === 'listening_mc' || normalizedType === 'mc' || normalizedType === 'multiple_choice'
+    ? (normalizedType === 'mc' || normalizedType === 'multiple_choice' ? 'listening_mc' : normalizedType)
+    : 'listening_mc';
+}
+
+function parseListeningSubQuestions(
+  rawQuestions: unknown[] | undefined,
+  parentType: string,
+  parentId: string
+): Question[] {
+  if (!rawQuestions?.length) return [];
+
+  return rawQuestions.map((rawQuestion, index) => {
+    const raw = (rawQuestion || {}) as Record<string, unknown>;
+    const data = (raw.data || raw) as Record<string, unknown>;
+    const type = normalizeListeningQuestionType(data.type, parentType);
+    const isFillType = type === 'listening_fill' || type === 'listening_fill_in_blank';
+    const isTfType = type === 'listening_tf' || type === 'listening_true_false';
+    const options = Array.isArray(data.options) ? data.options.map(String) : undefined;
+    const answer = data.answer;
+
+    return {
+      id: raw.id ? String(raw.id) : `${parentId}_q${index + 1}`,
+      type,
+      tier: 'tier2',
+      prompt: stripLeadingQuestionNumber(
+        typeof data.prompt === 'string'
+          ? data.prompt
+          : (typeof data.question === 'string' ? data.question : `Câu hỏi ${index + 1}`)
+      ) || `Câu hỏi ${index + 1}`,
+      pinyin: typeof data.pinyin === 'string' ? data.pinyin : undefined,
+      options: isFillType
+        ? undefined
+        : (options || (isTfType ? ['Đúng (正确)', 'Sai (错误)'] : ['A', 'B', 'C', 'D'])),
+      answer: typeof answer === 'number' || typeof answer === 'string' ? answer : 0,
+      acceptableAnswers: typeof data.acceptableAnswers === 'string' ? data.acceptableAnswers : undefined,
+      suggestedAnswer: typeof data.suggestedAnswer === 'string'
+        ? data.suggestedAnswer
+        : (typeof answer === 'string' ? answer : undefined),
+      explanation: typeof data.explanation === 'string' ? data.explanation : undefined
+    };
+  });
+}
+
+function normalizeListeningQuestions(questions: Question[]): Question[] {
+  return questions.map((question) => {
+    const rawSubQuestions = Array.isArray(question.questions) ? question.questions : undefined;
+    const subQuestions = question.subQuestions?.length
+      ? normalizeQuestionPrompts(question.subQuestions)
+      : parseListeningSubQuestions(rawSubQuestions, question.type, question.id);
+
+    return {
+      ...question,
+      prompt: stripLeadingQuestionNumber(question.prompt) || question.prompt,
+      subQuestions: subQuestions.length > 0 ? subQuestions : undefined,
+      options: subQuestions.length > 0 ? undefined : question.options,
+      answer: subQuestions.length > 0 ? undefined : question.answer
     };
   });
 }
@@ -67,15 +168,35 @@ function normalizeFillQuestions(questions: Question[]): Question[] {
 export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
   if (!exam) return exam;
 
-  const listeningQuestions = [...(exam.listeningQuestions || [])];
-  const speakingQuestions = [...(exam.speakingQuestions || [])];
+  const listeningQuestions = normalizeListeningQuestions(exam.listeningQuestions || []);
+  const normalizedSpeakingQuestions = normalizeQuestionPrompts(exam.speakingQuestions || []);
   const vocabList = [...(exam.vocabList || [])];
-  const mcQuestions = [...(exam.mcQuestions || [])];
+  const mcQuestions = normalizeQuestionPrompts(exam.mcQuestions || []);
   const fillQuestions = [...(exam.fillQuestions || [])];
-  const arrangeQuestions = [...(exam.arrangeQuestions || [])];
-  const essayQuestions = [...(exam.essayQuestions || [])];
-  const translationQuestions = [...(exam.translationQuestions || [])];
-  const handwritingQuestions = [...(exam.handwritingQuestions || [])];
+  const arrangeQuestions = normalizeQuestionPrompts(exam.arrangeQuestions || []);
+  const essayQuestions = normalizeQuestionPrompts(exam.essayQuestions || []);
+  const translationQuestions = normalizeTranslationQuestions(
+    normalizeQuestionPrompts(exam.translationQuestions || [])
+  );
+  const handwritingQuestions = normalizeQuestionPrompts(exam.handwritingQuestions || []);
+  const migratedTranslationIds = new Set(translationQuestions.map((question) => question.id));
+  const speakingQuestions = normalizedSpeakingQuestions.filter((question) => {
+    if (!isVietnameseToChineseAudioPrompt(question.prompt)) return true;
+    if (!migratedTranslationIds.has(question.id)) {
+      translationQuestions.push({
+        ...question,
+        type: 'translation',
+        translationType: 'vi_to_zh_audio',
+        pinyin: undefined
+      });
+      migratedTranslationIds.add(question.id);
+    }
+    return false;
+  });
+  const readingPassages = (exam.readingPassages || []).map((passage) => ({
+    ...passage,
+    questions: normalizeQuestionPrompts(passage.questions || [])
+  }));
   const normalizedFillQuestions = normalizeFillQuestions(fillQuestions);
 
   if (!exam.sections || exam.sections.length === 0) {
@@ -89,7 +210,8 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
       arrangeQuestions,
       essayQuestions,
       translationQuestions,
-      handwritingQuestions
+      handwritingQuestions,
+      readingPassages
     };
   }
 
@@ -109,7 +231,14 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
         type === 'listening_fill' ||
         type === 'listening_fill_in_blank'
       ) {
-        const itemPrompt = typeof itemData.prompt === 'string' ? itemData.prompt : 'Nghe và chọn đáp án:';
+        const itemPrompt = stripLeadingQuestionNumber(
+          typeof itemData.prompt === 'string' ? itemData.prompt : 'Nghe và chọn đáp án:'
+        ) || 'Nghe và chọn đáp án:';
+        const subQuestions = parseListeningSubQuestions(
+          Array.isArray(itemData.questions) ? itemData.questions : undefined,
+          type,
+          qId
+        );
         if (!listeningQuestions.some((q) => q.id === qId || q.prompt === itemPrompt)) {
           listeningQuestions.push({
             id: qId,
@@ -119,10 +248,13 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
             pinyin: typeof itemData.pinyin === 'string' ? itemData.pinyin : undefined,
             audioUrl: typeof itemData.audioUrl === 'string' ? itemData.audioUrl : (typeof itemData.audioPromptUrl === 'string' ? itemData.audioPromptUrl : undefined),
             audioPromptUrl: typeof itemData.audioPromptUrl === 'string' ? itemData.audioPromptUrl : undefined,
-            options: Array.isArray(itemData.options) ? itemData.options.map(String) : (type === 'listening_tf' || type === 'listening_true_false' ? ['Đúng (正确)', 'Sai (错误)'] : ['A', 'B', 'C', 'D']),
-            answer: typeof itemData.answer === 'number' ? itemData.answer : 0,
+            options: subQuestions.length > 0
+              ? undefined
+              : (Array.isArray(itemData.options) ? itemData.options.map(String) : (type === 'listening_tf' || type === 'listening_true_false' ? ['Đúng (正确)', 'Sai (错误)'] : ['A', 'B', 'C', 'D'])),
+            answer: subQuestions.length > 0 ? undefined : (typeof itemData.answer === 'number' ? itemData.answer : 0),
             explanation: typeof itemData.explanation === 'string' ? itemData.explanation : undefined,
-            questions: Array.isArray(itemData.questions) ? (itemData.questions as Record<string, unknown>[]) : undefined
+            questions: Array.isArray(itemData.questions) ? (itemData.questions as Record<string, unknown>[]) : undefined,
+            subQuestions: subQuestions.length > 0 ? subQuestions : undefined
           });
         }
         return false;
@@ -130,7 +262,23 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
 
       // Migrate speaking question if missing
       if (type === 'speaking' || type === 'speaking_record' || type === 'pronunciation') {
-        const itemPrompt = typeof itemData.prompt === 'string' ? itemData.prompt : 'Đọc ghi âm phát âm câu:';
+        const itemPrompt = stripLeadingQuestionNumber(
+          typeof itemData.prompt === 'string' ? itemData.prompt : 'Đọc ghi âm phát âm câu:'
+        ) || 'Đọc ghi âm phát âm câu:';
+        if (isVietnameseToChineseAudioPrompt(itemPrompt)) {
+          if (!translationQuestions.some((question) => question.id === qId || question.prompt === itemPrompt)) {
+            translationQuestions.push({
+              id: qId,
+              type: 'translation',
+              translationType: 'vi_to_zh_audio',
+              tier: 'tier3',
+              prompt: itemPrompt,
+              suggestedAnswer: typeof itemData.suggestedAnswer === 'string' ? itemData.suggestedAnswer : undefined,
+              explanation: typeof itemData.explanation === 'string' ? itemData.explanation : undefined
+            });
+          }
+          return false;
+        }
         if (!speakingQuestions.some((q) => q.id === qId || q.prompt === itemPrompt)) {
           speakingQuestions.push({
             id: qId,
@@ -141,6 +289,34 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
             imageUrl: typeof itemData.imageUrl === 'string' ? itemData.imageUrl : (typeof itemData.image === 'string' ? itemData.image : undefined),
             explanation: typeof itemData.explanation === 'string' ? itemData.explanation : undefined,
             items: Array.isArray(itemData.items) ? (itemData.items as string[]) : undefined
+          });
+        }
+        return false;
+      }
+
+      // Migrate Vietnamese-to-Chinese audio translation if it is still stored in sections.
+      if (type === 'translation' || type === 'translate' || type === 'translate_vi_zh') {
+        const itemPrompt = stripLeadingQuestionNumber(
+          typeof itemData.prompt === 'string' ? itemData.prompt : 'Dịch câu:'
+        ) || 'Dịch câu:';
+        const translationType =
+          itemData.translationType === 'vi_to_zh_audio' ||
+          itemData.translationType === 'zh_to_vi_text' ||
+          itemData.translationType === 'vi_to_zh_text'
+            ? itemData.translationType
+            : 'vi_to_zh_text';
+        if (!translationQuestions.some((question) => question.id === qId || question.prompt === itemPrompt)) {
+          translationQuestions.push({
+            id: qId,
+            type: 'translation',
+            translationType,
+            tier: 'tier3',
+            prompt: itemPrompt,
+            pinyin: translationType === 'vi_to_zh_audio'
+              ? undefined
+              : (typeof itemData.pinyin === 'string' ? itemData.pinyin : undefined),
+            suggestedAnswer: typeof itemData.suggestedAnswer === 'string' ? itemData.suggestedAnswer : undefined,
+            explanation: typeof itemData.explanation === 'string' ? itemData.explanation : undefined
           });
         }
         return false;
@@ -167,6 +343,8 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
     arrangeQuestions,
     essayQuestions,
     translationQuestions,
+    handwritingQuestions,
+    readingPassages,
     sections: remainingSections.length > 0 ? remainingSections : undefined
   };
 }
@@ -198,7 +376,9 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
 
       const itemHanzi = typeof itemData.hanzi === 'string' ? itemData.hanzi : undefined;
       const itemPinyin = typeof itemData.pinyin === 'string' ? itemData.pinyin : undefined;
-      const itemPrompt = typeof itemData.prompt === 'string' ? itemData.prompt : undefined;
+      const itemPrompt = stripLeadingQuestionNumber(
+        typeof itemData.prompt === 'string' ? itemData.prompt : undefined
+      );
       const itemMeaning = typeof itemData.meaning === 'string' ? itemData.meaning : undefined;
       const itemExample = typeof itemData.example === 'string' ? itemData.example : undefined;
       const itemExplanation = typeof itemData.explanation === 'string' ? itemData.explanation : undefined;
@@ -230,14 +410,22 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
         const subQuestions: Question[] = Array.isArray(itemData.questions)
           ? (itemData.questions as Record<string, unknown>[]).map((sq, sqIdx) => {
               const sqData = (sq.data || sq) as Record<string, unknown>;
+              const subType = typeof sqData.type === 'string' ? sqData.type.toLowerCase().trim() : 'mc';
+              const isTextAnswer = subType === 'essay' || subType === 'writing';
               return {
                 id: sq.id ? String(sq.id) : `${qId}_q${sqIdx}`,
-                type: 'mc',
-                tier: 'tier2',
-                prompt: typeof sqData.prompt === 'string' ? sqData.prompt : 'Câu hỏi đọc hiểu',
+                type: isTextAnswer ? 'essay' : 'mc',
+                tier: isTextAnswer ? 'tier3' : 'tier2',
+                prompt: stripLeadingQuestionNumber(
+                  typeof sqData.prompt === 'string' ? sqData.prompt : 'Câu hỏi đọc hiểu'
+                ) || 'Câu hỏi đọc hiểu',
                 pinyin: typeof sqData.pinyin === 'string' ? sqData.pinyin : undefined,
-                options: Array.isArray(sqData.options) ? sqData.options.map(String) : ['Đáp án A', 'Đáp án B'],
-                answer: typeof sqData.answer === 'number' ? sqData.answer : 0,
+                options: isTextAnswer
+                  ? undefined
+                  : (Array.isArray(sqData.options) ? sqData.options.map(String) : ['Đáp án A', 'Đáp án B']),
+                answer: isTextAnswer ? undefined : (typeof sqData.answer === 'number' ? sqData.answer : 0),
+                acceptableAnswers: typeof sqData.acceptableAnswers === 'string' ? sqData.acceptableAnswers : undefined,
+                suggestedAnswer: typeof sqData.suggestedAnswer === 'string' ? sqData.suggestedAnswer : undefined,
                 explanation: typeof sqData.explanation === 'string' ? sqData.explanation : undefined
               };
             })
@@ -262,6 +450,11 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
         type === 'listening_fill' ||
         type === 'listening_fill_in_blank'
       ) {
+        const subQuestions = parseListeningSubQuestions(
+          Array.isArray(itemData.questions) ? itemData.questions : undefined,
+          type,
+          qId
+        );
         listeningQuestions.push({
           id: qId,
           type: (type === 'listening' ? 'listening_multiple_choice' : type) as Question['type'],
@@ -270,12 +463,17 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
           pinyin: itemPinyin,
           audioUrl: itemAudioUrl || itemAudioPromptUrl,
           audioPromptUrl: itemAudioPromptUrl || itemAudioUrl,
-          options: (type === 'listening_fill' || type === 'listening_fill_in_blank') ? undefined : (itemOptions || (type === 'listening_tf' || type === 'listening_true_false' ? ['Đúng (正确)', 'Sai (错误)'] : ['A', 'B', 'C', 'D'])),
-          answer: typeof itemAnswer === 'number' ? itemAnswer : (typeof itemAnswer === 'string' ? itemAnswer : 0),
+          options: subQuestions.length > 0
+            ? undefined
+            : ((type === 'listening_fill' || type === 'listening_fill_in_blank') ? undefined : (itemOptions || (type === 'listening_tf' || type === 'listening_true_false' ? ['Đúng (正确)', 'Sai (错误)'] : ['A', 'B', 'C', 'D']))),
+          answer: subQuestions.length > 0
+            ? undefined
+            : (typeof itemAnswer === 'number' ? itemAnswer : (typeof itemAnswer === 'string' ? itemAnswer : 0)),
           acceptableAnswers: typeof itemData.acceptableAnswers === 'string' ? itemData.acceptableAnswers : (typeof itemAnswer === 'string' ? itemAnswer : undefined),
           suggestedAnswer: typeof itemData.suggestedAnswer === 'string' ? itemData.suggestedAnswer : (typeof itemAnswer === 'string' ? itemAnswer : undefined),
           explanation: itemExplanation,
-          questions: Array.isArray(itemData.questions) ? (itemData.questions as Record<string, unknown>[]) : undefined
+          questions: Array.isArray(itemData.questions) ? (itemData.questions as Record<string, unknown>[]) : undefined,
+          subQuestions: subQuestions.length > 0 ? subQuestions : undefined
         });
         return;
       }
@@ -352,16 +550,19 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
 
       // Translation
       if (type === 'translation' || type === 'translate' || type === 'translate_vi_zh') {
+        const translationType =
+          itemData.translationType === 'vi_to_zh_audio' ||
+          itemData.translationType === 'zh_to_vi_text' ||
+          itemData.translationType === 'vi_to_zh_text'
+            ? itemData.translationType
+            : 'vi_to_zh_text';
         translationQuestions.push({
           id: qId,
           type: 'translation',
-          translationType:
-            itemData.translationType === 'zh_to_vi_text' || itemData.translationType === 'vi_to_zh_text'
-              ? itemData.translationType
-              : 'vi_to_zh_text',
+          translationType,
           tier: 'tier3',
           prompt: itemPrompt || 'Dịch câu:',
-          pinyin: itemPinyin,
+          pinyin: translationType === 'vi_to_zh_audio' ? undefined : itemPinyin,
           suggestedAnswer: itemSuggestedAnswer || (typeof itemAnswer === 'string' ? itemAnswer : undefined),
           explanation: itemExplanation
         });
