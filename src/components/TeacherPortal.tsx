@@ -207,11 +207,42 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [newListenCorrectTf, setNewListenCorrectTf] = useState(0);
   const [newListenExplanation, setNewListenExplanation] = useState('');
 
+  // New Reading Passage state
+  const [selectedReadingPassageId, setSelectedReadingPassageId] = useState('');
+  const [newReadingTitle, setNewReadingTitle] = useState('');
+  const [newReadingContent, setNewReadingContent] = useState('');
+  const [newReadingQuestionPrompt, setNewReadingQuestionPrompt] = useState('');
+  const [newReadingOptA, setNewReadingOptA] = useState('');
+  const [newReadingOptB, setNewReadingOptB] = useState('');
+  const [newReadingOptC, setNewReadingOptC] = useState('');
+  const [newReadingOptD, setNewReadingOptD] = useState('');
+  const [newReadingCorrect, setNewReadingCorrect] = useState(0);
+
   // Editing Modal state for questions
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [editingReadingQuestion, setEditingReadingQuestion] = useState<{ passageId: string; questionId: string } | null>(null);
 
   const handleSaveEditQuestion = (updatedQ: Question) => {
     if (!editingExam) return;
+
+    if (editingReadingQuestion) {
+      const updatedPassages = (editingExam.readingPassages || []).map((passage) =>
+        passage.id === editingReadingQuestion.passageId
+          ? {
+              ...passage,
+              questions: passage.questions.map((question) =>
+                question.id === editingReadingQuestion.questionId ? updatedQ : question
+              )
+            }
+          : passage
+      );
+      const updatedExam = { ...editingExam, readingPassages: updatedPassages };
+      setEditingExam(updatedExam);
+      if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+      setEditingReadingQuestion(null);
+      return;
+    }
+
     const updatedExam = { ...editingExam };
 
     const removeQ = (arr?: Question[]) => arr?.filter((q) => q.id !== updatedQ.id);
@@ -846,6 +877,87 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     if (onSaveCustomExam) onSaveCustomExam(updatedExam);
   };
 
+  const handleAddReadingQuestion = (e: React.FormEvent) => {
+    e.preventDefault();
+    const selectedPassage = (editingExam.readingPassages || []).find(
+      (passage) => passage.id === selectedReadingPassageId
+    );
+
+    if (!selectedPassage && (!newReadingTitle.trim() || !newReadingContent.trim())) {
+      alert('Vui lòng nhập tiêu đề và nội dung bài đọc mới.');
+      return;
+    }
+    if (!newReadingQuestionPrompt.trim() || !newReadingOptA.trim() || !newReadingOptB.trim()) {
+      alert('Vui lòng nhập câu hỏi đọc và ít nhất 2 lựa chọn đáp án.');
+      return;
+    }
+
+    const options = [newReadingOptA.trim(), newReadingOptB.trim()];
+    if (newReadingOptC.trim()) options.push(newReadingOptC.trim());
+    if (newReadingOptD.trim()) options.push(newReadingOptD.trim());
+
+    const readingQuestion: Question = {
+      id: `reading_q_${Date.now()}`,
+      type: 'mc',
+      tier: 'tier2',
+      prompt: newReadingQuestionPrompt.trim(),
+      options,
+      answer: newReadingCorrect
+    };
+
+    const updatedPassages: ReadingPassage[] = selectedPassage
+      ? (editingExam.readingPassages || []).map((passage) =>
+          passage.id === selectedPassage.id
+            ? { ...passage, questions: [...passage.questions, readingQuestion] }
+            : passage
+        )
+      : [
+          ...(editingExam.readingPassages || []),
+          {
+            id: `reading_${Date.now()}`,
+            title: newReadingTitle.trim(),
+            content: newReadingContent.trim(),
+            questions: [readingQuestion]
+          }
+        ];
+
+    const updatedExam = { ...editingExam, readingPassages: updatedPassages };
+    setEditingExam(updatedExam);
+    if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+
+    if (!selectedPassage) {
+      setNewReadingTitle('');
+      setNewReadingContent('');
+    }
+    setNewReadingQuestionPrompt('');
+    setNewReadingOptA('');
+    setNewReadingOptB('');
+    setNewReadingOptC('');
+    setNewReadingOptD('');
+    setNewReadingCorrect(0);
+  };
+
+  const handleDeleteReadingPassage = (passageId: string) => {
+    const updatedPassages = (editingExam.readingPassages || []).filter((passage) => passage.id !== passageId);
+    const updatedExam = { ...editingExam, readingPassages: updatedPassages };
+    setEditingExam(updatedExam);
+    if (selectedReadingPassageId === passageId) {
+      setSelectedReadingPassageId('');
+    }
+    if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+  };
+
+  const handleDeleteReadingQuestion = (passageId: string, questionId: string) => {
+    const updatedPassages = (editingExam.readingPassages || []).map((passage) =>
+      passage.id === passageId
+        ? { ...passage, questions: passage.questions.filter((question) => question.id !== questionId) }
+        : passage
+    );
+    const updatedExam = { ...editingExam, readingPassages: updatedPassages };
+    setEditingExam(updatedExam);
+    if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+  };
+
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStatus = statusFilter === 'ALL' || sub.status === statusFilter;
 
@@ -1164,7 +1276,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 <BookOpen className="w-5 h-5 text-red-700" /> Quản Lý & Chỉnh Sửa Chi Tiết Bài Thi
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Chỉnh sửa từ vựng, câu hỏi trắc nghiệm, bài điền từ, xếp câu chip, bài dịch và ghi âm phát âm.
+                Chỉnh sửa từ vựng, bài đọc chọn đáp án, câu hỏi trắc nghiệm, bài điền từ, xếp câu chip, bài dịch và ghi âm phát âm.
               </p>
             </div>
 
@@ -1199,6 +1311,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                       fillQuestions: [],
                       arrangeQuestions: [],
                       listeningQuestions: [],
+                      readingPassages: [],
                       essayQuestions: [],
                       speakingQuestions: [],
                       translationQuestions: []
@@ -2035,6 +2148,177 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </form>
           </div>
 
+          {/* Form Thêm Bài Đọc Hiểu Chọn Đáp Án */}
+          <div className="space-y-3 pt-4 border-t border-slate-200">
+            <h4 className="font-bold text-slate-800 text-sm flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-sky-900 font-extrabold">
+                <FileText className="w-4 h-4 text-sky-600" />
+                Quản Lý Bài Đọc Hiểu Chọn Đáp Án ({(editingExam.readingPassages || []).length} bài đọc)
+              </span>
+            </h4>
+
+            <div className="space-y-3">
+              {(editingExam.readingPassages || []).map((passage, passageIdx) => (
+                <div key={passage.id} className="p-3.5 bg-sky-50/70 border border-sky-200 rounded-xl space-y-3 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <span className="font-bold text-sky-950 text-sm block">
+                        Bài đọc {passageIdx + 1}: {passage.title}
+                      </span>
+                      <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{passage.content}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteReadingPassage(passage.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer shrink-0"
+                      title="Xóa bài đọc"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 border-t border-sky-200 pt-2">
+                    {passage.questions.map((q, questionIdx) => (
+                      <div key={q.id} className="p-2.5 bg-white border border-sky-100 rounded-lg flex items-start justify-between gap-2">
+                        <div className="space-y-1 min-w-0">
+                          <p className="font-semibold text-slate-800">Câu {questionIdx + 1}: {q.prompt}</p>
+                          <p className="text-slate-600">Lựa chọn: {q.options?.join(' | ')}</p>
+                          <p className="font-bold text-emerald-700">
+                            Đáp án đúng: {q.options?.[q.answer as number] || q.answer}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingQuestion(q);
+                              setEditingReadingQuestion({ passageId: passage.id, questionId: q.id });
+                            }}
+                            className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                            title="Sửa câu hỏi đọc"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReadingQuestion(passage.id, q.id)}
+                            className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                            title="Xóa câu hỏi đọc"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleAddReadingQuestion} className="bg-sky-50/50 border border-sky-200 rounded-xl p-4 space-y-3">
+              <span className="text-xs font-bold text-sky-950 flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-sky-600" /> Soạn bài đọc và câu hỏi chọn đáp án:
+              </span>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Chọn bài đọc đã có hoặc tạo bài đọc mới:</label>
+                <select
+                  value={selectedReadingPassageId}
+                  onChange={(e) => setSelectedReadingPassageId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="">+ Tạo bài đọc mới</option>
+                  {(editingExam.readingPassages || []).map((passage, idx) => (
+                    <option key={passage.id} value={passage.id}>
+                      Thêm câu vào Bài đọc {idx + 1}: {passage.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {!selectedReadingPassageId && (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={newReadingTitle}
+                    onChange={(e) => setNewReadingTitle(e.target.value)}
+                    placeholder="Tiêu đề bài đọc (Ví dụ: Đọc đoạn văn và chọn đáp án đúng)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                  <textarea
+                    rows={4}
+                    value={newReadingContent}
+                    onChange={(e) => setNewReadingContent(e.target.value)}
+                    placeholder="Nội dung đoạn đọc bằng chữ Hán..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+              )}
+
+              <textarea
+                rows={2}
+                value={newReadingQuestionPrompt}
+                onChange={(e) => setNewReadingQuestionPrompt(e.target.value)}
+                placeholder="Câu hỏi đọc hiểu (Ví dụ: 王文是哪国人？)"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-sky-500"
+              />
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <input
+                  type="text"
+                  value={newReadingOptA}
+                  onChange={(e) => setNewReadingOptA(e.target.value)}
+                  placeholder="Đáp án A"
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                />
+                <input
+                  type="text"
+                  value={newReadingOptB}
+                  onChange={(e) => setNewReadingOptB(e.target.value)}
+                  placeholder="Đáp án B"
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                />
+                <input
+                  type="text"
+                  value={newReadingOptC}
+                  onChange={(e) => setNewReadingOptC(e.target.value)}
+                  placeholder="Đáp án C"
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                />
+                <input
+                  type="text"
+                  value={newReadingOptD}
+                  onChange={(e) => setNewReadingOptD(e.target.value)}
+                  placeholder="Đáp án D"
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white outline-none"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  Đáp án đúng:
+                  <select
+                    value={newReadingCorrect}
+                    onChange={(e) => setNewReadingCorrect(Number(e.target.value))}
+                    className="px-2 py-1 border border-slate-300 rounded-lg text-xs bg-white font-bold"
+                  >
+                    <option value={0}>A</option>
+                    <option value={1}>B</option>
+                    <option value={2}>C</option>
+                    <option value={3}>D</option>
+                  </select>
+                </label>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-1.5 bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs px-4 py-2.5 rounded-lg transition cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  {selectedReadingPassageId ? 'Thêm câu vào bài đọc' : 'Tạo bài đọc và thêm câu'}
+                </button>
+              </div>
+            </form>
+          </div>
+
           {/* Form Thêm Bài Tự Luận */}
           <div className="space-y-3 pt-4 border-t border-slate-200">
             <h4 className="font-bold text-slate-800 text-sm">Quản Lý Bài Tự Luận ({(editingExam.essayQuestions || []).length} câu)</h4>
@@ -2758,7 +3042,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       <EditQuestionModal
         question={editingQuestion}
         isOpen={!!editingQuestion}
-        onClose={() => setEditingQuestion(null)}
+        onClose={() => {
+          setEditingQuestion(null);
+          setEditingReadingQuestion(null);
+        }}
         onSave={handleSaveEditQuestion}
       />
 
