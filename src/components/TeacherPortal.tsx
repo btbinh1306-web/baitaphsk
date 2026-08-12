@@ -247,10 +247,37 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       return;
     }
 
+    const listeningWithUpdatedSubQuestion = (editingExam.listeningQuestions || []).map((parent) => {
+      if (!parent.subQuestions?.some((subQuestion) => subQuestion.id === updatedQ.id)) return parent;
+      return {
+        ...parent,
+        subQuestions: parent.subQuestions.map((subQuestion) =>
+          subQuestion.id === updatedQ.id
+            ? { ...updatedQ, audioUrl: undefined, audioPromptUrl: undefined }
+            : subQuestion
+        )
+      };
+    });
+    if (listeningWithUpdatedSubQuestion.some((parent, index) => parent !== editingExam.listeningQuestions?.[index])) {
+      const updatedExam = { ...editingExam, listeningQuestions: listeningWithUpdatedSubQuestion };
+      setEditingExam(updatedExam);
+      if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+      return;
+    }
+
+    const questionToSave = updatedQ.subQuestions?.length
+      ? {
+          ...updatedQ,
+          options: undefined,
+          answer: undefined,
+          acceptableAnswers: undefined,
+          suggestedAnswer: undefined
+        }
+      : updatedQ;
     const updatedExam = { ...editingExam };
 
     const removeQ = (arr?: Question[]) => arr?.filter((q) => q.id !== updatedQ.id);
-    const type = updatedQ.type;
+    const type = questionToSave.type;
 
     updatedExam.mcQuestions = removeQ(updatedExam.mcQuestions) || [];
     updatedExam.fillQuestions = removeQ(updatedExam.fillQuestions);
@@ -261,26 +288,26 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     updatedExam.translationQuestions = removeQ(updatedExam.translationQuestions);
 
     if (type === 'mc') {
-      updatedExam.mcQuestions = [...updatedExam.mcQuestions, updatedQ];
+      updatedExam.mcQuestions = [...updatedExam.mcQuestions, questionToSave];
     } else if (type === 'fill') {
-      updatedExam.fillQuestions = [...(updatedExam.fillQuestions || []), updatedQ];
+      updatedExam.fillQuestions = [...(updatedExam.fillQuestions || []), questionToSave];
     } else if (type === 'arrange') {
-      updatedExam.arrangeQuestions = [...(updatedExam.arrangeQuestions || []), updatedQ];
+      updatedExam.arrangeQuestions = [...(updatedExam.arrangeQuestions || []), questionToSave];
     } else if (
       type === 'listening_mc' ||
       type === 'listening_tf' ||
       type === 'listening_multiple_choice' ||
       type === 'listening_true_false'
     ) {
-      updatedExam.listeningQuestions = [...(updatedExam.listeningQuestions || []), updatedQ];
+      updatedExam.listeningQuestions = [...(updatedExam.listeningQuestions || []), questionToSave];
     } else if (type === 'essay') {
-      updatedExam.essayQuestions = [...updatedExam.essayQuestions, updatedQ];
+      updatedExam.essayQuestions = [...updatedExam.essayQuestions, questionToSave];
     } else if (type === 'speaking' || type === 'speaking_record') {
-      updatedExam.speakingQuestions = [...updatedExam.speakingQuestions, updatedQ];
+      updatedExam.speakingQuestions = [...updatedExam.speakingQuestions, questionToSave];
     } else if (type === 'translation') {
-      updatedExam.translationQuestions = [...(updatedExam.translationQuestions || []), updatedQ];
+      updatedExam.translationQuestions = [...(updatedExam.translationQuestions || []), questionToSave];
     } else {
-      updatedExam.mcQuestions = [...updatedExam.mcQuestions, updatedQ];
+      updatedExam.mcQuestions = [...updatedExam.mcQuestions, questionToSave];
     }
 
     setEditingExam(updatedExam);
@@ -404,16 +431,24 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               subQuestions: undefined
             }];
           })();
+      const sharedAudioUrl = newListenAudioUrl.trim() || parent.audioUrl || parent.audioPromptUrl || undefined;
+      const childQuestion: Question = {
+        ...newQ,
+        audioUrl: undefined,
+        audioPromptUrl: undefined
+      };
 
       updatedListen = updatedListen.map((question) =>
         question.id === newListenParentId
           ? {
               ...question,
+              audioUrl: sharedAudioUrl,
+              audioPromptUrl: sharedAudioUrl,
               options: undefined,
               answer: undefined,
               acceptableAnswers: undefined,
               suggestedAnswer: undefined,
-              subQuestions: [...existingSubQuestions, newQ]
+              subQuestions: [...existingSubQuestions, childQuestion]
             }
           : question
       );
@@ -442,6 +477,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     setEditingExam(updatedExam);
     if (onSaveCustomExam) onSaveCustomExam(updatedExam);
     if (newListenParentId === qId) setNewListenParentId('');
+  };
+
+  const handleSelectListeningParent = (parentId: string) => {
+    setNewListenParentId(parentId);
+    const parent = (editingExam.listeningQuestions || []).find((question) => question.id === parentId);
+    setNewListenAudioUrl(parent?.audioUrl || parent?.audioPromptUrl || '');
+    if (parentId) {
+      requestAnimationFrame(() => {
+        document.getElementById('listening-question-editor-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -1927,18 +1973,28 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                       {q.subQuestions?.length ? (
                         <div className="space-y-1.5 pt-1">
                           {q.subQuestions.map((subQuestion, subIdx) => (
-                            <div key={subQuestion.id} className="rounded-lg bg-white border border-indigo-100 p-2">
-                              <p className="font-semibold text-slate-800">
-                                Câu {subIdx + 1}: {subQuestion.prompt}
-                              </p>
-                              {subQuestion.options && (
-                                <p className="text-slate-600 mt-0.5">
-                                  Lựa chọn: {subQuestion.options.join(' | ')}
-                                  <span className="font-bold text-emerald-700 ml-2">
-                                    (Đáp án đúng: {subQuestion.options[subQuestion.answer as number] || subQuestion.answer})
-                                  </span>
+                            <div key={subQuestion.id} className="rounded-lg bg-white border border-indigo-100 p-2 flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-800">
+                                  Câu {subIdx + 1}: {subQuestion.prompt}
                                 </p>
-                              )}
+                                {subQuestion.options && (
+                                  <p className="text-slate-600 mt-0.5">
+                                    Lựa chọn: {subQuestion.options.join(' | ')}
+                                    <span className="font-bold text-emerald-700 ml-2">
+                                      (Đáp án đúng: {subQuestion.options[subQuestion.answer as number] || subQuestion.answer})
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setEditingQuestion(subQuestion)}
+                                className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer shrink-0"
+                                title="Sửa câu hỏi trong cuộc hội thoại"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -1964,24 +2020,19 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      {(q.audioUrl || q.audioPromptUrl) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewListenParentId(q.id);
-                            setNewListenAudioUrl('');
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md bg-white border border-indigo-200 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
-                          title="Thêm câu hỏi dùng chung file audio này"
-                        >
-                          <Plus className="w-3 h-3" /> Thêm câu cùng audio
-                        </button>
-                      )}
                       <button
                         type="button"
-                        onClick={() => setEditingQuestion(q)}
+                        onClick={() => handleSelectListeningParent(q.id)}
+                        className="inline-flex items-center gap-1 rounded-md bg-white border border-indigo-200 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                        title="Thêm câu hỏi vào cuộc hội thoại này"
+                      >
+                        <Plus className="w-3 h-3" /> Thêm câu vào đây
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingQuestion(q.subQuestions?.length ? { ...q, type: q.subQuestions[0].type } : q)}
                         className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
-                        title="Sửa câu hỏi này"
+                        title={q.subQuestions?.length ? 'Sửa thông tin cuộc hội thoại và file nghe' : 'Sửa câu hỏi này'}
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
@@ -2025,7 +2076,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </div>
 
             {/* New Listening Question Form */}
-            <form onSubmit={handleAddListenQuestion} className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-4 space-y-3.5">
+            <form id="listening-question-editor-form" onSubmit={handleAddListenQuestion} className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-4 space-y-3.5">
               <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
                 <Plus className="w-4 h-4 text-indigo-600" /> Soạn Bài Tập Luyện Nghe Mới:
               </span>
@@ -2034,18 +2085,14 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700">Câu hỏi này thuộc bài nghe nào?</label>
                 <select
                   value={newListenParentId}
-                  onChange={(e) => {
-                    setNewListenParentId(e.target.value);
-                    if (e.target.value) setNewListenAudioUrl('');
-                  }}
+                  onChange={(e) => handleSelectListeningParent(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Bài nghe mới (tạo audio riêng)</option>
                   {(editingExam.listeningQuestions || [])
-                    .filter((question) => question.audioUrl || question.audioPromptUrl)
                     .map((question, index) => (
                       <option key={question.id} value={question.id}>
-                        Dùng chung audio: Hội thoại {index + 1} - {question.prompt}
+                        Thêm vào hội thoại {index + 1} - {question.prompt}
                       </option>
                     ))}
                 </select>
@@ -2102,7 +2149,6 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               </div>
 
               {/* Audio File Upload or URL Input */}
-              {!newListenParentId && (
               <div className="p-3 bg-white border border-indigo-200 rounded-xl space-y-2">
                 <label className="block text-xs font-bold text-indigo-950 flex items-center gap-1.5">
                   <Volume2 className="w-4 h-4 text-indigo-600" /> Tải Lên File Âm Thanh Hoặc Dán Link MP3:
@@ -2151,7 +2197,6 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                   </div>
                 )}
               </div>
-              )}
 
               {/* Options or Answer Input based on Type */}
               {newListenType === 'listening_multiple_choice' || newListenType === 'listening_mc' ? (
