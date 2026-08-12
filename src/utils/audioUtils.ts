@@ -29,10 +29,14 @@ const getDriveFileInfo = (rawLink: string): { fileId: string; resourceKey: strin
   return { fileId, resourceKey };
 };
 
-/**
- * Converts Google Drive links to an image thumbnail URL. Drive thumbnails are
- * more reliable than the media endpoint for image MIME types and HEIC uploads.
- */
+/** Builds a same-origin media URL so the browser never has to load Drive directly. */
+const getDriveProxyUrl = (fileId: string, resourceKey: string, kind: 'audio' | 'image'): string => {
+  const params = new URLSearchParams({ id: fileId, kind });
+  if (resourceKey) params.set('resourcekey', resourceKey);
+  return `/api/media/drive?${params.toString()}`;
+};
+
+/** Converts Google Drive links to a same-origin image thumbnail URL. */
 export const getDriveMediaPlayerUrl = (rawLink: string): string => {
   if (!rawLink) return '';
   const trimmed = rawLink.trim();
@@ -41,15 +45,13 @@ export const getDriveMediaPlayerUrl = (rawLink: string): string => {
   const actualUrl = getActualUrl(rawLink);
   const { fileId, resourceKey } = getDriveFileInfo(rawLink);
   if (fileId) {
-    const params = new URLSearchParams({ id: fileId, sz: 'w2000' });
-    if (resourceKey) params.set('resourcekey', resourceKey);
-    return `https://drive.google.com/thumbnail?${params.toString()}`;
+    return getDriveProxyUrl(fileId, resourceKey, 'image');
   }
 
   return actualUrl;
 };
 
-/** Returns the direct media URL used by HTML5 audio players. */
+/** Returns a same-origin media URL used by HTML5 audio players. */
 export const getDriveAudioPlayerUrl = (rawLink: string): string => {
   if (!rawLink) return '';
   const trimmed = rawLink.trim();
@@ -58,9 +60,7 @@ export const getDriveAudioPlayerUrl = (rawLink: string): string => {
   const actualUrl = getActualUrl(rawLink);
   const { fileId, resourceKey } = getDriveFileInfo(rawLink);
   if (fileId) {
-    const params = new URLSearchParams({ export: 'media', id: fileId });
-    if (resourceKey) params.set('resourcekey', resourceKey);
-    return `https://drive.google.com/uc?${params.toString()}`;
+    return getDriveProxyUrl(fileId, resourceKey, 'audio');
   }
 
   return actualUrl;

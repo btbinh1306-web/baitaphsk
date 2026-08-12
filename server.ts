@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { Readable } from 'node:stream';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
@@ -51,6 +52,66 @@ function writeJsonFile<T>(filePath: string, data: T): boolean {
 
 // Media file upload & serving
 app.use('/api/media', express.static(UPLOADS_DIR));
+
+// Proxy public Google Drive media through this server so deployed browsers do
+// not have to load Drive's cross-origin redirect directly. Range headers are
+// forwarded so native audio controls can seek normally.
+app.get('/api/media/drive', async (req, res) => {
+  try {
+    const fileId = typeof req.query.id === 'string' ? req.query.id.trim() : '';
+    const resourceKey = typeof req.query.resourcekey === 'string' ? req.query.resourcekey.trim() : '';
+    const kind = req.query.kind === 'image' ? 'image' : 'audio';
+
+    if (!/^[a-zA-Z0-9_-]{25,60}$/.test(fileId)) {
+      res.status(400).json({ ok: false, error: 'Invalid Google Drive file ID' });
+      return;
+    }
+
+    const upstreamUrl = new URL(
+      kind === 'image'
+        ? 'https://drive.google.com/thumbnail'
+        : 'https://drive.usercontent.google.com/download'
+    );
+    upstreamUrl.searchParams.set('id', fileId);
+    if (kind === 'image') {
+      upstreamUrl.searchParams.set('sz', 'w2000');
+    } else {
+      upstreamUrl.searchParams.set('export', 'media');
+    }
+    if (resourceKey) upstreamUrl.searchParams.set('resourcekey', resourceKey);
+
+    const headers: Record<string, string> = {};
+    if (typeof req.headers.range === 'string') headers.Range = req.headers.range;
+
+    const upstream = await fetch(upstreamUrl, { headers });
+    if (!upstream.ok && upstream.status !== 206) {
+      res.status(upstream.status).json({ ok: false, error: 'Google Drive media is unavailable' });
+      return;
+    }
+
+    res.status(upstream.status);
+    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    for (const headerName of ['content-length', 'content-range', 'accept-ranges']) {
+      const value = upstream.headers.get(headerName);
+      if (value) res.setHeader(headerName, value);
+    }
+
+    if (!upstream.body) {
+      res.end();
+      return;
+    }
+    Readable.fromWeb(upstream.body as any).pipe(res);
+  } catch (err: any) {
+    console.error('Drive media proxy error:', err);
+    if (!res.headersSent) {
+      res.status(502).json({ ok: false, error: 'Could not load media from Google Drive' });
+    } else {
+      res.end();
+    }
+  }
+});
 
 app.post('/api/media/upload', (req, res) => {
   try {
