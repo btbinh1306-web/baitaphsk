@@ -6,6 +6,7 @@ import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { sanitizeExamSections } from '../utils/lessonParser';
+import { getExamGroupLabel, groupExamsForSelection } from '../utils/examGrouping';
 import { ExerciseRenderer } from './ExerciseRenderer';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
 import { getHandwritingExercises, convertHandwritingToExamLesson } from '../services/handwritingService';
@@ -107,6 +108,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   }, [rawExams, deletedExamIds]);
 
   const filteredExams = allExams;
+  const examGroups = useMemo(() => groupExamsForSelection(filteredExams), [filteredExams]);
 
   // Load draft from localStorage on initial mount
   const initialDraft = useMemo(() => loadFormDraft(), []);
@@ -116,6 +118,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const [selectedExamId, setSelectedExamId] = useState(
     () => initialDraft?.selectedExamId || allExams[0]?.id || 'hsk3-b1'
   );
+  const selectedExamForPicker = allExams.find((exam) => exam.id === selectedExamId);
+  const selectedExamGroupLabel = selectedExamForPicker
+    ? getExamGroupLabel(selectedExamForPicker)
+    : examGroups[0]?.label || '';
+  const examsInSelectedGroup =
+    examGroups.find((group) => group.label === selectedExamGroupLabel)?.exams || [];
 
   // Vocabulary lock state - per exam
   const [vocabUnlocked, setVocabUnlocked] = useState<Record<string, boolean>>(
@@ -203,6 +211,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const handleSelectExam = (examId: string) => {
     setSelectedExamId(examId);
     setShowVocabTable(true);
+  };
+
+  const handleSelectExamGroup = (groupLabel: string) => {
+    const firstExam = examGroups.find((group) => group.label === groupLabel)?.exams[0];
+    if (firstExam) handleSelectExam(firstExam.id);
   };
 
   const handleUnlockExam = () => {
@@ -648,34 +661,42 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Chọn bài học / Đề thi <span className="text-red-500">*</span>
-              </label>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    1. Chọn cấp bậc / nhóm bài <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedExamGroupLabel}
+                    onChange={(e) => handleSelectExamGroup(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition font-semibold text-slate-800"
+                  >
+                    {examGroups.map((group) => (
+                      <option key={group.label} value={group.label}>
+                        {group.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <select
-                value={selectedExamId}
-                onChange={(e) => handleSelectExam(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition font-medium text-slate-800 truncate"
-              >
-                {filteredExams.map((ex) => {
-                  const isHw =
-                    ex.isHandwriting ||
-                    ex.type === 'handwriting_submission' ||
-                    (ex.handwritingQuestions && ex.handwritingQuestions.length > 0);
-                  const hasLevelInTitle =
-                    ex.title.toLowerCase().startsWith(ex.level.toLowerCase()) ||
-                    ex.title.startsWith('[') ||
-                    ex.title.startsWith('「');
-                  const tag = hasLevelInTitle ? '' : `[${ex.level}] `;
-                  const displayTitle = tag + ex.title;
-                  return (
-                    <option key={ex.id} value={ex.id}>
-                      {displayTitle}
-                    </option>
-                  );
-                })}
-              </select>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    2. Chọn bài học / Đề thi <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedExamId}
+                    onChange={(e) => handleSelectExam(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition font-medium text-slate-800"
+                  >
+                    {examsInSelectedGroup.map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
               {(currentExam.isHandwriting ||
                 currentExam.type === 'handwriting_submission' ||
@@ -1127,7 +1148,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           ) : (
                             <button
                               type="button"
-                              onClick={() => speakText(q.pinyin || q.prompt)}
+                              onClick={() => speakText(q.audioText || q.pinyin || q.prompt)}
                               className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition cursor-pointer shadow-xs"
                             >
                               <Volume2 className="w-4 h-4" /> Bấm để phát âm thanh (Giọng đọc tự động TTS)

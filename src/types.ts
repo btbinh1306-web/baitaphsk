@@ -38,6 +38,7 @@ export interface Question {
   wordBank?: string[]; // word bank choices for fill in blanks section
   suggestedAnswer?: string; // model answer unlocked when student inputs answer
   explanation?: string;
+  audioText?: string; // Hidden TTS script used when a listening audio file is not attached
   audioPromptUrl?: string;
   audioUrl?: string; // Attached audio file data/URL for listening questions
   imageUrl?: string; // Attached image file data/URL for questions

@@ -4,6 +4,7 @@ import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { fetchTeacherSubmissions, gradeSubmissionInGas, getGasConfig, saveLocalSubmission } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { sanitizeExamSections } from '../utils/lessonParser';
+import { groupExamsForSelection } from '../utils/examGrouping';
 import { getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { fileToCompressedDataUrl } from '../utils/imageUtils';
 import { ImportLesson } from './ImportLesson';
@@ -129,6 +130,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   // All Available Exams
   const rawExams = [...customExams, ...SAMPLE_EXAMS.filter((s) => !customExams.some((c) => c.id === s.id))];
   const allExams = rawExams.filter((e) => !deletedExamIds.includes(e.id));
+  const examGroups = groupExamsForSelection(allExams);
 
   // Delete Confirm & Notice state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -1223,10 +1225,14 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-red-500 w-full sm:w-auto"
               >
                 <option value="NEW">+ Tạo bài thi mới</option>
-                {allExams.map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    [{ex.level || 'HSK'}] {ex.title}
-                  </option>
+                {examGroups.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.exams.map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.title}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>

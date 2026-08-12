@@ -1,6 +1,8 @@
 import { ExamLesson } from '../types';
+import { HSK1_BAI1_TO_5_EXAMS } from './hsk1Bai1To5';
 
 export const SAMPLE_EXAMS: ExamLesson[] = [
+  ...HSK1_BAI1_TO_5_EXAMS,
   {
     id: 'hsk1-b1-ai-xiaoyu',
     title: 'HSK 1 - Bài 1: 小语，你好！ (Đọc câu, Nối từ, Xếp câu & Dịch thuật)',
