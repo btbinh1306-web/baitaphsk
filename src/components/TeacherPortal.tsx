@@ -217,6 +217,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [newReadingOptC, setNewReadingOptC] = useState('');
   const [newReadingOptD, setNewReadingOptD] = useState('');
   const [newReadingCorrect, setNewReadingCorrect] = useState(0);
+  const [editingReadingPassageId, setEditingReadingPassageId] = useState<string | null>(null);
+  const [editingReadingTitle, setEditingReadingTitle] = useState('');
+  const [editingReadingContent, setEditingReadingContent] = useState('');
 
   // Editing Modal state for questions
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -944,6 +947,38 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     if (selectedReadingPassageId === passageId) {
       setSelectedReadingPassageId('');
     }
+    if (editingReadingPassageId === passageId) {
+      setEditingReadingPassageId(null);
+    }
+    if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+  };
+
+  const handleStartEditingReadingPassage = (passage: ReadingPassage) => {
+    setEditingReadingPassageId(passage.id);
+    setEditingReadingTitle(passage.title);
+    setEditingReadingContent(passage.content);
+  };
+
+  const handleCancelEditingReadingPassage = () => {
+    setEditingReadingPassageId(null);
+    setEditingReadingTitle('');
+    setEditingReadingContent('');
+  };
+
+  const handleSaveReadingPassage = (passageId: string) => {
+    if (!editingReadingTitle.trim() || !editingReadingContent.trim()) {
+      alert('Vui lòng nhập tiêu đề và nội dung bài đọc.');
+      return;
+    }
+
+    const updatedPassages = (editingExam.readingPassages || []).map((passage) =>
+      passage.id === passageId
+        ? { ...passage, title: editingReadingTitle.trim(), content: editingReadingContent.trim() }
+        : passage
+    );
+    const updatedExam = { ...editingExam, readingPassages: updatedPassages };
+    setEditingExam(updatedExam);
+    handleCancelEditingReadingPassage();
     if (onSaveCustomExam) onSaveCustomExam(updatedExam);
   };
 
@@ -2161,20 +2196,67 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               {(editingExam.readingPassages || []).map((passage, passageIdx) => (
                 <div key={passage.id} className="p-3.5 bg-sky-50/70 border border-sky-200 rounded-xl space-y-3 text-xs">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1 min-w-0">
-                      <span className="font-bold text-sky-950 text-sm block">
-                        Bài đọc {passageIdx + 1}: {passage.title}
-                      </span>
-                      <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{passage.content}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteReadingPassage(passage.id)}
-                      className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer shrink-0"
-                      title="Xóa bài đọc"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {editingReadingPassageId === passage.id ? (
+                      <div className="space-y-2 min-w-0 flex-1">
+                        <input
+                          type="text"
+                          value={editingReadingTitle}
+                          onChange={(e) => setEditingReadingTitle(e.target.value)}
+                          className="w-full px-3 py-2 border border-sky-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-sky-500"
+                          aria-label="Tiêu đề bài đọc đang sửa"
+                        />
+                        <textarea
+                          rows={4}
+                          value={editingReadingContent}
+                          onChange={(e) => setEditingReadingContent(e.target.value)}
+                          className="w-full px-3 py-2 border border-sky-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-sky-500"
+                          aria-label="Nội dung bài đọc đang sửa"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCancelEditingReadingPassage}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" /> Hủy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveReadingPassage(passage.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-sky-700 rounded-lg hover:bg-sky-800 transition cursor-pointer"
+                          >
+                            <Save className="w-3.5 h-3.5" /> Lưu đoạn văn
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <span className="font-bold text-sky-950 text-sm block">
+                          Bài đọc {passageIdx + 1}: {passage.title}
+                        </span>
+                        <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{passage.content}</p>
+                      </div>
+                    )}
+                    {editingReadingPassageId !== passage.id && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditingReadingPassage(passage)}
+                          className="p-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                          title="Sửa tiêu đề và nội dung bài đọc"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReadingPassage(passage.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                          title="Xóa bài đọc"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2 border-t border-sky-200 pt-2">
