@@ -1,4 +1,4 @@
-import { ExamLesson, Question, ReadingPassage } from '../types';
+import { ExamLesson, Question, ReadingPassage, VocabItem } from '../types';
 
 const fillQuestion = (id: string, prompt: string, answer: string, wordBank: string[]): Question => ({
   id,
@@ -97,6 +97,125 @@ const bai2WordBank = ['请问', '叫', '名字', '什么', '对不起', '没关�
 const bai3WordBank = ['越南', '中国', '谁', '这', '那', '个', '的', '朋友', '哪', '忙', '想', '吗'];
 const bai4WordBank = ['有', '没有', '几', '多少', '两', '口', '呢', '和', '岁', '今年'];
 const bai5WordBank = ['今天', '号', '月', '年', '星期', '昨天', '明天', '休息', '会', '菜', '吃', '做', '喜欢', '些', '新'];
+
+const vocab = (hanzi: string, pinyin: string, type: string, meaning: string): VocabItem => ({
+  hanzi,
+  pinyin,
+  type,
+  meaning
+});
+
+const bai1Vocab: VocabItem[] = [
+  vocab('王', 'wáng', 'Họ', 'họ Vương'),
+  vocab('老师', 'lǎoshī', 'Danh từ', 'giáo viên, thầy/cô'),
+  vocab('大家', 'dàjiā', 'Đại từ', 'mọi người'),
+  vocab('们', 'men', 'Trợ tố', 'chỉ số nhiều'),
+  vocab('学生', 'xuésheng', 'Danh từ', 'học sinh'),
+  vocab('是', 'shì', 'Động từ', 'là'),
+  vocab('不', 'bù', 'Phó từ', 'không'),
+  vocab('谢谢', 'xièxie', 'Động từ / câu giao tiếp', 'cảm ơn'),
+  vocab('不客气', 'bú kèqi', 'Cụm cố định', 'không có gì, đừng khách sáo'),
+  vocab('同学', 'tóngxué', 'Danh từ', 'bạn học'),
+  vocab('再见', 'zàijiàn', 'Cụm cố định', 'tạm biệt')
+];
+
+const bai2Vocab: VocabItem[] = [
+  vocab('请问', 'qǐngwèn', 'Động từ / mẫu câu', 'xin hỏi'),
+  vocab('叫', 'jiào', 'Động từ', 'gọi, tên là'),
+  vocab('名字', 'míngzi', 'Danh từ', 'tên'),
+  vocab('什么', 'shénme', 'Đại từ nghi vấn', 'gì, cái gì'),
+  vocab('对不起', 'duìbuqǐ', 'Cụm cố định', 'xin lỗi'),
+  vocab('没关系', 'méi guānxi', 'Cụm cố định', 'không sao'),
+  vocab('没事', 'méi shì', 'Cụm cố định', 'không sao, không có việc gì'),
+  vocab('很', 'hěn', 'Phó từ', 'rất'),
+  vocab('高兴', 'gāoxìng', 'Tính từ', 'vui'),
+  vocab('认识', 'rènshi', 'Động từ', 'biết, làm quen'),
+  vocab('也', 'yě', 'Phó từ', 'cũng')
+];
+
+const bai3Vocab: VocabItem[] = [
+  vocab('人', 'rén', 'Danh từ', 'người'),
+  vocab('越南', 'Yuènán', 'Danh từ riêng', 'Việt Nam'),
+  vocab('中国', 'Zhōngguó', 'Danh từ riêng', 'Trung Quốc'),
+  vocab('的', 'de', 'Trợ từ kết cấu', 'của; nối định ngữ với danh từ'),
+  vocab('法国', 'Fǎguó', 'Danh từ riêng', 'Pháp'),
+  vocab('泰国', 'Tàiguó', 'Danh từ riêng', 'Thái Lan'),
+  vocab('汉语', 'Hànyǔ', 'Danh từ', 'tiếng Hán'),
+  vocab('中文', 'Zhōngwén', 'Danh từ', 'tiếng Trung'),
+  vocab('谁', 'shéi', 'Đại từ nghi vấn', 'ai'),
+  vocab('这', 'zhè', 'Đại từ chỉ thị', 'này, đây'),
+  vocab('那', 'nà', 'Đại từ chỉ thị', 'kia, đó'),
+  vocab('个', 'gè', 'Lượng từ', 'lượng từ thông dụng'),
+  vocab('女', 'nǚ', 'Danh từ / tính từ', 'nữ'),
+  vocab('男', 'nán', 'Danh từ / tính từ', 'nam'),
+  vocab('朋友', 'péngyou', 'Danh từ', 'bạn'),
+  vocab('国', 'guó', 'Danh từ', 'nước, quốc gia'),
+  vocab('哪', 'nǎ', 'Đại từ nghi vấn', 'nào'),
+  vocab('喂', 'wéi', 'Thán từ', 'a lô'),
+  vocab('姐姐', 'jiějie', 'Danh từ', 'chị gái'),
+  vocab('工作', 'gōngzuò', 'Động từ / danh từ', 'làm việc; công việc'),
+  vocab('还', 'hái', 'Phó từ', 'còn, vẫn'),
+  vocab('忙', 'máng', 'Tính từ', 'bận'),
+  vocab('太…了', 'tài…le', 'Cấu trúc', 'quá…'),
+  vocab('对', 'duì', 'Tính từ / động từ', 'đúng; đối với'),
+  vocab('想', 'xiǎng', 'Động từ', 'muốn; nhớ'),
+  vocab('他', 'tā', 'Đại từ', 'anh ấy'),
+  vocab('她', 'tā', 'Đại từ', 'cô ấy'),
+  vocab('吗', 'ma', 'Trợ từ nghi vấn', 'không? à?')
+];
+
+const bai4Vocab: VocabItem[] = [
+  vocab('有', 'yǒu', 'Động từ', 'có'),
+  vocab('没有', 'méiyǒu', 'Động từ phủ định', 'không có'),
+  vocab('多少', 'duōshao', 'Đại từ nghi vấn', 'bao nhiêu'),
+  vocab('几', 'jǐ', 'Đại từ nghi vấn', 'mấy'),
+  vocab('个', 'gè', 'Lượng từ', 'lượng từ thông dụng'),
+  vocab('百', 'bǎi', 'Số từ', 'trăm'),
+  vocab('千', 'qiān', 'Số từ', 'nghìn'),
+  vocab('哥哥', 'gēge', 'Danh từ', 'anh trai'),
+  vocab('爸爸', 'bàba', 'Danh từ', 'bố'),
+  vocab('妈妈', 'māma', 'Danh từ', 'mẹ'),
+  vocab('妹妹', 'mèimei', 'Danh từ', 'em gái'),
+  vocab('两', 'liǎng', 'Số từ', 'hai (dùng trước lượng từ)'),
+  vocab('家', 'jiā', 'Danh từ', 'nhà, gia đình'),
+  vocab('口', 'kǒu', 'Lượng từ', 'người trong gia đình'),
+  vocab('呢', 'ne', 'Trợ từ', 'thì sao?'),
+  vocab('和', 'hé', 'Liên từ', 'và'),
+  vocab('岁', 'suì', 'Lượng từ', 'tuổi'),
+  vocab('儿', 'ér', 'Danh từ', 'con; nhi'),
+  vocab('孩子', 'háizi', 'Danh từ', 'trẻ con, con cái'),
+  vocab('大', 'dà', 'Tính từ', 'lớn'),
+  vocab('多', 'duō', 'Tính từ / đại từ', 'nhiều; bao nhiêu'),
+  vocab('今年', 'jīnnián', 'Danh từ thời gian', 'năm nay')
+];
+
+const bai5Vocab: VocabItem[] = [
+  vocab('今天', 'jīntiān', 'Danh từ thời gian', 'hôm nay'),
+  vocab('号', 'hào', 'Danh từ', 'ngày (trong tháng); số'),
+  vocab('日', 'rì', 'Danh từ', 'ngày'),
+  vocab('月', 'yuè', 'Danh từ', 'tháng'),
+  vocab('年', 'nián', 'Danh từ', 'năm'),
+  vocab('星期', 'xīngqī', 'Danh từ', 'tuần; thứ'),
+  vocab('昨天', 'zuótiān', 'Danh từ thời gian', 'hôm qua'),
+  vocab('明天', 'míngtiān', 'Danh từ thời gian', 'ngày mai'),
+  vocab('休息', 'xiūxi', 'Động từ', 'nghỉ ngơi'),
+  vocab('会', 'huì', 'Động từ năng nguyện', 'biết; sẽ'),
+  vocab('菜', 'cài', 'Danh từ', 'món ăn; rau'),
+  vocab('吃', 'chī', 'Động từ', 'ăn'),
+  vocab('饭', 'fàn', 'Danh từ', 'cơm, bữa ăn'),
+  vocab('做', 'zuò', 'Động từ', 'làm'),
+  vocab('喜欢', 'xǐhuan', 'Động từ tâm lý', 'thích'),
+  vocab('面条儿', 'miàntiáor', 'Danh từ', 'mì sợi'),
+  vocab('饺子', 'jiǎozi', 'Danh từ', 'sủi cảo'),
+  vocab('些', 'xiē', 'Lượng từ', 'một số, vài'),
+  vocab('上', 'shàng', 'Động từ / phương vị', 'lên; đi (học/làm)'),
+  vocab('下', 'xià', 'Động từ / phương vị', 'xuống; tan (học/làm)'),
+  vocab('新', 'xīn', 'Tính từ', 'mới'),
+  vocab('电脑', 'diànnǎo', 'Danh từ', 'máy tính'),
+  vocab('看', 'kàn', 'Động từ', 'nhìn, xem, đọc'),
+  vocab('好', 'hǎo', 'Tính từ', 'tốt; dễ/ngon/đẹp khi đứng trước V'),
+  vocab('真', 'zhēn', 'Phó từ', 'thật, thật là')
+];
 
 const bai1FillQuestions: Question[] = [
   fillQuestion('hsk1_bai1_fill_01', '王老师是我的________。', '老师', bai1WordBank),
@@ -488,6 +607,7 @@ const makeExam = (
   title: string,
   description: string,
   instruction: string,
+  vocabList: VocabItem[],
   fillQuestions: Question[],
   mcQuestions: Question[],
   reading: ReadingPassage,
@@ -503,6 +623,7 @@ const makeExam = (
   level: 'HSK 1',
   description,
   instruction,
+  vocabList,
   mcQuestions,
   fillQuestions,
   arrangeQuestions,
@@ -519,6 +640,7 @@ export const HSK1_BAI1_TO_5_EXAMS: ExamLesson[] = [
     'HSK 1 - Bài 1: 你好！ / Chào hỏi',
     'Bài tập tổng hợp 5 kỹ năng theo file Word: chào hỏi, 是/不是, 老师, 学生, 大家, 同学, 谢谢, 不客气 và số 1–10.',
     'Mỗi bài là một phiếu độc lập. Phần nghe có thể dùng TTS mẫu hoặc giáo viên gắn file nghe riêng; phần nói ghi âm từng câu.',
+    bai1Vocab,
     bai1FillQuestions,
     bai1McQuestions,
     bai1Reading,
@@ -534,6 +656,7 @@ export const HSK1_BAI1_TO_5_EXAMS: ExamLesson[] = [
     'HSK 1 - Bài 2: 我叫李文 / Tôi tên là Lý Văn',
     'Bài tập tổng hợp 5 kỹ năng theo file Word: 请问, 叫, 名字, 什么, 对不起, 没关系, 很, 高兴, 认识 và 也.',
     'Mỗi bài là một phiếu độc lập. Không hiển thị pinyin đáp án trong phần dịch; học sinh tự dịch và ghi âm.',
+    bai2Vocab,
     bai2FillQuestions,
     bai2McQuestions,
     bai2Reading,
@@ -549,6 +672,7 @@ export const HSK1_BAI1_TO_5_EXAMS: ExamLesson[] = [
     'HSK 1 - Bài 3: 我是中国人 / Tôi là người Trung Quốc',
     'Bài tập tổng hợp 5 kỹ năng theo file Word: quốc tịch, 谁, 这/那, 的, 个, 朋友, 哪, 忙, 想 và 吗.',
     'Mỗi bài là một phiếu độc lập. Phần nghe hiển thị câu hỏi nhưng không hiển thị kịch bản nghe.',
+    bai3Vocab,
     bai3FillQuestions,
     bai3McQuestions,
     bai3Reading,
@@ -564,6 +688,7 @@ export const HSK1_BAI1_TO_5_EXAMS: ExamLesson[] = [
     'HSK 1 - Bài 4: 我有两个孩子 / Tôi có hai người con',
     'Bài tập tổng hợp 5 kỹ năng theo file Word: 有/没有, 几, 多少, 两, 口, 家, 岁, 今年 và số đếm đến hàng nghìn.',
     'Mỗi bài là một phiếu độc lập. Học sinh làm bài viết rồi ghi âm phần nói theo từng câu.',
+    bai4Vocab,
     bai4FillQuestions,
     bai4McQuestions,
     bai4Reading,
@@ -579,6 +704,7 @@ export const HSK1_BAI1_TO_5_EXAMS: ExamLesson[] = [
     'HSK 1 - Bài 5: 今天我休息 / Hôm nay tôi nghỉ',
     'Bài tập tổng hợp 5 kỹ năng theo file Word: ngày tháng, 星期, 休息, 会, 菜, 吃, 做, 喜欢, 面条儿, 饺子, 新 và 台.',
     'Mỗi bài là một phiếu độc lập. Học sinh không xem kịch bản nghe và không xem pinyin đáp án phần dịch.',
+    bai5Vocab,
     bai5FillQuestions,
     bai5McQuestions,
     bai5Reading,

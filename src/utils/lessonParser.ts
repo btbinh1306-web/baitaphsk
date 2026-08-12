@@ -266,6 +266,27 @@ function normalizeListeningQuestions(questions: Question[]): Question[] {
   });
 }
 
+function getVocabTypeLabel(itemData: Record<string, unknown>): string {
+  const typeCandidates = [
+    itemData.typeLabel,
+    itemData.wordType,
+    itemData.partOfSpeech,
+    itemData.part_of_speech,
+    itemData.vocabType,
+    itemData.pos,
+    itemData.loaiTu,
+    itemData['loại từ'],
+    itemData.type
+  ];
+
+  const typeLabel = typeCandidates.find((value) => {
+    if (typeof value !== 'string' || !value.trim()) return false;
+    return !['vocab', 'flashcard'].includes(value.trim().toLowerCase());
+  });
+
+  return typeof typeLabel === 'string' ? typeLabel.trim() : 'Từ vựng';
+}
+
 export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
   if (!exam) return exam;
 
@@ -483,7 +504,6 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
       const itemMeaning = typeof itemData.meaning === 'string' ? itemData.meaning : undefined;
       const itemExample = typeof itemData.example === 'string' ? itemData.example : undefined;
       const itemExplanation = typeof itemData.explanation === 'string' ? itemData.explanation : undefined;
-      const itemTypeLabel = typeof itemData.typeLabel === 'string' ? itemData.typeLabel : undefined;
       const itemTitle = typeof itemData.title === 'string' ? itemData.title : undefined;
       const itemContent = typeof itemData.content === 'string' ? itemData.content : undefined;
       const itemAudioUrl = typeof itemData.audioUrl === 'string' ? itemData.audioUrl : undefined;
@@ -499,7 +519,7 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
         vocabList.push({
           hanzi: itemHanzi || itemPrompt || 'Word',
           pinyin: itemPinyin || '',
-          type: itemTypeLabel || item.type || 'Từ vựng',
+          type: getVocabTypeLabel(itemData),
           meaning: itemMeaning || (itemOptions ? itemOptions.join(', ') : ''),
           example: itemExample || itemExplanation
         });
