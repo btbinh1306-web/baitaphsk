@@ -15,11 +15,33 @@ import {
 
 const CUSTOM_EXAMS_STORAGE_KEY = 'hsk_custom_exams_v2';
 
+function loadCachedExams(): ExamLesson[] {
+  try {
+    const saved = localStorage.getItem(CUSTOM_EXAMS_STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : null;
+    return Array.isArray(parsed) ? parsed.map((exam) => sanitizeExamSections(exam)) : [];
+  } catch (error) {
+    console.warn('Failed to load cached exams:', error);
+    return [];
+  }
+}
+
+function loadCachedDeletedExamIds(): string[] {
+  try {
+    const saved = localStorage.getItem('hsk_deleted_exam_ids');
+    const parsed = saved ? JSON.parse(saved) : null;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn('Failed to load cached deleted exam IDs:', error);
+    return [];
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('STUDENT');
   const [lookupSubmissionId, setLookupSubmissionId] = useState<string>('');
-  const [customExams, setCustomExams] = useState<ExamLesson[]>([]);
-  const [deletedExamIds, setDeletedExamIds] = useState<string[]>([]);
+  const [customExams, setCustomExams] = useState<ExamLesson[]>(loadCachedExams);
+  const [deletedExamIds, setDeletedExamIds] = useState<string[]>(loadCachedDeletedExamIds);
 
   // Load custom exams and deleted exam IDs from server API & localStorage on mount
   useEffect(() => {
@@ -28,27 +50,11 @@ export default function App() {
       const serverExams = await fetchServerCustomExams();
       const serverDeleted = await fetchServerDeletedExamIds();
 
-      let localExams: ExamLesson[] = [];
-      let localDeleted: string[] = [];
+      let localExams: ExamLesson[] = loadCachedExams();
+      let localDeleted: string[] = loadCachedDeletedExamIds();
 
-      try {
-        const saved = localStorage.getItem(CUSTOM_EXAMS_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            localExams = parsed.map((e) => sanitizeExamSections(e));
-          }
-        }
-        const savedDeleted = localStorage.getItem('hsk_deleted_exam_ids');
-        if (savedDeleted) {
-          const parsedDel = JSON.parse(savedDeleted);
-          if (Array.isArray(parsedDel)) {
-            localDeleted = parsedDel;
-          }
-        }
-      } catch (err) {
-        console.error('Failed to parse localStorage:', err);
-      }
+      // The lazy sync below can take several seconds on a cold Apps Script request.
+      // Cached lessons keep the last known audio links visible while it refreshes.
 
       // Merge server + local exams (server takes precedence)
       const examMap = new Map<string, ExamLesson>();
