@@ -58,9 +58,9 @@ export const getDriveAudioPlayerUrl = (rawLink: string): string => {
   const actualUrl = getActualUrl(rawLink);
   const { fileId, resourceKey } = getDriveFileInfo(rawLink);
   if (fileId) {
-    const params = new URLSearchParams({ id: fileId, export: 'download', confirm: 't' });
+    const params = new URLSearchParams({ export: 'media', id: fileId });
     if (resourceKey) params.set('resourcekey', resourceKey);
-    return `https://drive.usercontent.google.com/download?${params.toString()}`;
+    return `https://drive.google.com/uc?${params.toString()}`;
   }
 
   return actualUrl;
