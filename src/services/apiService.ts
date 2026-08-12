@@ -2,6 +2,7 @@ import { AudioRecordItem, ExamLesson, SubmissionData } from '../types';
 import { HandwritingExercise } from '../types/handwriting';
 import {
   deleteGasExam,
+  fetchGasDeletedExamIds,
   fetchGasExams,
   fetchGasHandwritingExercises,
   saveGasExam,
@@ -58,7 +59,9 @@ export async function deleteServerCustomExam(examId: string): Promise<boolean> {
     });
     const data = await res.json();
     const localDeleted = Boolean(data && data.ok);
-    return gasDeleted === true || localDeleted;
+    // When GAS is configured, a local Express success is not enough for
+    // cross-device deletion because the deployed server may be ephemeral.
+    return gasDeleted !== null ? gasDeleted === true : localDeleted;
   } catch (err) {
     console.warn('Failed to delete custom exam on server', err);
     return gasDeleted === true;
@@ -66,16 +69,20 @@ export async function deleteServerCustomExam(examId: string): Promise<boolean> {
 }
 
 export async function fetchServerDeletedExamIds(): Promise<string[]> {
+  const gasDeleted = await fetchGasDeletedExamIds();
+  let localDeleted: string[] = [];
+
   try {
     const res = await fetch('/api/deleted-exam-ids');
     const data = await res.json();
     if (data && data.ok && Array.isArray(data.deletedIds)) {
-      return data.deletedIds;
+      localDeleted = data.deletedIds.map(String);
     }
   } catch (err) {
     console.warn('Failed to fetch deleted exam IDs from server', err);
   }
-  return [];
+
+  return Array.from(new Set([...(gasDeleted || []), ...localDeleted]));
 }
 
 // --- HANDWRITING EXERCISES ---

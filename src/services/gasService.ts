@@ -214,8 +214,12 @@ export const getLocalSubmissions = (): SubmissionData[] => {
   return [];
 };
 
-export const saveLocalSubmission = (sub: SubmissionData, syncServer = true): void => {
+export const saveLocalSubmission = (sub: SubmissionData, syncServer = true, replaceId?: string): void => {
   const current = getLocalSubmissions();
+  if (replaceId && replaceId !== sub.id) {
+    const oldIndex = current.findIndex((item) => item.id === replaceId);
+    if (oldIndex >= 0) current.splice(oldIndex, 1);
+  }
   // Check if exists, update or prepend
   const idx = current.findIndex((item) => item.id === sub.id);
   if (idx >= 0) {
@@ -289,9 +293,9 @@ export const submitToGas = async (
 
   // Always save locally so it works even offline or without configured URL
   saveLocalSubmission(newSubRecord, false);
-  await saveServerSubmission(newSubRecord);
 
   if (!config.sheetUrl || config.sheetUrl.trim() === '') {
+    await saveServerSubmission(newSubRecord);
     // Return local submission ID with success
     return {
       ok: true,
@@ -331,15 +335,17 @@ export const submitToGas = async (
       if (data.id) {
         // Update local ID if server assigned a different one
         newSubRecord.id = String(data.id);
-        saveLocalSubmission(newSubRecord, false);
-        await saveServerSubmission(newSubRecord);
       }
+      saveLocalSubmission(newSubRecord, false, localId);
+      await saveServerSubmission(newSubRecord);
       return { ok: true, id: data.id || localId };
     } else {
+      await saveServerSubmission(newSubRecord);
       return { ok: false, error: data?.error || 'Lỗi khi gửi lên Apps Script' };
     }
   } catch (err: any) {
     console.error('GAS POST submit error:', err);
+    await saveServerSubmission(newSubRecord);
     // Even if GAS fetch fails (e.g., CORS or network error), we return success with local ID & warn
     return {
       ok: true,
@@ -385,6 +391,7 @@ export const fetchTeacherSubmissions = async (
   });
 
   // 2. Fetch Google Sheets remote submissions if URL configured
+  const remoteSubmissionIds = new Set<string>();
   if (config.sheetUrl && config.sheetUrl.trim() !== '') {
     try {
       const url = new URL(config.sheetUrl.trim());
@@ -411,6 +418,7 @@ export const fetchTeacherSubmissions = async (
           const id = String(r['ID'] || r['id'] || '');
 
           if (id) {
+            remoteSubmissionIds.add(id);
             const existing = subMap.get(id);
             const mapped: SubmissionData = {
               id: id,
@@ -437,7 +445,7 @@ export const fetchTeacherSubmissions = async (
                 extractedFeedbackAudios,
                 mergeAudioRecords(driveAudios, existing?.audios)
               ),
-              isHandwriting: existing?.isHandwriting
+              isHandwriting: existing?.isHandwriting || extractedSubImgs.length > 0
             };
             subMap.set(id, mapped);
           }
@@ -448,7 +456,56 @@ export const fetchTeacherSubmissions = async (
     }
   }
 
-  const allRows = Array.from(subMap.values());
+  const dedupedRows = new Map<string, SubmissionData>();
+  subMap.forEach((row) => {
+    const images = (row.submissionImages || []).map(String).filter(Boolean).sort();
+    const isHandwriting = Boolean(row.isHandwriting || images.length > 0);
+    const identity = [
+      row.name.trim().toLowerCase(),
+      row.class.trim().toLowerCase(),
+      row.lesson.trim().toLowerCase(),
+      row.time.trim(),
+      row.correct,
+      row.done,
+      row.total,
+      row.percent,
+      row.wrongCount,
+      row.notDone,
+      row.wrong,
+      row.essays
+    ].join(':');
+    const dedupeKey = isHandwriting
+      ? `handwriting:${row.exerciseId || row.lesson}:${row.name.trim().toLowerCase()}:${row.class.trim().toLowerCase()}:${images.join('|')}`
+      : `submission:${identity}`;
+    const previous = dedupedRows.get(dedupeKey);
+
+    if (!previous) {
+      dedupedRows.set(dedupeKey, row);
+      return;
+    }
+
+    const rowIsRemote = remoteSubmissionIds.has(row.id);
+    const previousIsRemote = remoteSubmissionIds.has(previous.id);
+    const preferred = rowIsRemote && !previousIsRemote ? row : previous;
+    const secondary = preferred === row ? previous : row;
+    dedupedRows.set(dedupeKey, {
+      ...secondary,
+      ...preferred,
+      id: preferred.id,
+      submissionImages: preferred.submissionImages?.length
+        ? preferred.submissionImages
+        : secondary.submissionImages,
+      correctedImages: preferred.correctedImages?.length
+        ? preferred.correctedImages
+        : secondary.correctedImages,
+      audios: mergeAudioRecords(preferred.audios, secondary.audios),
+      comment: preferred.comment || secondary.comment,
+      teacherComment: preferred.teacherComment || secondary.teacherComment,
+      status: preferred.status === 'Đã chấm' || secondary.status === 'Đã chấm' ? 'Đã chấm' : 'Chờ chấm'
+    });
+  });
+
+  const allRows = Array.from(dedupedRows.values());
   return { ok: true, rows: allRows };
 };
 

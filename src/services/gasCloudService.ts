@@ -84,6 +84,16 @@ export async function fetchGasExams(): Promise<ExamLesson[] | null> {
   return data.exams.filter((exam) => exam.type !== 'handwriting_submission') as ExamLesson[];
 }
 
+export async function fetchGasDeletedExamIds(): Promise<string[] | null> {
+  const capabilities = await getGasCapabilities();
+  if (!capabilities?.lessons) return null;
+
+  const data = await gasGet<{ ok?: boolean; deletedIds?: unknown[] }>('list_deleted_exams');
+  if (!data?.ok || !Array.isArray(data.deletedIds)) return null;
+
+  return data.deletedIds.map(String);
+}
+
 export async function fetchGasHandwritingExercises(): Promise<HandwritingExercise[] | null> {
   const capabilities = await getGasCapabilities();
   if (!capabilities?.lessons) return null;

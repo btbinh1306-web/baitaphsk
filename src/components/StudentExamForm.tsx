@@ -277,6 +277,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setSubError(null);
 
     if (!studentName.trim()) {

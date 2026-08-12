@@ -151,6 +151,8 @@ export const HandwritingExerciseView = React.forwardRef(
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+
     const finalName = studentName.trim();
     const finalClass = studentClass.trim();
     const finalTopic = lessonTopicInput.trim();

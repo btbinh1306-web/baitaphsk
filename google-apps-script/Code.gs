@@ -4,6 +4,7 @@
 var SUBMISSION_FOLDER_ID = '1S39P7i1nXiX6JeSXXRiS4Y1I4zIJr_qw';
 var LESSON_FOLDER_ID = '1MK2ZlsjR7sCguyLMZT0pt5KLLS0X2bN9';
 var GV_PASSWORD = 'tbtt123';
+var DELETED_EXAM_IDS_PROPERTY = 'HSK_DELETED_EXAM_IDS';
 
 var HEADERS = [
   'ID', 'Thời gian', 'Họ tên', 'Lớp', 'Bài', 'Số câu đúng', 'Đã làm', 'Tổng', 'Phần trăm',
@@ -25,6 +26,23 @@ function json_(value) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function getDeletedExamIds_() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(DELETED_EXAM_IDS_PROPERTY);
+    var parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(function(id) { return String(id); }) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setDeletedExamIds_(ids) {
+  PropertiesService.getScriptProperties().setProperty(
+    DELETED_EXAM_IDS_PROPERTY,
+    JSON.stringify(Array.from(new Set((ids || []).map(function(id) { return String(id); }))))
+  );
+}
+
 function doGet(e) {
   var params = (e && e.parameter) || {};
   var action = params.action || '';
@@ -41,6 +59,7 @@ function doGet(e) {
   }
 
   if (action === 'list_exams') return listExams_();
+  if (action === 'list_deleted_exams') return json_({ ok: true, deletedIds: getDeletedExamIds_() });
 
   if (params.mode === 'teacher') return listTeacherSubmissions_(params.pass);
   if (params.mode === 'result') return findResult_(params.id);
@@ -179,6 +198,8 @@ function saveExam_(exam) {
     file = folder.createFile(fileName, content, MimeType.PLAIN_TEXT);
   }
 
+  setDeletedExamIds_(getDeletedExamIds_().filter(function(id) { return id !== String(exam.id); }));
+
   return json_({ ok: true, exam: exam, fileId: file.getId() });
 }
 
@@ -193,7 +214,10 @@ function deleteExam_(id) {
     files.next().setTrashed(true);
     deleted = true;
   }
-  return json_({ ok: true, deleted: deleted, id: String(id) });
+  var deletedIds = getDeletedExamIds_();
+  if (deletedIds.indexOf(String(id)) < 0) deletedIds.push(String(id));
+  setDeletedExamIds_(deletedIds);
+  return json_({ ok: true, deleted: deleted, id: String(id), deletedIds: deletedIds });
 }
 
 function listExams_() {
@@ -201,13 +225,16 @@ function listExams_() {
   if (!folder) return json_({ ok: false, error: 'Chưa cấu hình thư mục HSK_SOANBAI' });
 
   var exams = [];
+  var deletedIds = getDeletedExamIds_();
   var files = folder.getFiles();
   while (files.hasNext()) {
     var file = files.next();
     if (!/\.json$/i.test(file.getName())) continue;
     try {
       var exam = JSON.parse(file.getBlob().getDataAsString());
-      if (exam && exam.id) exams.push(normalizeDriveLinks_(exam));
+      if (exam && exam.id && deletedIds.indexOf(String(exam.id)) < 0) {
+        exams.push(normalizeDriveLinks_(exam));
+      }
     } catch (error) {
       // Ignore unrelated or malformed files in the lesson folder.
     }

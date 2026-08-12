@@ -58,7 +58,7 @@ interface TeacherPortalProps {
   customExams?: ExamLesson[];
   deletedExamIds?: string[];
   onSaveCustomExam?: (exam: ExamLesson) => void;
-  onDeleteCustomExam?: (examId: string) => void;
+  onDeleteCustomExam?: (examId: string) => Promise<boolean> | void;
 }
 
 export const TeacherPortal: React.FC<TeacherPortalProps> = ({
@@ -1506,14 +1506,18 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                   <span className="font-bold">Xác nhận xóa bài thi này?</span>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const idToDelete = editingExam.id;
                       const titleToDelete = editingExam.title;
                       const remaining = allExams.filter((e) => e.id !== idToDelete);
                       const fallbackRaw = remaining[0] || SAMPLE_EXAMS[0];
                       const fallback = fallbackRaw ? sanitizeExamSections(fallbackRaw) : null;
 
-                      onDeleteCustomExam(idToDelete);
+                      const deleted = await onDeleteCustomExam(idToDelete);
+                      if (deleted === false) {
+                        alert('Không thể đồng bộ việc xóa bài lên máy chủ. Bài vẫn được giữ lại để không mất dữ liệu.');
+                        return;
+                      }
                       setShowDeleteConfirm(false);
                       setDeleteNotice(`Đã xóa bài thi "${titleToDelete}" thành công!`);
 

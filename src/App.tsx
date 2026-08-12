@@ -46,31 +46,42 @@ export default function App() {
   // Load custom exams and deleted exam IDs from server API & localStorage on mount
   useEffect(() => {
     async function initData() {
-      // 1. Try server first for sync across devices
-      const serverExams = await fetchServerCustomExams();
-      const serverDeleted = await fetchServerDeletedExamIds();
-
       let localExams: ExamLesson[] = loadCachedExams();
       let localDeleted: string[] = loadCachedDeletedExamIds();
+
+      // Push previous local delete intents once so an old local-only deletion
+      // is also applied to the shared backend after an app update.
+      if (localDeleted.length) {
+        await Promise.all(localDeleted.map((id) => deleteServerCustomExam(id)));
+      }
+
+      // Try server first for sync across devices.
+      const serverExams = await fetchServerCustomExams();
+      const serverDeleted = await fetchServerDeletedExamIds();
+      const mergedDeleted = Array.from(new Set([...serverDeleted, ...localDeleted]));
+      const deletedSet = new Set(mergedDeleted);
 
       // The lazy sync below can take several seconds on a cold Apps Script request.
       // Cached lessons keep the last known audio links visible while it refreshes.
 
       // Merge server + local exams (server takes precedence)
       const examMap = new Map<string, ExamLesson>();
-      localExams.forEach((e) => examMap.set(e.id, e));
-      serverExams.forEach((e) => examMap.set(e.id, sanitizeExamSections(e)));
+      localExams
+        .filter((exam) => !deletedSet.has(exam.id))
+        .forEach((e) => examMap.set(e.id, e));
+      serverExams
+        .filter((exam) => !deletedSet.has(exam.id))
+        .forEach((e) => examMap.set(e.id, sanitizeExamSections(e)));
 
       // Migrate older local-only exams without overwriting server versions.
       const serverExamIds = new Set(serverExams.map((exam) => exam.id));
       await Promise.all(
         localExams
-          .filter((exam) => !serverExamIds.has(exam.id))
+          .filter((exam) => !deletedSet.has(exam.id) && !serverExamIds.has(exam.id))
           .map((exam) => saveServerCustomExam(exam))
       );
 
       const mergedExams = Array.from(examMap.values());
-      const mergedDeleted = Array.from(new Set([...serverDeleted, ...localDeleted]));
 
       setCustomExams(mergedExams);
       setDeletedExamIds(mergedDeleted);
@@ -121,7 +132,11 @@ export default function App() {
 
   // Delete custom exam handler
   const handleDeleteCustomExam = async (examId: string) => {
-    await deleteServerCustomExam(examId);
+    const deletedRemotely = await deleteServerCustomExam(examId);
+    if (!deletedRemotely) {
+      console.error('Failed to delete custom exam from shared storage:', examId);
+      return false;
+    }
 
     setCustomExams((prev) => {
       const updated = prev.filter((e) => e.id !== examId);
@@ -140,6 +155,8 @@ export default function App() {
       } catch (err) {}
       return updated;
     });
+
+    return true;
   };
 
   const handleNavigateToResult = (submissionId: string) => {
