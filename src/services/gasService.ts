@@ -10,7 +10,7 @@ import {
   gradeServerSubmission,
   uploadMediaFile
 } from './apiService';
-import { DEFAULT_GAS_WEB_APP_URL } from './gasConfig';
+import { DEFAULT_GAS_WEB_APP_URL, getConfiguredGasWebAppUrl } from './gasConfig';
 import { clearGasCapabilitiesCache, deleteGasSubmissions, getGasCapabilities } from './gasCloudService';
 
 const DEFAULT_CONFIG_KEY = 'hsk_gas_config';
@@ -20,7 +20,13 @@ export const getGasConfig = (): GasConfig => {
   try {
     const saved = localStorage.getItem(DEFAULT_CONFIG_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          ...parsed,
+          sheetUrl: getConfiguredGasWebAppUrl()
+        };
+      }
     }
   } catch (e) {
     console.warn('Failed to parse GasConfig from localStorage', e);
@@ -410,14 +416,6 @@ export const fetchTeacherSubmissions = async (
     (sub) => !deletedIdSet.has(String(sub.id).trim().toLowerCase())
   );
 
-  // Migrate older local-only submissions without replacing newer server records.
-  const serverSubmissionIds = new Set(serverSubs.map((sub) => sub.id));
-  await Promise.all(
-    localSubs
-      .filter((sub) => !serverSubmissionIds.has(sub.id))
-      .map((sub) => saveServerSubmission(sub))
-  );
-
   const subMap = new Map<string, SubmissionData>();
   localSubs.forEach((s) => subMap.set(s.id, s));
   serverSubs.filter((s) => !deletedIdSet.has(String(s.id).trim().toLowerCase())).forEach((s) => {
@@ -431,6 +429,7 @@ export const fetchTeacherSubmissions = async (
 
   // 2. Fetch Google Sheets remote submissions if URL configured
   const remoteSubmissionIds = new Set<string>();
+  let gasReadSucceeded = false;
   if (config.sheetUrl && config.sheetUrl.trim() !== '') {
     try {
       const url = new URL(config.sheetUrl.trim());
@@ -443,6 +442,7 @@ export const fetchTeacherSubmissions = async (
 
       const data = await res.json();
       if (data && data.ok && Array.isArray(data.rows)) {
+        gasReadSucceeded = true;
         data.rows.forEach((r: any) => {
           const correct = Number(r['Số câu đúng'] || 0);
           const total = Number(r['Tổng'] || 0);
@@ -496,8 +496,23 @@ export const fetchTeacherSubmissions = async (
     }
   }
 
+  // Do not re-upload stale browser copies after a successful Google Sheet read.
+  // The Sheet is authoritative whenever its request succeeded, including []
+  // after the teacher has intentionally cleared all submissions.
+  if (!gasReadSucceeded) {
+    const serverSubmissionIds = new Set(serverSubs.map((sub) => sub.id));
+    await Promise.all(
+      localSubs
+        .filter((sub) => !serverSubmissionIds.has(sub.id))
+        .map((sub) => saveServerSubmission(sub))
+    );
+  }
+
   const dedupedRows = new Map<string, SubmissionData>();
-  subMap.forEach((row) => {
+  const sourceRows = gasReadSucceeded
+    ? Array.from(subMap.values()).filter((row) => remoteSubmissionIds.has(row.id))
+    : Array.from(subMap.values());
+  sourceRows.forEach((row) => {
     const images = (row.submissionImages || []).map(String).filter(Boolean).sort();
     const isHandwriting = Boolean(row.isHandwriting || images.length > 0);
     const identity = [
