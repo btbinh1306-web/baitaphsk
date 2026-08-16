@@ -12,6 +12,7 @@ import {
 } from './apiService';
 import { DEFAULT_GAS_WEB_APP_URL, getConfiguredGasWebAppUrl } from './gasConfig';
 import { clearGasCapabilitiesCache, deleteGasSubmissions, getGasCapabilities } from './gasCloudService';
+import { getGasRequestUrl } from './gasTransport';
 
 const DEFAULT_CONFIG_KEY = 'hsk_gas_config';
 const LOCAL_SUBMISSIONS_KEY = 'hsk_local_submissions_v1';
@@ -361,7 +362,7 @@ export const submitToGas = async (
       submissionImages: payload.submissionImages || []
     };
 
-    const res = await fetch(config.sheetUrl.trim(), {
+    const res = await fetch(getGasRequestUrl(config.sheetUrl.trim()), {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
@@ -437,7 +438,7 @@ export const fetchTeacherSubmissions = async (
       url.searchParams.append('mode', 'teacher');
       url.searchParams.append('pass', pass);
 
-      const res = await fetch(url.toString(), {
+      const res = await fetch(getGasRequestUrl(url.toString()), {
         method: 'GET'
       });
 
@@ -662,7 +663,7 @@ export const fetchResultById = async (
     url.searchParams.append('mode', 'result');
     url.searchParams.append('id', id.trim());
 
-    const res = await fetch(url.toString(), {
+    const res = await fetch(getGasRequestUrl(url.toString()), {
       method: 'GET'
     });
 
@@ -837,7 +838,7 @@ export const gradeSubmissionInGas = async (
   }
 
   try {
-    const res = await fetch(config.sheetUrl.trim(), {
+    const res = await fetch(getGasRequestUrl(config.sheetUrl.trim()), {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'

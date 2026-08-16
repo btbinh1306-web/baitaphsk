@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getGasConfig, saveGasConfig } from '../services/gasService';
+import { getGasRequestUrl } from '../services/gasTransport';
 import { Settings, Copy, Check, Link2, Key, Database, Play, AlertCircle, HelpCircle, Code2, Server, Lock, Unlock } from 'lucide-react';
 import appsScriptCode from '../../google-apps-script/Code.gs?raw';
 
@@ -61,7 +62,7 @@ export const GasSetupModal: React.FC = () => {
     setTestResult(null);
 
     try {
-      const res = await fetch(sheetUrl.trim());
+      const res = await fetch(getGasRequestUrl(sheetUrl.trim()));
       const data = await res.json();
       if (data && data.ok) {
         setTestResult({ ok: true, message: 'Kết nối thành công! Google Apps Script hoạt động bình thường.' });

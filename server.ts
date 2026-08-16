@@ -10,6 +10,7 @@ const PORT = 3000;
 // Configure body parser limits for large payloads (base64 images & audio)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.text({ type: 'text/plain', limit: '50mb' }));
 
 // Ensure data_store directory exists
 const DATA_DIR = path.join(process.cwd(), 'data_store');
@@ -67,6 +68,56 @@ function getDeletedSubmissionIds(): string[] {
 
 // Media file upload & serving
 app.use('/api/media', express.static(UPLOADS_DIR));
+
+function getGasProxyTarget(req: express.Request): URL | null {
+  const rawTarget = typeof req.query.target === 'string' ? req.query.target.trim() : '';
+  if (!rawTarget) return null;
+
+  try {
+    const target = new URL(rawTarget);
+    const isAllowedPath = /^\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/.test(target.pathname);
+    if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !isAllowedPath) {
+      return null;
+    }
+
+    Object.entries(req.query).forEach(([key, value]) => {
+      if (key === 'target' || typeof value !== 'string') return;
+      target.searchParams.set(key, value);
+    });
+    return target;
+  } catch {
+    return null;
+  }
+}
+
+async function proxyGoogleAppsScript(req: express.Request, res: express.Response): Promise<void> {
+  const target = getGasProxyTarget(req);
+  if (!target) {
+    res.status(400).json({ ok: false, error: 'Invalid Google Apps Script target' });
+    return;
+  }
+
+  try {
+    const upstream = await fetch(target, {
+      method: req.method,
+      headers: req.method === 'POST'
+        ? { 'Content-Type': 'text/plain;charset=utf-8' }
+        : undefined,
+      body: req.method === 'POST'
+        ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}))
+        : undefined
+    });
+    const body = await upstream.text();
+    const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
+    res.status(upstream.status).setHeader('Content-Type', contentType).send(body);
+  } catch (err: any) {
+    console.error('Google Apps Script proxy error:', err);
+    res.status(502).json({ ok: false, error: 'Không thể kết nối Google Sheet' });
+  }
+}
+
+app.get('/api/gas', proxyGoogleAppsScript);
+app.post('/api/gas', proxyGoogleAppsScript);
 
 // Proxy public Google Drive media through this server so deployed browsers do
 // not have to load Drive's cross-origin redirect directly. Range headers are

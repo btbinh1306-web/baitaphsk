@@ -1,6 +1,7 @@
 import { ExamLesson } from '../types';
 import { HandwritingExercise } from '../types/handwriting';
 import { getConfiguredGasWebAppUrl } from './gasConfig';
+import { getGasRequestUrl } from './gasTransport';
 
 export type GasMediaFolder = 'lesson' | 'submission' | 'correction';
 
@@ -36,7 +37,7 @@ async function gasGet<T>(action: string): Promise<T | null> {
   if (!url) return null;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(getGasRequestUrl(url));
     const data = await response.json();
     return data as T;
   } catch (error) {
@@ -50,7 +51,7 @@ async function gasPost<T>(payload: Record<string, unknown>): Promise<T | null> {
   if (!url) return null;
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(getGasRequestUrl(url), {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
