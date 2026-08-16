@@ -74,6 +74,14 @@ const MAX_LESSON_HISTORY = 50;
 
 const cloneExam = (exam: ExamLesson): ExamLesson => structuredClone(exam);
 
+const normalizeLessonFilterValue = (value: string): string =>
+  value
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*\/\s*/g, '/')
+    .trim()
+    .toLocaleLowerCase('vi');
+
 interface TeacherPortalProps {
   customExams?: ExamLesson[];
   deletedExamIds?: string[];
@@ -1292,11 +1300,16 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStatus = statusFilter === 'ALL' || sub.status === statusFilter;
     const normalizedLesson = sub.lesson.trim();
+    const normalizedLessonKey = normalizeLessonFilterValue(normalizedLesson);
     const selectedLevelGroup = studentExamGroups.find((group) => group.label === lessonLevelFilter);
+    const selectedLevelLessonKeys = new Set(
+      (selectedLevelGroup?.exams || []).map((exam) => normalizeLessonFilterValue(exam.title))
+    );
     const matchesLevel =
       lessonLevelFilter === 'ALL' ||
-      Boolean(selectedLevelGroup?.exams.some((exam) => exam.title === normalizedLesson));
-    const matchesLesson = lessonFilter === 'ALL' || normalizedLesson === lessonFilter;
+      selectedLevelLessonKeys.has(normalizedLessonKey);
+    const matchesLesson =
+      lessonFilter === 'ALL' || normalizedLessonKey === normalizeLessonFilterValue(lessonFilter);
 
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =

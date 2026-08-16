@@ -16,8 +16,8 @@ export function isHandwritingExam(exam: ExamLesson): boolean {
 }
 
 export function getExamGroupLabel(exam: ExamLesson): string {
-  if (isHandwritingExam(exam)) return 'Nộp bài viết tay';
   if (GROUP_ORDER.includes(exam.level)) return exam.level;
+  if (isHandwritingExam(exam)) return 'Nộp bài viết tay';
   return 'Khác';
 }
 
