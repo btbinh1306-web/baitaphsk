@@ -75,10 +75,11 @@ function getGasProxyTarget(req: express.Request): URL | null {
 
   try {
     const target = new URL(rawTarget);
-    const isAllowedPath = /^\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/.test(target.pathname);
+    const isAllowedPath = /^\/macros\/s\/[a-zA-Z0-9_-]+\/exec\/?$/.test(target.pathname);
     if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !isAllowedPath) {
       return null;
     }
+    target.pathname = target.pathname.replace(/\/+$/, '');
 
     Object.entries(req.query).forEach(([key, value]) => {
       if (key === 'target' || typeof value !== 'string') return;
@@ -109,7 +110,11 @@ async function proxyGoogleAppsScript(req: express.Request, res: express.Response
     });
     const body = await upstream.text();
     const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
-    res.status(upstream.status).setHeader('Content-Type', contentType).send(body);
+    res
+      .status(upstream.status)
+      .setHeader('Content-Type', contentType)
+      .setHeader('Cache-Control', 'no-store')
+      .send(body);
   } catch (err: any) {
     console.error('Google Apps Script proxy error:', err);
     res.status(502).json({ ok: false, error: 'Không thể kết nối Google Sheet' });

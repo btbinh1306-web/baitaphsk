@@ -5,8 +5,18 @@ const LEGACY_GAS_WEB_APP_URLS = new Set([
   'https://script.google.com/macros/s/AKfycbyaB0n2M2wstStKGHE7KH4MlvXhb6Z4bYggs952KXUw6VwtexlGm6358eDumo8wPPYp/exec'
 ]);
 
+export function normalizeGasWebAppUrl(url: string): string {
+  const trimmed = url.trim();
+  const embeddedUrl = trimmed.match(
+    /https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec\/?(?:\?[^\s)\]]*)?/i
+  )?.[0];
+  const normalized = embeddedUrl || trimmed;
+  return normalized.replace(/\/+(?=\?|$)/, '');
+}
+
 function migrateGasWebAppUrl(url: string): string {
-  return LEGACY_GAS_WEB_APP_URLS.has(url) ? DEFAULT_GAS_WEB_APP_URL : url;
+  const normalized = normalizeGasWebAppUrl(url);
+  return LEGACY_GAS_WEB_APP_URLS.has(normalized) ? DEFAULT_GAS_WEB_APP_URL : normalized;
 }
 
 export function getConfiguredGasWebAppUrl(): string {
