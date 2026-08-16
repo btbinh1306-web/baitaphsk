@@ -122,9 +122,48 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     [currentExam.listeningQuestions]
   );
 
+  const shuffledArrangeChips = useMemo(() => {
+    const pools = new Map<string, string[]>();
+
+    (currentExam.arrangeQuestions || []).forEach((question) => {
+      const chips = [...(question.wordChips || [])];
+      for (let index = chips.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [chips[index], chips[randomIndex]] = [chips[randomIndex], chips[index]];
+      }
+
+      // Avoid showing the original order by chance when a question has several chips.
+      if (chips.length > 1 && chips.every((chip, index) => chip === question.wordChips?.[index])) {
+        [chips[0], chips[chips.length - 1]] = [chips[chips.length - 1], chips[0]];
+      }
+
+      pools.set(question.id, chips);
+    });
+
+    return pools;
+  }, [currentExam.arrangeQuestions]);
+
   const groupedFillQuestions = useMemo(() => {
     if (!currentExam.fillQuestions) return [];
     const groups: { tier: string; wordBank?: string[]; questions: typeof currentExam.fillQuestions }[] = [];
+    const shuffleWordBank = (words: string[]) => {
+      const shuffled = [...words];
+      for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+      }
+
+      // Avoid showing the source order by chance when there are several words.
+      if (shuffled.length > 1 && shuffled.every((word, index) => word === words[index])) {
+        [shuffled[0], shuffled[shuffled.length - 1]] = [
+          shuffled[shuffled.length - 1],
+          shuffled[0],
+        ];
+      }
+
+      return shuffled;
+    };
+
     currentExam.fillQuestions.forEach((q) => {
       const tierKey = q.tier || 'tier1';
       let g = groups.find((item) => item.tier === tierKey);
@@ -144,7 +183,47 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }
       g.questions.push(q);
     });
-    return groups;
+    return groups.map((group) => {
+      const nonEmptyWordBanks = group.questions
+        .map((question) => question.wordBank?.map((word) => word.trim()).filter(Boolean) || [])
+        .filter((wordBank) => wordBank.length > 0);
+
+      if (nonEmptyWordBanks.length === 0) return group;
+
+      const getWordBankKey = (wordBank: string[]) =>
+        Array.from(new Set(wordBank)).sort().join("\u0001");
+      const sharedWordBankKey = getWordBankKey(nonEmptyWordBanks[0]);
+      const hasSharedWordBank = nonEmptyWordBanks.every(
+        (wordBank) => getWordBankKey(wordBank) === sharedWordBankKey,
+      );
+
+      if (!hasSharedWordBank) {
+        return {
+          ...group,
+          wordBank: shuffleWordBank(group.wordBank || []),
+        };
+      }
+
+      // A repeated bank can be the lesson vocabulary list rather than the actual
+      // choices for every question. Keep only the words used as accepted answers.
+      const acceptedAnswers = new Set(
+        group.questions.flatMap((question) => {
+          const rawAnswer = question.acceptableAnswers ?? question.answer;
+          const answerText = typeof rawAnswer === "string" ? rawAnswer : "";
+          return answerText
+            .split("|")
+            .map((answer) => answer.trim())
+            .filter(Boolean);
+        }),
+      );
+      const sharedWordBank = nonEmptyWordBanks[0];
+      const answerWords = sharedWordBank.filter((word) => acceptedAnswers.has(word));
+
+      return {
+        ...group,
+        wordBank: shuffleWordBank(answerWords.length > 0 ? answerWords : sharedWordBank),
+      };
+    });
   }, [currentExam.fillQuestions]);
 
   const hasVocabList = !!(currentExam.vocabList && currentExam.vocabList.length > 0);
@@ -954,7 +1033,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 <div className="space-y-6">
                   {currentExam.arrangeQuestions.map((q, idx) => {
                     const userOrdered = arrangeAnswers[q.id] || [];
-                    const chips = q.wordChips || [];
+                    const chips = shuffledArrangeChips.get(q.id) || q.wordChips || [];
 
                     // Track remaining available chips
                     const availableChips = [...chips];
