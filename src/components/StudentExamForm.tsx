@@ -129,11 +129,18 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       const tierKey = q.tier || 'tier1';
       let g = groups.find((item) => item.tier === tierKey);
       if (!g) {
-        g = { tier: tierKey, wordBank: q.wordBank, questions: [] };
+        g = { tier: tierKey, wordBank: [], questions: [] };
         groups.push(g);
       }
-      if (!g.wordBank && q.wordBank) {
-        g.wordBank = q.wordBank;
+      if (q.wordBank?.length) {
+        const existingWords = g.wordBank || [];
+        g.wordBank = q.wordBank.reduce<string[]>((words, word) => {
+          const normalizedWord = word.trim();
+          if (normalizedWord && !words.includes(normalizedWord)) {
+            words.push(normalizedWord);
+          }
+          return words;
+        }, [...existingWords]);
       }
       g.questions.push(q);
     });

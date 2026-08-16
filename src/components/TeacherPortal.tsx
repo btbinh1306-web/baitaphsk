@@ -61,7 +61,9 @@ import {
   FileCode,
   Pencil,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 
 type HistoryState<T> = {
@@ -898,9 +900,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       alert('Vui lòng nhập Tên bài thi');
       return;
     }
+
+    // Publish the same normalized shape that StudentExamForm consumes.
+    const examToPublish = sanitizeExamSections(examToSave);
     if (onSaveCustomExam) {
-      await onSaveCustomExam(examToSave);
-      alert(`Đã lưu thành công bài thi: "${examToSave.title}"! Học sinh có thể làm bài ngay.`);
+      await onSaveCustomExam(examToPublish);
+      alert(`Đã lưu thành công bài thi: "${examToPublish.title}"! Học sinh có thể làm bài ngay.`);
     }
   };
 
@@ -1718,7 +1723,25 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={undoEditingExam}
+                disabled={editingHistory.past.length === 0}
+                className="inline-flex items-center gap-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-xs px-3 py-2 rounded-lg transition cursor-pointer"
+                title="Hoàn tác thay đổi gần nhất (⌘/Ctrl + Z)"
+              >
+                <Undo2 className="w-4 h-4" /> Hoàn tác
+              </button>
+              <button
+                type="button"
+                onClick={redoEditingExam}
+                disabled={editingHistory.future.length === 0}
+                className="inline-flex items-center gap-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-xs px-3 py-2 rounded-lg transition cursor-pointer"
+                title="Làm lại thay đổi vừa hoàn tác (⌘/Ctrl + Shift + Z hoặc Ctrl + Y)"
+              >
+                <Redo2 className="w-4 h-4" /> Làm lại
+              </button>
               <button
                 type="button"
                 onClick={handleSaveExamChanges}
