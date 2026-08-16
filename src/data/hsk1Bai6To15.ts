@@ -885,7 +885,7 @@ const b15Translation = [
 const aggregate610Vocab = uniqueVocab(b6Vocab, b7Vocab, b8Vocab, b9Vocab, b10Vocab);
 const aggregate610 = makeExam(
   'hsk1-bai6-10-tong-hop-5-ky-nang',
-  'HSK 1 – Tổng hợp Bài 6–10',
+  'HSK 1 - Tổng hợp Bài 6–10',
   'Ôn tập số điện thoại, địa điểm, thời gian, phương vị từ, hoạt động hằng ngày, mua bán và giá tiền.',
   aggregate610Vocab,
   [
@@ -948,7 +948,7 @@ const aggregate610 = makeExam(
 const aggregate1015Vocab = uniqueVocab(b10Vocab, b11Vocab, b12Vocab, b13Vocab, b14Vocab, b15Vocab);
 const aggregate1015 = makeExam(
   'hsk1-bai10-15-tong-hop-5-ky-nang',
-  'HSK 1 – Tổng hợp Bài 10–15',
+  'HSK 1 - Tổng hợp Bài 10–15',
   'Ôn tập mua bán, giá tiền, đang làm, thời tiết, sức khỏe, gọi món, 了, 有些/有的, 哪个, 也/还 và đi lại.',
   aggregate1015Vocab,
   [
@@ -1008,7 +1008,7 @@ const aggregate1015 = makeExam(
   ]
 );
 
-export const HSK1_BAI6_TO_15_EXAMS: ExamLesson[] = [
+const bai6To15IndividualExams: ExamLesson[] = [
   makeExam('hsk1-bai6-5-ky-nang', 'HSK 1 - Bài 6: 你的手机号是多少？', 'Bài tập 5 kỹ năng: số điện thoại, địa điểm, mua đồ, đồ uống và câu liên động.', b6Vocab, b6Mc, b6Fill, b6Arrange, b6Reading, b6Listening, b6Essay, b6Speaking, b6Translation),
   makeExam('hsk1-bai7-5-ky-nang', 'HSK 1 - Bài 7: 我晚上六点半下班', 'Bài tập 5 kỹ năng: giờ, buổi trong ngày, tiết học, gặp nhau và lời đề nghị.', b7Vocab, b7Mc, b7Fill, b7Arrange, b7Reading, b7Listening, b7Essay, b7Speaking, b7Translation),
   makeExam('hsk1-bai8-5-ky-nang', 'HSK 1 - Bài 8: 我爸爸也在医院工作', 'Bài tập 5 kỹ năng: căn phòng, phương vị từ, con vật, khả năng và đến nơi.', b8Vocab, b8Mc, b8Fill, b8Arrange, b8Reading, b8Listening, b8Essay, b8Speaking, b8Translation),
@@ -1019,6 +1019,35 @@ export const HSK1_BAI6_TO_15_EXAMS: ExamLesson[] = [
   makeExam('hsk1-bai13-5-ky-nang', 'HSK 1 - Bài 13: 请给我一杯茶', 'Bài tập 5 kỹ năng: 一下, 给, 可以, song tân ngữ và giao tiếp ở nhà hàng.', b13Vocab, b13Mc, b13Fill, b13Arrange, b13Reading, b13Listening, b13Essay, b13Speaking, b13Translation),
   makeExam('hsk1-bai14-5-ky-nang', 'HSK 1 - Bài 14: 我看了一个电影', 'Bài tập 5 kỹ năng: 了, 没有 + V, 有些/有的, 都, 写, 听见 và động từ ly hợp.', b14Vocab, b14Mc, b14Fill, b14Arrange, b14Reading, b14Listening, b14Essay, b14Speaking, b14Translation),
   makeExam('hsk1-bai15-5-ky-nang', 'HSK 1 - Bài 15: 大兴机场见！', 'Bài tập 5 kỹ năng: 哪个, 也/还, địa điểm, thời lượng, máy bay, sân bay và gia đình.', b15Vocab, b15Mc, b15Fill, b15Arrange, b15Reading, b15Listening, b15Essay, b15Speaking, b15Translation),
+];
+
+const combineExams = (id: string, title: string, description: string, exams: ExamLesson[]): ExamLesson => ({
+  id,
+  title,
+  level: 'HSK 1',
+  description,
+  instruction: 'Làm theo thứ tự: từ vựng – nghe – đọc – viết – nói – dịch. Phần nghe dùng TTS; giáo viên có thể thay bằng audioUrl.',
+  vocabList: uniqueVocab(...exams.map((exam) => exam.vocabList || [])),
+  mcQuestions: exams.flatMap((exam) => exam.mcQuestions),
+  fillQuestions: exams.flatMap((exam) => exam.fillQuestions || []),
+  arrangeQuestions: exams.flatMap((exam) => exam.arrangeQuestions || []),
+  readingPassages: exams.flatMap((exam) => exam.readingPassages || []),
+  listeningQuestions: exams.flatMap((exam) => exam.listeningQuestions || []),
+  essayQuestions: exams.flatMap((exam) => exam.essayQuestions),
+  speakingQuestions: exams.flatMap((exam) => exam.speakingQuestions),
+  translationQuestions: exams.flatMap((exam) => exam.translationQuestions || [])
+});
+
+const aggregate615 = combineExams(
+  'hsk1-bai6-15-tong-hop-5-ky-nang',
+  'HSK 1 - Tổng hợp Bài 6–15',
+  'Bài tập tổng hợp từ Bài 6 đến Bài 15: ôn toàn bộ từ vựng, ngữ pháp và 5 kỹ năng.',
+  bai6To15IndividualExams
+);
+
+export const HSK1_BAI6_TO_15_EXAMS: ExamLesson[] = [
+  ...bai6To15IndividualExams,
+  aggregate615,
   aggregate610,
   aggregate1015
 ];

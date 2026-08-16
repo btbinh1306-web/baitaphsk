@@ -28,7 +28,30 @@ function lessonNumber(exam: ExamLesson): number {
   return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
+function isAggregateExam(exam: ExamLesson): boolean {
+  return /tổng hợp/i.test(exam.title) || /tong-hop/i.test(exam.id);
+}
+
+function aggregateRange(exam: ExamLesson): [number, number] | null {
+  const match = exam.title.match(/Bài\s+(\d+)\s*[–-]\s*(\d+)/iu);
+  return match ? [Number(match[1]), Number(match[2])] : null;
+}
+
 function sortExams(a: ExamLesson, b: ExamLesson): number {
+  const aAggregate = isAggregateExam(a);
+  const bAggregate = isAggregateExam(b);
+
+  if (aAggregate !== bAggregate) return aAggregate ? 1 : -1;
+
+  if (aAggregate && bAggregate) {
+    const aRange = aggregateRange(a);
+    const bRange = aggregateRange(b);
+    if (aRange && bRange) {
+      if (aRange[0] !== bRange[0]) return aRange[0] - bRange[0];
+      if (aRange[1] !== bRange[1]) return bRange[1] - aRange[1];
+    }
+  }
+
   const numberDifference = lessonNumber(a) - lessonNumber(b);
   if (numberDifference !== 0) return numberDifference;
   return a.title.localeCompare(b.title, 'vi');
