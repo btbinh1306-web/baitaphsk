@@ -638,6 +638,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     if (res.ok && res.rows) {
       setSubmissions(res.rows);
     } else {
+      setSubmissions([]);
       setErrorMsg(res.error || 'Không thể lấy dữ liệu bài nộp');
     }
     setIsLoading(false);

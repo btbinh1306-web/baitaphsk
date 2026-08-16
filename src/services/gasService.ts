@@ -430,6 +430,7 @@ export const fetchTeacherSubmissions = async (
   // 2. Fetch Google Sheets remote submissions if URL configured
   const remoteSubmissionIds = new Set<string>();
   let gasReadSucceeded = false;
+  let gasReadError = '';
   if (config.sheetUrl && config.sheetUrl.trim() !== '') {
     try {
       const url = new URL(config.sheetUrl.trim());
@@ -439,6 +440,10 @@ export const fetchTeacherSubmissions = async (
       const res = await fetch(url.toString(), {
         method: 'GET'
       });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
 
       const data = await res.json();
       if (data && data.ok && Array.isArray(data.rows)) {
@@ -490,10 +495,23 @@ export const fetchTeacherSubmissions = async (
             subMap.set(id, mapped);
           }
         });
+      } else {
+        gasReadError = data?.error || 'Apps Script không trả về danh sách bài nộp hợp lệ';
       }
     } catch (err: any) {
       console.warn('GAS GET teacher error:', err);
+      gasReadError = 'Không thể kết nối Google Sheet';
     }
+  }
+
+  // When Google Sheet is configured, never fall back to stale server/browser
+  // rows. A failed remote read must be visible as an error, not as old data.
+  if (config.sheetUrl && config.sheetUrl.trim() !== '' && !gasReadSucceeded) {
+    return {
+      ok: false,
+      rows: [],
+      error: gasReadError || 'Không thể đọc danh sách bài nộp từ Google Sheet'
+    };
   }
 
   // Do not re-upload stale browser copies after a successful Google Sheet read.
