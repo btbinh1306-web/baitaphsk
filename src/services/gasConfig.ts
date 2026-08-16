@@ -1,6 +1,8 @@
 export const DEFAULT_GAS_WEB_APP_URL =
   'https://script.google.com/macros/s/AKfycbzxnRqH-ohgth045nhd-hogJ3JNrEsq2gDjw7TUgOQMh8WDiOVCknKLqDRW7nBUo1ap/exec';
 const LEGACY_GAS_WEB_APP_URLS = new Set([
+  'https://script.google.com/macros/s/AKfycbzRfoyKBfq_s9FZAzCJyb7Fmoqdg2RT0o8op_gHtqowhDXhKIKvGr16XWo2WEa3FNnV/exec',
+  'https://script.google.com/macros/s/AKfycbxSo6VoTPGaNaolINc5wPEiV-UJUjKJX9VOcOuBhNqu4V4T8EOw5pRZ2cjt8J8wLt68/exec',
   'https://script.google.com/macros/s/AKfycbwLXgg53v_sOQH_Yhb74aUpTIVx0eOChGrPkuB4OsA-DhkJnm1K0s_uxf4eO6JXl65h/exec',
   'https://script.google.com/macros/s/AKfycbyaB0n2M2wstStKGHE7KH4MlvXhb6Z4bYggs952KXUw6VwtexlGm6358eDumo8wPPYp/exec'
 ]);
@@ -14,9 +16,10 @@ export function normalizeGasWebAppUrl(url: string): string {
   return normalized.replace(/\/+(?=\?|$)/, '');
 }
 
-function migrateGasWebAppUrl(url: string): string {
+export function migrateGasWebAppUrl(url: string): string {
   const normalized = normalizeGasWebAppUrl(url);
-  return LEGACY_GAS_WEB_APP_URLS.has(normalized) ? DEFAULT_GAS_WEB_APP_URL : normalized;
+  const baseUrl = normalized.split('?')[0];
+  return LEGACY_GAS_WEB_APP_URLS.has(baseUrl) ? DEFAULT_GAS_WEB_APP_URL : normalized;
 }
 
 export function getConfiguredGasWebAppUrl(): string {

@@ -10,7 +10,7 @@ import {
   gradeServerSubmission,
   uploadMediaFile
 } from './apiService';
-import { DEFAULT_GAS_WEB_APP_URL, getConfiguredGasWebAppUrl } from './gasConfig';
+import { DEFAULT_GAS_WEB_APP_URL, getConfiguredGasWebAppUrl, migrateGasWebAppUrl } from './gasConfig';
 import { clearGasCapabilitiesCache, deleteGasSubmissions, getGasCapabilities } from './gasCloudService';
 import { getGasRequestUrl } from './gasTransport';
 
@@ -40,7 +40,10 @@ export const getGasConfig = (): GasConfig => {
 
 export const saveGasConfig = (config: GasConfig): void => {
   try {
-    localStorage.setItem(DEFAULT_CONFIG_KEY, JSON.stringify(config));
+    localStorage.setItem(
+      DEFAULT_CONFIG_KEY,
+      JSON.stringify({ ...config, sheetUrl: migrateGasWebAppUrl(config.sheetUrl) })
+    );
     clearGasCapabilitiesCache();
   } catch (e) {
     console.warn('Failed to save GAS config:', e);
