@@ -1,8 +1,12 @@
 import { ExamLesson } from '../types';
 import { HSK1_BAI1_TO_5_EXAMS } from './hsk1Bai1To5';
+import { HSK1_BAI6_TO_15_EXAMS } from './hsk1Bai6To15';
+import { HSK2_BAI1_WORD_EXAMS } from './hsk2Bai1Word';
 
 export const SAMPLE_EXAMS: ExamLesson[] = [
   ...HSK1_BAI1_TO_5_EXAMS,
+  ...HSK1_BAI6_TO_15_EXAMS,
+  ...HSK2_BAI1_WORD_EXAMS,
   {
     id: 'hsk1-b1-ai-xiaoyu',
     title: 'HSK 1 - Bài 1: 小语，你好！ (Đọc câu, Nối từ, Xếp câu & Dịch thuật)',
