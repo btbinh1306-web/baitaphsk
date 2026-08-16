@@ -1,4 +1,4 @@
-import { LessonSection } from './types/lesson';
+import { LessonData, LessonSection } from './types/lesson';
 
 export interface VocabItem {
   hanzi: string;
@@ -74,6 +74,8 @@ export interface ExamLesson {
   translationQuestions?: Question[];
   handwritingQuestions?: Question[];
   sections?: LessonSection[];
+  // Keeps the imported schema intact so the teacher editor can round-trip every field.
+  sourceLessonData?: LessonData;
 }
 
 export interface AudioRecordItem {
@@ -88,6 +90,7 @@ export interface AudioRecordItem {
 
 export interface SubmissionData {
   id: string;
+  duplicateIds?: string[]; // IDs of older duplicate records merged into this row
   time: string;
   name: string;
   class: string;

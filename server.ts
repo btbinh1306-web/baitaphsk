@@ -334,6 +334,41 @@ app.post('/api/submissions/grade', (req, res) => {
   }
 });
 
+app.post('/api/submissions/delete', (req, res) => {
+  try {
+    const rawIds = Array.isArray(req.body?.ids)
+      ? req.body.ids
+      : req.body?.id
+        ? [req.body.id]
+        : [];
+    const ids: string[] = Array.from(
+      new Set<string>(
+        rawIds
+          .map(String)
+          .map((id) => id.trim())
+          .filter(Boolean)
+      )
+    );
+    if (ids.length === 0) {
+      res.status(400).json({ ok: false, error: 'Missing submission IDs' });
+      return;
+    }
+
+    const currentSubs = readJsonFile<any[]>(SUBMISSIONS_FILE, []);
+    const idSet = new Set(ids.map((id) => id.toLowerCase()));
+    const updatedSubs = currentSubs.filter((sub) => !idSet.has(String(sub.id).trim().toLowerCase()));
+    const saved = writeJsonFile(SUBMISSIONS_FILE, updatedSubs);
+    if (!saved) {
+      res.status(500).json({ ok: false, error: 'Could not delete submissions' });
+      return;
+    }
+
+    res.json({ ok: true, deletedIds: ids });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 async function start() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {

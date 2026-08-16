@@ -8,6 +8,7 @@ interface GasCapabilities {
   lessons?: boolean;
   media?: boolean;
   submissions?: boolean;
+  deleteSubmissions?: boolean;
 }
 
 let capabilitiesPromise: Promise<GasCapabilities | null> | null = null;
@@ -117,6 +118,18 @@ export async function deleteGasExam(examId: string): Promise<boolean | null> {
   if (!capabilities?.lessons) return null;
 
   const data = await gasPost<{ ok?: boolean }>({ action: 'delete_exam', id: examId });
+  return data ? Boolean(data.ok) : false;
+}
+
+export async function deleteGasSubmissions(ids: string[], pass: string): Promise<boolean | null> {
+  const capabilities = await getGasCapabilities();
+  if (!capabilities?.deleteSubmissions) return null;
+
+  const data = await gasPost<{ ok?: boolean }>({
+    action: 'delete_submissions',
+    ids,
+    pass
+  });
   return data ? Boolean(data.ok) : false;
 }
 

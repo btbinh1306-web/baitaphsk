@@ -721,5 +721,8 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
     sections: lessonData.sections
   };
 
-  return sanitizeExamSections(parsedExam);
+  return {
+    ...sanitizeExamSections(parsedExam),
+    sourceLessonData: lessonData
+  };
 }

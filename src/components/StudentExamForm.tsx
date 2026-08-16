@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { AudioRecorder } from './AudioRecorder';
 import { AudioRecordItem, ExamLesson, Question } from '../types';
@@ -6,12 +6,11 @@ import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { sanitizeExamSections } from '../utils/lessonParser';
-import { getExamGroupLabel, groupExamsForSelection } from '../utils/examGrouping';
+import { groupExamsForSelection } from '../utils/examGrouping';
 import { ExerciseRenderer } from './ExerciseRenderer';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
-import { getHandwritingExercises, convertHandwritingToExamLesson } from '../services/handwritingService';
-import { fetchServerHandwritingExercises } from '../services/apiService';
 import { loadFormDraft, useStudentFormDraft } from '../hooks/useStudentFormDraft';
+import { useStudentExamCatalog } from '../hooks/useStudentExamCatalog';
 import {
   Send,
   CheckCircle2,
@@ -47,65 +46,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   deletedExamIds = [],
   onSuccessNavigateToResult
 }) => {
-  const [serverHwExamLessons, setServerHwExamLessons] = useState<ExamLesson[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchServerHandwritingExercises().then((exercises) => {
-      if (!cancelled) {
-        setServerHwExamLessons(exercises.map(convertHandwritingToExamLesson));
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Load handwriting exercises from handwritingService
-  const hwExamLessons = useMemo(() => {
-    try {
-      return getHandwritingExercises().map(convertHandwritingToExamLesson);
-    } catch (e) {
-      return [];
-    }
-  }, []);
-
-  // Combine custom exams, handwriting exercises, and sample exams
-  const rawExams = useMemo(() => {
-    const list: ExamLesson[] = [...customExams];
-
-    serverHwExamLessons.forEach((hw) => {
-      if (!list.some((e) => e.id === hw.id)) {
-        list.push(hw);
-      }
-    });
-
-    // Add handwriting exercises if not already in customExams
-    hwExamLessons.forEach((hw) => {
-      if (!list.some((e) => e.id === hw.id)) {
-        list.push(hw);
-      }
-    });
-
-    // Add sample exams if not already in customExams
-    SAMPLE_EXAMS.forEach((s) => {
-      if (!list.some((e) => e.id === s.id)) {
-        list.push(s);
-      }
-    });
-
-    return list;
-  }, [customExams, hwExamLessons]);
-
-  const allExams = useMemo(() => {
-    return rawExams.filter(
-      (e) =>
-        !deletedExamIds.includes(e.id) &&
-        e.id !== 'hw_hsk1_b5' &&
-        !e.title.includes('HSK1 Bài 5') &&
-        !e.title.includes('HSK 1 Bài 5')
-    );
-  }, [rawExams, deletedExamIds]);
+  const { allExams } = useStudentExamCatalog(customExams, deletedExamIds);
 
   const filteredExams = allExams;
   const examGroups = useMemo(() => groupExamsForSelection(filteredExams), [filteredExams]);
@@ -115,13 +56,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
   const [studentName, setStudentName] = useState(() => initialDraft?.studentName || '');
   const [studentClass, setStudentClass] = useState(() => initialDraft?.studentClass || '');
-  const [selectedExamId, setSelectedExamId] = useState(
-    () => initialDraft?.selectedExamId || allExams[0]?.id || 'hsk3-b1'
-  );
-  const selectedExamForPicker = allExams.find((exam) => exam.id === selectedExamId);
-  const selectedExamGroupLabel = selectedExamForPicker
-    ? getExamGroupLabel(selectedExamForPicker)
-    : examGroups[0]?.label || '';
+  const [selectedExamGroupLabel, setSelectedExamGroupLabel] = useState('');
+  const [selectedExamId, setSelectedExamId] = useState('');
   const examsInSelectedGroup =
     examGroups.find((group) => group.label === selectedExamGroupLabel)?.exams || [];
 
@@ -208,14 +144,29 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   // Strictly enforce: if exam has vocab list, questions MUST stay locked until user clicks "Đã học xong"
   const isVocabDone = !hasVocabList || !!vocabUnlocked[currentExam.id];
 
-  const handleSelectExam = (examId: string) => {
-    setSelectedExamId(examId);
+  const resetExamProgress = () => {
+    setVocabUnlocked({});
     setShowVocabTable(true);
+    setMcAnswers({});
+    setFillAnswers({});
+    setArrangeAnswers({});
+    setEssayAnswers({});
+    setQuestionComments({});
+    setUnlockedReference({});
+    setAudioRecords({});
+    setSubmittedId(null);
+    setSubError(null);
+  };
+
+  const handleSelectExam = (examId: string) => {
+    resetExamProgress();
+    setSelectedExamId(examId);
   };
 
   const handleSelectExamGroup = (groupLabel: string) => {
-    const firstExam = examGroups.find((group) => group.label === groupLabel)?.exams[0];
-    if (firstExam) handleSelectExam(firstExam.id);
+    resetExamProgress();
+    setSelectedExamGroupLabel(groupLabel);
+    setSelectedExamId('');
   };
 
   const handleUnlockExam = () => {
@@ -279,6 +230,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     e.preventDefault();
     if (isSubmitting) return;
     setSubError(null);
+
+    if (!selectedExamId) {
+      setSubError('Vui lòng chọn cấp bậc và bài học / đề thi trước khi bắt đầu.');
+      return;
+    }
 
     if (!studentName.trim()) {
       setSubError('Vui lòng nhập Họ và Tên của học sinh.');
@@ -547,19 +503,6 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     setTimeout(() => setCopiedId(false), 2000);
   };
 
-  const renderTierBadge = (tier?: string) => {
-    if (tier === 'tier1') {
-      return <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded">Cấp 1: Tri thức</span>;
-    }
-    if (tier === 'tier2') {
-      return <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded">Cấp 2: Bán giao tiếp</span>;
-    }
-    if (tier === 'tier3') {
-      return <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-rose-100 text-rose-800 rounded">Cấp 3: Giao tiếp tự do</span>;
-    }
-    return null;
-  };
-
   const renderListeningAnswer = (question: Question) => {
     const isFillType = question.type === 'listening_fill' || question.type === 'listening_fill_in_blank';
 
@@ -615,15 +558,17 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Banner / Header */}
-      <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-700 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-emerald-100 mb-3">
-            <BookOpen className="w-3.5 h-3.5" /> Hệ Thống Luyện Thi & Ôn Tập HSK Tương Tác
+      {selectedExamId && (
+        <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-700 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-emerald-100 mb-3">
+              <BookOpen className="w-3.5 h-3.5" /> Hệ Thống Luyện Thi & Ôn Tập HSK Tương Tác
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">{currentExam.title}</h2>
+            <p className="text-teal-100 text-sm mt-1 max-w-2xl">{currentExam.description}</p>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">{currentExam.title}</h2>
-          <p className="text-teal-100 text-sm mt-1 max-w-2xl">{currentExam.description}</p>
         </div>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Student Information Box */}
@@ -673,6 +618,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     onChange={(e) => handleSelectExamGroup(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition font-semibold text-slate-800"
                   >
+                    <option value="">Chọn cấp bậc / nhóm bài</option>
                     {examGroups.map((group) => (
                       <option key={group.label} value={group.label}>
                         {group.label}
@@ -688,8 +634,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   <select
                     value={selectedExamId}
                     onChange={(e) => handleSelectExam(e.target.value)}
+                    disabled={!selectedExamGroupLabel}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition font-medium text-slate-800"
                   >
+                    <option value="">Chọn bài học / đề thi</option>
                     {examsInSelectedGroup.map((ex) => (
                       <option key={ex.id} value={ex.id}>
                         {ex.title}
@@ -699,7 +647,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </div>
               </div>
 
-              {(currentExam.isHandwriting ||
+              {selectedExamId && (currentExam.isHandwriting ||
                 currentExam.type === 'handwriting_submission' ||
                 (currentExam.handwritingQuestions && currentExam.handwritingQuestions.length > 0)) && (
                 <div className="p-2.5 bg-teal-50 border border-teal-200 rounded-lg flex items-center justify-between text-xs text-teal-900 font-medium">
@@ -716,6 +664,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           </div>
         </div>
 
+        {selectedExamId ? (
+          <>
         {/* SECTION 0: VOCABULARY LEARNING SHEET & LOCK SYSTEM */}
         {hasVocabList && (
           <div className="bg-white rounded-xl border border-teal-200 p-5 shadow-sm space-y-4">
@@ -873,14 +823,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           <span className="text-[10px] text-amber-700 font-sans italic">Item này được giữ lại đầy đủ</span>
                         </div>
                       )}
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
                         <div className="flex items-start gap-2">
                           <span className="font-bold text-teal-600 text-sm mt-0.5">Câu {idx + 1}:</span>
                           <div>
                             <p className="text-sm font-semibold text-slate-800">{q.prompt}</p>
                           </div>
                         </div>
-                        {renderTierBadge(q.tier)}
                       </div>
 
                       {q.options && (
@@ -935,15 +884,6 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 <div className="space-y-6">
                   {groupedFillQuestions.map((group, groupIdx) => (
                     <div key={groupIdx} className="space-y-4">
-                      {/* Group Header Badge */}
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                        <span className="text-xs font-bold text-emerald-900 bg-emerald-50 px-3 py-1 rounded-md uppercase tracking-wider border border-emerald-200">
-                          {group.tier === 'tier1' && '📌 Cấp 1: Tri thức - Điền từ vựng'}
-                          {group.tier === 'tier2' && '📌 Cấp 2: Bán giao tiếp - Ngữ pháp & Hội thoại'}
-                          {group.tier === 'tier3' && '📌 Cấp 3: Giao tiếp tự do'}
-                        </span>
-                      </div>
-
                       {/* Prominent Word Bank Display */}
                       {group.wordBank && group.wordBank.length > 0 && (
                         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2">
@@ -968,11 +908,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       <div className="space-y-3">
                         {group.questions.map((q, qIdx) => (
                           <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                            <div className="flex items-start justify-between gap-2">
+                            <div>
                               <p className="text-sm font-semibold text-slate-800">
                                 Câu {qIdx + 1}: {q.prompt}
                               </p>
-                              {renderTierBadge(q.tier)}
                             </div>
                             <input
                               type="text"
@@ -1021,13 +960,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                     return (
                       <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                        <div className="flex items-start justify-between gap-2">
+                        <div>
                           <div>
                             <p className="text-sm font-semibold text-slate-800">
-                              Câu {idx + 1}: {q.prompt}
+                              Câu {idx + 1}: Sắp xếp
                             </p>
                           </div>
-                          {renderTierBadge(q.tier)}
                         </div>
 
                         {/* Order display area */}
@@ -1187,14 +1125,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             {/* SECTION 4: READING PASSAGES */}
             {currentExam.readingPassages && currentExam.readingPassages.length > 0 && (
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-sky-100 text-sky-800 font-bold flex items-center justify-center text-sm">
                       4
                     </span>
                     <h3 className="font-bold text-slate-800 text-lg">Phần Đọc Hiểu Đoạn Văn</h3>
                   </div>
-                  {renderTierBadge('tier2')}
                 </div>
 
                 <div className="space-y-6">
@@ -1271,14 +1208,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             {/* SECTION 5: ESSAY QUESTIONS */}
             {currentExam.essayQuestions.length > 0 && (
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm">
                       5
                     </span>
                     <h3 className="font-bold text-slate-800 text-lg">Phần Viết & Tự Luận</h3>
                   </div>
-                  {renderTierBadge('tier3')}
                 </div>
 
                 <div className="space-y-4">
@@ -1497,6 +1433,18 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </>
               )}
             </button>
+          </div>
+        )}
+          </>
+        ) : (
+          <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-slate-500 space-y-2">
+            <BookOpen className="w-8 h-8 text-teal-500 mx-auto" />
+            <p className="font-bold text-slate-700 text-base">
+              Vui lòng chọn cấp bậc và bài học / đề thi để bắt đầu.
+            </p>
+            <p className="text-xs text-slate-500">
+              Chọn bước 1 trước, sau đó chọn bài cụ thể ở bước 2.
+            </p>
           </div>
         )}
       </form>

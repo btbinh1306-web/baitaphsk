@@ -88,4 +88,3 @@ export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({ item }) => {
       return <UnsupportedExercise type={item.type} />;
   }
 };
-

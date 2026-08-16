@@ -1,14 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AudioRecordItem, SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
-import { fetchTeacherSubmissions, gradeSubmissionInGas, getGasConfig, saveLocalSubmission } from '../services/gasService';
+import {
+  deleteSubmissionsInGas,
+  fetchTeacherSubmissions,
+  gradeSubmissionInGas,
+  getGasConfig,
+  saveLocalSubmission
+} from '../services/gasService';
 import { speakText } from '../utils/tts';
-import { sanitizeExamSections } from '../utils/lessonParser';
+import { parseLessonToExam, sanitizeExamSections } from '../utils/lessonParser';
+import { validateLesson } from '../utils/validateLesson';
+import { LessonData } from '../types/lesson';
 import { groupExamsForSelection } from '../utils/examGrouping';
+import { useStudentExamCatalog } from '../hooks/useStudentExamCatalog';
 import { getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { fileToCompressedDataUrl } from '../utils/imageUtils';
 import { ImportLesson } from './ImportLesson';
 import { EditQuestionModal } from './EditQuestionModal';
+import { LessonDataEditor } from './LessonDataEditor';
 import { AudioRecorder } from './AudioRecorder';
 import { HandwritingExerciseEditor } from './exercises/HandwritingExerciseEditor';
 import { HandwritingGradingPanel } from './exercises/HandwritingGradingPanel';
@@ -53,6 +63,16 @@ import {
   Upload,
   Image as ImageIcon
 } from 'lucide-react';
+
+type HistoryState<T> = {
+  past: T[];
+  present: T;
+  future: T[];
+};
+
+const MAX_LESSON_HISTORY = 50;
+
+const cloneExam = (exam: ExamLesson): ExamLesson => structuredClone(exam);
 
 interface TeacherPortalProps {
   customExams?: ExamLesson[];
@@ -114,7 +134,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'Chờ chấm' | 'Đã chấm'>('ALL');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'HANDWRITING' | 'OTHER'>('ALL');
+  const [lessonLevelFilter, setLessonLevelFilter] = useState('ALL');
+  const [lessonFilter, setLessonFilter] = useState('ALL');
 
   // Selected Submission for Modal Detail & Grading
   const [selectedSub, setSelectedSub] = useState<SubmissionData | null>(null);
@@ -126,11 +147,32 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [uploadingFeedbackAudio, setUploadingFeedbackAudio] = useState<string | null>(null);
   const [isGrading, setIsGrading] = useState(false);
   const [gradeSuccess, setGradeSuccess] = useState(false);
+  const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
 
   // All Available Exams
   const rawExams = [...customExams, ...SAMPLE_EXAMS.filter((s) => !customExams.some((c) => c.id === s.id))];
   const allExams = rawExams.filter((e) => !deletedExamIds.includes(e.id));
   const examGroups = groupExamsForSelection(allExams);
+  const { allExams: studentCatalogExams } = useStudentExamCatalog(customExams, deletedExamIds);
+  const studentExamGroups = useMemo(() => groupExamsForSelection(studentCatalogExams), [studentCatalogExams]);
+  const studentExamOptions = useMemo(() => {
+    const groups = lessonLevelFilter === 'ALL'
+      ? studentExamGroups
+      : studentExamGroups.filter((group) => group.label === lessonLevelFilter);
+    const seenTitles = new Set<string>();
+
+    return groups.flatMap((group) => group.exams).filter((exam) => {
+      if (seenTitles.has(exam.title)) return false;
+      seenTitles.add(exam.title);
+      return true;
+    });
+  }, [lessonLevelFilter, studentExamGroups]);
+
+  useEffect(() => {
+    if (lessonFilter !== 'ALL' && !studentExamOptions.some((exam) => exam.title === lessonFilter)) {
+      setLessonFilter('ALL');
+    }
+  }, [lessonFilter, studentExamOptions]);
 
   // Delete Confirm & Notice state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -139,7 +181,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   // Exam Selection for Editing
   const initialExam = sanitizeExamSections(allExams[0] || SAMPLE_EXAMS[0]);
   const [selectedExamId, setSelectedExamId] = useState<string>(initialExam?.id || 'hsk3-b1');
-  const [editingExam, setEditingExam] = useState<ExamLesson>({
+  const initialEditingExam: ExamLesson = {
     ...initialExam,
     vocabList: initialExam?.vocabList || [],
     mcQuestions: initialExam?.mcQuestions || [],
@@ -149,7 +191,81 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     essayQuestions: initialExam?.essayQuestions || [],
     speakingQuestions: initialExam?.speakingQuestions || [],
     translationQuestions: initialExam?.translationQuestions || []
-  });
+  };
+  const [editingHistory, setEditingHistory] = useState<HistoryState<ExamLesson>>(() => ({
+    past: [],
+    present: initialEditingExam,
+    future: []
+  }));
+  const editingExam = editingHistory.present;
+  const setEditingExam = (next: ExamLesson | ((current: ExamLesson) => ExamLesson)) => {
+    setEditingHistory((current) => {
+      const nextExam = typeof next === 'function' ? next(current.present) : next;
+      if (JSON.stringify(current.present) === JSON.stringify(nextExam)) return current;
+      return {
+        past: [...current.past, cloneExam(current.present)].slice(-MAX_LESSON_HISTORY),
+        present: cloneExam(nextExam),
+        future: []
+      };
+    });
+  };
+  const replaceEditingExam = (nextExam: ExamLesson) => {
+    setEditingHistory({ past: [], present: cloneExam(nextExam), future: [] });
+  };
+  const undoEditingExam = () => {
+    setEditingHistory((current) => {
+      if (current.past.length === 0) return current;
+      const previous = current.past[current.past.length - 1];
+      return {
+        past: current.past.slice(0, -1),
+        present: cloneExam(previous),
+        future: [cloneExam(current.present), ...current.future].slice(0, MAX_LESSON_HISTORY)
+      };
+    });
+  };
+  const redoEditingExam = () => {
+    setEditingHistory((current) => {
+      if (current.future.length === 0) return current;
+      const [next, ...remainingFuture] = current.future;
+      return {
+        past: [...current.past, cloneExam(current.present)].slice(-MAX_LESSON_HISTORY),
+        present: cloneExam(next),
+        future: remainingFuture
+      };
+    });
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'editor') return;
+
+    const handleLessonHistoryShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.matches('input, textarea, [contenteditable="true"]')
+      ) {
+        return;
+      }
+
+      const modifierPressed = event.metaKey || event.ctrlKey;
+      if (!modifierPressed || event.altKey) return;
+
+      const key = event.key.toLowerCase();
+      const wantsUndo = key === 'z' && !event.shiftKey;
+      const wantsRedo = (key === 'z' && event.shiftKey) || (key === 'y' && event.ctrlKey);
+
+      if (wantsUndo && editingHistory.past.length > 0) {
+        event.preventDefault();
+        undoEditingExam();
+      } else if (wantsRedo && editingHistory.future.length > 0) {
+        event.preventDefault();
+        redoEditingExam();
+      }
+    };
+
+    window.addEventListener('keydown', handleLessonHistoryShortcut);
+    return () => window.removeEventListener('keydown', handleLessonHistoryShortcut);
+  }, [activeTab, editingHistory.future.length, editingHistory.past.length]);
 
   // New Vocab Form state
   const [newHanzi, setNewHanzi] = useState('');
@@ -169,6 +285,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   // New Fill Question state
   const [newFillPrompt, setNewFillPrompt] = useState('');
   const [newFillAnswer, setNewFillAnswer] = useState('');
+  const [newFillWordBank, setNewFillWordBank] = useState('');
 
   // New Sentence Arrangement Question state
   const [newArrPrompt, setNewArrPrompt] = useState('');
@@ -508,6 +625,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const loadSubmissions = async (pass: string) => {
     setIsLoading(true);
     setErrorMsg(null);
+    setDeleteNotice(null);
     const res = await fetchTeacherSubmissions(pass);
     if (res.ok && res.rows) {
       setSubmissions(res.rows);
@@ -515,6 +633,27 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       setErrorMsg(res.error || 'Không thể lấy dữ liệu bài nộp');
     }
     setIsLoading(false);
+  };
+
+  const handleDeleteGradedSubmission = async (sub: SubmissionData) => {
+    if (sub.status !== 'Đã chấm') return;
+
+    const idsToDelete = Array.from(new Set([sub.id, ...(sub.duplicateIds || [])]));
+    const confirmed = window.confirm(
+      `Xoá bài đã chấm của ${sub.name || 'học sinh này'}?\n\nThao tác này sẽ xoá bài trên Google Sheet và không thể hoàn tác.`
+    );
+    if (!confirmed) return;
+
+    setDeletingSubmissionId(sub.id);
+    const result = await deleteSubmissionsInGas(idsToDelete, passwordInput || config.teacherPass);
+    if (result.ok) {
+      setSubmissions((current) => current.filter((item) => !idsToDelete.includes(item.id)));
+      setSelectedSub((current) => (current?.id === sub.id ? null : current));
+      setDeleteNotice(`Đã xoá bài đã chấm của ${sub.name || 'học sinh'}.`);
+    } else {
+      alert(result.error || 'Không thể xoá bài nộp.');
+    }
+    setDeletingSubmissionId(null);
   };
 
   const openGradingModal = (sub: SubmissionData) => {
@@ -707,14 +846,45 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
   // Save changes to current exam
   const handleSaveExamChanges = async () => {
-    if (!editingExam.title) {
+    let examToSave = editingExam;
+
+    if (editingExam.sourceLessonData) {
+      const validation = validateLesson(JSON.stringify(editingExam.sourceLessonData));
+      if (!validation.isValid || !validation.parsedData) {
+        alert(`Không thể lưu JSON bài học:\n${validation.errors.map((error) => `${error.path}: ${error.message}`).join('\n')}`);
+        return;
+      }
+      examToSave = parseLessonToExam(validation.parsedData);
+      setEditingExam(examToSave);
+    }
+
+    if (!examToSave.title) {
       alert('Vui lòng nhập Tên bài thi');
       return;
     }
     if (onSaveCustomExam) {
-      await onSaveCustomExam(editingExam);
-      alert(`Đã lưu thành công bài thi: "${editingExam.title}"! Học sinh có thể làm bài ngay.`);
+      await onSaveCustomExam(examToSave);
+      alert(`Đã lưu thành công bài thi: "${examToSave.title}"! Học sinh có thể làm bài ngay.`);
     }
+  };
+
+  const validateSourceLessonData = (nextValue: Record<string, unknown>): string | null => {
+    const validation = validateLesson(JSON.stringify(nextValue));
+    if (validation.isValid) return null;
+    return validation.errors.map((error) => `${error.path}: ${error.message}`).join(' | ');
+  };
+
+  const handleSourceLessonDataChange = (nextValue: Record<string, unknown>) => {
+    const nextSource = nextValue as LessonData;
+    const validation = validateLesson(JSON.stringify(nextSource));
+
+    if (validation.isValid && validation.parsedData) {
+      setEditingExam(parseLessonToExam(validation.parsedData));
+      return;
+    }
+
+    // Keep an in-progress nested edit visible until the teacher completes the required fields.
+    setEditingExam((current) => ({ ...current, sourceLessonData: nextSource }));
   };
 
   // Add Vocabulary Item
@@ -804,7 +974,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       type: 'fill',
       tier: 'tier2',
       prompt: newFillPrompt.trim(),
-      acceptableAnswers: newFillAnswer.trim()
+      acceptableAnswers: newFillAnswer.trim(),
+      wordBank: newFillWordBank
+        .split(',')
+        .map((word) => word.trim())
+        .filter(Boolean)
+        .filter((word, index, words) => words.indexOf(word) === index)
     };
 
     const updatedFill = [...(editingExam.fillQuestions || []), newQ];
@@ -814,6 +989,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
     setNewFillPrompt('');
     setNewFillAnswer('');
+    setNewFillWordBank('');
   };
 
   const handleDeleteFillQuestion = (qId: string) => {
@@ -821,6 +997,32 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     const updatedExam = { ...editingExam, fillQuestions: updatedFill };
     setEditingExam(updatedExam);
     if (onSaveCustomExam) onSaveCustomExam(updatedExam);
+  };
+
+  const fillWordBankGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    (editingExam.fillQuestions || []).forEach((question) => {
+      const tier = question.tier || 'tier1';
+      const words = groups.get(tier) || [];
+      (question.wordBank || []).forEach((word) => {
+        const normalizedWord = word.trim();
+        if (normalizedWord && !words.includes(normalizedWord)) words.push(normalizedWord);
+      });
+      groups.set(tier, words);
+    });
+    return Array.from(groups.entries()).map(([tier, wordBank]) => ({ tier, wordBank }));
+  }, [editingExam.fillQuestions]);
+
+  const handleUpdateFillWordBank = (tier: string, rawWordBank: string) => {
+    const wordBank = rawWordBank
+      .split(',')
+      .map((word) => word.trim())
+      .filter(Boolean)
+      .filter((word, index, words) => words.indexOf(word) === index);
+    const updatedFill = (editingExam.fillQuestions || []).map((question) =>
+      (question.tier || 'tier1') === tier ? { ...question, wordBank } : question
+    );
+    setEditingExam({ ...editingExam, fillQuestions: updatedFill });
   };
 
   // Add Sentence Arrangement Question
@@ -1078,20 +1280,23 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     if (onSaveCustomExam) onSaveCustomExam(updatedExam);
   };
 
+  const getIsHandwritingSubmission = (sub: SubmissionData) =>
+    Boolean(
+      sub.isHandwriting ||
+        (sub.submissionImages && sub.submissionImages.length > 0) ||
+        (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
+        sub.lesson.toLowerCase().includes('chép') ||
+        sub.lesson.toLowerCase().includes('nộp ảnh')
+    );
+
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStatus = statusFilter === 'ALL' || sub.status === statusFilter;
-
-    const isHw =
-      sub.isHandwriting ||
-      (sub.submissionImages && sub.submissionImages.length > 0) ||
-      (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
-      sub.lesson.toLowerCase().includes('chép') ||
-      sub.lesson.toLowerCase().includes('nộp ảnh');
-
-    const matchesType =
-      typeFilter === 'ALL' ||
-      (typeFilter === 'HANDWRITING' && isHw) ||
-      (typeFilter === 'OTHER' && !isHw);
+    const normalizedLesson = sub.lesson.trim();
+    const selectedLevelGroup = studentExamGroups.find((group) => group.label === lessonLevelFilter);
+    const matchesLevel =
+      lessonLevelFilter === 'ALL' ||
+      Boolean(selectedLevelGroup?.exams.some((exam) => exam.title === normalizedLesson));
+    const matchesLesson = lessonFilter === 'ALL' || normalizedLesson === lessonFilter;
 
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
@@ -1101,8 +1306,20 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       sub.id.toLowerCase().includes(q) ||
       sub.lesson.toLowerCase().includes(q);
 
-    return matchesStatus && matchesType && matchesSearch;
+    return matchesStatus && matchesLevel && matchesLesson && matchesSearch;
   });
+
+  const submissionGroups = Array.from(
+    filteredSubmissions
+      .reduce<Map<string, SubmissionData[]>>((groups, sub) => {
+        const label = sub.lesson.trim() || (getIsHandwritingSubmission(sub) ? 'Bài chép tay' : 'Bài chưa đặt tên');
+        const group = groups.get(label) || [];
+        group.push(sub);
+        groups.set(label, group);
+        return groups;
+      }, new Map())
+      .entries()
+  ).sort(([labelA], [labelB]) => labelA.localeCompare(labelB, 'vi'));
 
   if (!isAuthenticated) {
     return (
@@ -1234,7 +1451,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm theo Tên học sinh, Lớp, Bài học hoặc Mã bài nộp..."
+                placeholder="Tìm theo tên học sinh, lớp, mã bài nộp..."
                 className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
@@ -1242,13 +1459,36 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               <Filter className="w-4 h-4 text-slate-400" />
               <select
-                value={typeFilter}
-                onChange={(e: any) => setTypeFilter(e.target.value)}
+                value={lessonLevelFilter}
+                onChange={(e) => {
+                  setLessonLevelFilter(e.target.value);
+                  setLessonFilter('ALL');
+                }}
+                aria-label="Cấp bậc / Nhóm bài"
+                title="Cấp bậc / Nhóm bài"
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-medium outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
               >
-                <option value="ALL">Tất cả loại bài</option>
-                <option value="HANDWRITING">📝 Nộp ảnh / Bài viết tay</option>
-                <option value="OTHER">📊 Khác (Trắc nghiệm / Tự luận)</option>
+                <option value="ALL">Tất cả</option>
+                {studentExamGroups.map((group) => (
+                  <option key={group.label} value={group.label}>
+                    {group.label}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={lessonFilter}
+                onChange={(e) => setLessonFilter(e.target.value)}
+                aria-label="Bài học / Đề thi"
+                title="Bài học / Đề thi"
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-medium outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer max-w-[22rem]"
+              >
+                <option value="ALL">Tất cả bài</option>
+                {studentExamOptions.map((exam) => (
+                  <option key={exam.id} value={exam.title}>
+                    {exam.title}
+                  </option>
+                ))}
               </select>
 
               <select
@@ -1262,6 +1502,23 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               </select>
             </div>
           </div>
+
+          {deleteNotice && (
+            <div className="flex items-center justify-between gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+              <span className="inline-flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> {deleteNotice}
+              </span>
+              <button
+                type="button"
+                onClick={() => setDeleteNotice(null)}
+                className="p-1 text-emerald-700 hover:bg-emerald-100 rounded cursor-pointer"
+                title="Đóng thông báo"
+                aria-label="Đóng thông báo"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {errorMsg && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 flex items-center gap-2">
@@ -1288,87 +1545,105 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider">
                       <th className="p-3.5">Mã ID</th>
                       <th className="p-3.5">Họ tên & Lớp</th>
-                      <th className="p-3.5">Bài thi / Đề bài</th>
                       <th className="p-3.5">Kết quả / Loại bài</th>
                       <th className="p-3.5">Trạng thái</th>
                       <th className="p-3.5 text-right">Hành động</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {filteredSubmissions.map((sub) => {
-                      const isHw =
-                        sub.isHandwriting ||
-                        (sub.submissionImages && sub.submissionImages.length > 0) ||
-                        (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
-                        sub.lesson.toLowerCase().includes('chép') ||
-                        sub.lesson.toLowerCase().includes('nộp ảnh');
-
-                      return (
-                        <tr key={sub.id} className="hover:bg-slate-50/80 transition">
-                          <td className="p-3.5 font-mono font-bold text-red-700">{sub.id}</td>
-                          <td className="p-3.5">
-                            <div className="font-semibold text-slate-800">{sub.name}</div>
-                            <div className="text-xs text-slate-500">Lớp: {sub.class}</div>
-                            {isHw && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200 mt-1">
-                                <Pencil className="w-3 h-3 text-teal-600" /> Bài chép tay / Nộp ảnh
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3.5 max-w-xs truncate text-slate-700" title={sub.lesson}>
-                            {sub.lesson}
-                          </td>
-                          <td className="p-3.5">
-                            {isHw ? (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 inline-flex items-center gap-1.5 text-xs w-fit">
-                                  <ImageIcon className="w-3.5 h-3.5 text-teal-600" /> {sub.submissionImages?.length || 1} ảnh bài nộp
+                    {submissionGroups.map(([groupLabel, groupItems]) => (
+                      <React.Fragment key={groupLabel}>
+                        <tr className="bg-slate-50 border-y border-slate-200">
+                          <td colSpan={5} className="px-3.5 py-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 font-bold text-slate-800">
+                                <BookOpen className="w-4 h-4 text-red-700" />
+                                <span>{groupLabel}</span>
+                                <span className="text-[11px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                                  {groupItems.length} bài nộp
                                 </span>
                               </div>
-                            ) : (
-                              <div>
-                                <span className="font-bold text-slate-800">
-                                  {sub.total > 0 ? Math.round((sub.correct / sub.total) * 100) : (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
-                                </span>
-                                <span className="text-xs text-slate-500 block">
-                                  ({sub.correct}/{sub.total} câu)
-                                </span>
+                              <div className="flex items-center gap-2 text-[11px] font-semibold">
+                                <span className="text-amber-700">{groupItems.filter((item) => item.status !== 'Đã chấm').length} chờ chấm</span>
+                                <span className="text-emerald-700">{groupItems.filter((item) => item.status === 'Đã chấm').length} đã chấm</span>
                               </div>
-                            )}
-                          </td>
-                          <td className="p-3.5">
-                            {sub.status === 'Đã chấm' ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm ({sub.speakScore || 'N/A'})
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">
-                                <Clock className="w-3.5 h-3.5" /> Chờ chấm
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3.5 text-right">
-                            {isHw ? (
-                              <button
-                                type="button"
-                                onClick={() => openGradingModal(sub)}
-                                className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5" /> Chấm bài chép tay <ChevronRight className="w-3.5 h-3.5" />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openGradingModal(sub)}
-                                className="inline-flex items-center gap-1 bg-red-700 hover:bg-red-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer"
-                              >
-                                Chấm bài / Chi tiết <ChevronRight className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            </div>
                           </td>
                         </tr>
-                      );
-                    })}
+                        {groupItems.map((sub) => {
+                          const isHw = getIsHandwritingSubmission(sub);
+                          const isDeleting = deletingSubmissionId === sub.id;
+
+                          return (
+                            <tr key={sub.id} className="hover:bg-slate-50/80 transition">
+                              <td className="p-3.5 font-mono font-bold text-red-700">{sub.id}</td>
+                              <td className="p-3.5">
+                                <div className="font-semibold text-slate-800">{sub.name}</div>
+                                <div className="text-xs text-slate-500">Lớp: {sub.class}</div>
+                              </td>
+                              <td className="p-3.5">
+                                {isHw ? (
+                                  <span className="font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 inline-flex items-center gap-1.5 text-xs w-fit">
+                                    <ImageIcon className="w-3.5 h-3.5 text-teal-600" /> {sub.submissionImages?.length || 1} ảnh bài nộp
+                                  </span>
+                                ) : (
+                                  <div>
+                                    <span className="font-bold text-slate-800">
+                                      {sub.total > 0 ? Math.round((sub.correct / sub.total) * 100) : (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
+                                    </span>
+                                    <span className="text-xs text-slate-500 block">({sub.correct}/{sub.total} câu)</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3.5">
+                                {sub.status === 'Đã chấm' ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">
+                                    <Clock className="w-3.5 h-3.5" /> Chờ chấm
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3.5 text-right">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                  {isHw ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openGradingModal(sub)}
+                                      className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition cursor-pointer"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" /> Chấm bài <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => openGradingModal(sub)}
+                                      className="inline-flex items-center gap-1 bg-red-700 hover:bg-red-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                                    >
+                                      Chấm bài <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {sub.status === 'Đã chấm' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleDeleteGradedSubmission(sub)}
+                                      disabled={isDeleting}
+                                      title="Xoá bài đã chấm"
+                                      aria-label={`Xoá bài đã chấm của ${sub.name}`}
+                                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 transition cursor-pointer"
+                                    >
+                                      <Trash2 className={`w-4 h-4 ${isDeleting ? 'animate-pulse' : ''}`} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1382,7 +1657,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         <ImportLesson
           onSaveCustomExam={onSaveCustomExam}
           onImportSuccess={(newExam) => {
-            setEditingExam(sanitizeExamSections(newExam));
+            replaceEditingExam(sanitizeExamSections(newExam));
             setNewListenParentId('');
           }}
         />
@@ -1438,12 +1713,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                       speakingQuestions: [],
                       translationQuestions: []
                     };
-                    setEditingExam(newExam);
+                    replaceEditingExam(newExam);
                   } else {
                     const found = allExams.find((item) => item.id === selectedId);
                     if (found) {
                       const cleanFound = sanitizeExamSections(found);
-                      setEditingExam({
+                      replaceEditingExam({
                         ...cleanFound,
                         vocabList: cleanFound.vocabList || [],
                         mcQuestions: cleanFound.mcQuestions || [],
@@ -1477,7 +1752,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(editingExam, null, 2));
+                    const exportData = editingExam.sourceLessonData || editingExam;
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
                     const downloadAnchor = document.createElement('a');
                     downloadAnchor.setAttribute("href", dataStr);
                     downloadAnchor.setAttribute("download", `${editingExam.id || 'bai-thi'}_export.json`);
@@ -1523,7 +1799,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
                       if (fallback) {
                         setSelectedExamId(fallback.id);
-                        setEditingExam({
+                        replaceEditingExam({
                           ...fallback,
                           vocabList: fallback.vocabList || [],
                           mcQuestions: fallback.mcQuestions || [],
@@ -1562,6 +1838,21 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </div>
           )}
 
+          {editingExam.sourceLessonData && (
+            <LessonDataEditor
+              title="Chỉnh sửa toàn bộ bài học đã nhập"
+              value={editingExam.sourceLessonData as unknown as Record<string, unknown>}
+              onChange={handleSourceLessonDataChange}
+              canUndo={editingHistory.past.length > 0}
+              canRedo={editingHistory.future.length > 0}
+              onUndo={undoEditingExam}
+              onRedo={redoEditingExam}
+              validateAdvancedJson={validateSourceLessonData}
+            />
+          )}
+
+          {!editingExam.sourceLessonData && (
+            <>
           {/* Exam Info Form */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div>
@@ -1807,6 +2098,34 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
           <div className="space-y-3 pt-4 border-t border-slate-200">
             <h4 className="font-bold text-slate-800 text-sm">Quản Lý Câu Hỏi Điền Từ Vào Chỗ Trống ({(editingExam.fillQuestions || []).length} câu)</h4>
 
+            <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+              <div>
+                <h5 className="font-bold text-emerald-950 text-sm">Bảng từ cho sẵn</h5>
+                <p className="text-xs text-emerald-800 mt-1">
+                  Chỉnh sửa các từ học sinh sẽ nhìn thấy trước phần điền từ. Các từ được áp dụng cho toàn bộ câu cùng cấp độ.
+                </p>
+              </div>
+
+              {fillWordBankGroups.length > 0 ? (
+                fillWordBankGroups.map(({ tier, wordBank }) => (
+                  <label key={tier} className="block space-y-1.5">
+                    <span className="text-xs font-semibold text-emerald-900">
+                      {tier === 'tier1' ? 'Cấp 1: Tri thức' : tier === 'tier2' ? 'Cấp 2: Bán giao tiếp' : 'Cấp 3: Giao tiếp tự do'}
+                    </span>
+                    <textarea
+                      value={wordBank.join(', ')}
+                      onChange={(event) => handleUpdateFillWordBank(tier, event.target.value)}
+                      placeholder="老师, 学生, 谢谢... (cách nhau bằng dấu phẩy)"
+                      rows={2}
+                      className="w-full px-3 py-2 border border-emerald-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                    />
+                  </label>
+                ))
+              ) : (
+                <p className="text-xs italic text-emerald-800">Chưa có câu điền từ để thiết lập bảng từ.</p>
+              )}
+            </div>
+
             <div className="space-y-2">
               {(editingExam.fillQuestions || []).map((q, idx) => (
                 <div key={q.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
@@ -1850,6 +2169,13 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 value={newFillAnswer}
                 onChange={(e) => setNewFillAnswer(e.target.value)}
                 placeholder="Đáp án đúng (Nếu có nhiều đáp án cùng đúng, cách nhau bằng dấu | ví dụ: 学习|学)"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <input
+                type="text"
+                value={newFillWordBank}
+                onChange={(e) => setNewFillWordBank(e.target.value)}
+                placeholder="Bảng từ cho sẵn (cách nhau bằng dấu phẩy, ví dụ: 学习, 工作, 休息)"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-red-500"
               />
               <div className="flex justify-end">
@@ -2894,6 +3220,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               </div>
             </form>
           </div>
+            </>
+          )}
         </div>
       )}
 

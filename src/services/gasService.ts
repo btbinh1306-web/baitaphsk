@@ -1,7 +1,8 @@
 import { AudioRecordItem, SubmissionData, GasConfig, TeacherGradePayload } from '../types';
 import { safeSetLocalStorage } from '../utils/storageUtils';
-import { getHandwritingSubmissions, saveHandwritingSubmission } from './handwritingService';
+import { deleteHandwritingSubmissions, getHandwritingSubmissions, saveHandwritingSubmission } from './handwritingService';
 import {
+  deleteServerSubmissions,
   saveServerSubmission,
   fetchServerSubmissions,
   fetchServerSubmissionById,
@@ -9,7 +10,7 @@ import {
   uploadMediaFile
 } from './apiService';
 import { DEFAULT_GAS_WEB_APP_URL } from './gasConfig';
-import { clearGasCapabilitiesCache, getGasCapabilities } from './gasCloudService';
+import { clearGasCapabilitiesCache, deleteGasSubmissions, getGasCapabilities } from './gasCloudService';
 
 const DEFAULT_CONFIG_KEY = 'hsk_gas_config';
 const LOCAL_SUBMISSIONS_KEY = 'hsk_local_submissions_v1';
@@ -233,6 +234,38 @@ export const saveLocalSubmission = (sub: SubmissionData, syncServer = true, repl
   if (syncServer) void saveServerSubmission(sub);
 };
 
+export const deleteSubmissionsInGas = async (
+  ids: string[],
+  pass: string
+): Promise<{ ok: boolean; error?: string }> => {
+  const normalizedIds = Array.from(new Set(ids.map(String).map((id) => id.trim()).filter(Boolean)));
+  if (normalizedIds.length === 0) return { ok: false, error: 'Không có mã bài nộp để xoá' };
+
+  const config = getGasConfig();
+  const gasConfigured = Boolean(config.sheetUrl && config.sheetUrl.trim());
+  const gasDeleted = await deleteGasSubmissions(normalizedIds, pass);
+
+  if (gasConfigured && gasDeleted !== true) {
+    return {
+      ok: false,
+      error:
+        gasDeleted === null
+          ? 'Google Apps Script chưa có chức năng xoá bài. Hãy cập nhật Code.gs và deploy New version.'
+          : 'Không thể xoá bài trên Google Sheet. Vui lòng kiểm tra mật khẩu và deployment Apps Script.'
+    };
+  }
+
+  const serverDeleted = await deleteServerSubmissions(normalizedIds);
+  if (gasConfigured ? gasDeleted !== true : !serverDeleted) {
+    return { ok: false, error: 'Không thể xoá bài nộp trên máy chủ' };
+  }
+
+  const idSet = new Set(normalizedIds);
+  safeSetLocalStorage(LOCAL_SUBMISSIONS_KEY, getLocalSubmissions().filter((sub) => !idSet.has(sub.id)));
+  deleteHandwritingSubmissions(normalizedIds);
+  return { ok: true };
+};
+
 /**
  * Submit exam response to Google Apps Script / Google Sheet
  */
@@ -440,6 +473,7 @@ export const fetchTeacherSubmissions = async (
               teacherComment: cleanedComment || existing?.teacherComment || '',
               submissionImages: extractedSubImgs.length > 0 ? extractedSubImgs : existing?.submissionImages,
               correctedImages: extractedCorrImgs.length > 0 ? extractedCorrImgs : existing?.correctedImages,
+              duplicateIds: existing?.duplicateIds,
               status: (r['Trạng thái'] === 'Đã chấm' || existing?.status === 'Đã chấm') ? 'Đã chấm' : 'Chờ chấm',
               audios: mergeAudioRecords(
                 extractedFeedbackAudios,
@@ -492,6 +526,9 @@ export const fetchTeacherSubmissions = async (
       ...secondary,
       ...preferred,
       id: preferred.id,
+      duplicateIds: Array.from(
+        new Set([...(preferred.duplicateIds || []), ...(secondary.duplicateIds || []), preferred.id, secondary.id])
+      ),
       submissionImages: preferred.submissionImages?.length
         ? preferred.submissionImages
         : secondary.submissionImages,

@@ -53,7 +53,8 @@ function doGet(e) {
       capabilities: {
         lessons: true,
         media: true,
-        submissions: true
+        submissions: true,
+        deleteSubmissions: true
       }
     });
   }
@@ -72,12 +73,13 @@ function doPost(e) {
     var data = JSON.parse((e && e.postData && e.postData.contents) || '{}');
 
     if (data.action === 'capabilities') {
-      return json_({ ok: true, capabilities: { lessons: true, media: true, submissions: true } });
+      return json_({ ok: true, capabilities: { lessons: true, media: true, submissions: true, deleteSubmissions: true } });
     }
     if (data.action === 'upload_media') return uploadMedia_(data);
     if (data.action === 'save_exam') return saveExam_(data.exam);
     if (data.action === 'delete_exam') return deleteExam_(data.id);
     if (data.action === 'grade') return gradeSubmission_(data);
+    if (data.action === 'delete_submissions') return deleteSubmissions_(data);
 
     return saveSubmission_(data);
   } catch (error) {
@@ -350,4 +352,28 @@ function gradeSubmission_(data) {
     }
   }
   return json_({ ok: false, error: 'Không tìm thấy ID' });
+}
+
+function deleteSubmissions_(data) {
+  if (String(data.pass || '') !== String(GV_PASSWORD)) return json_({ ok: false, error: 'Sai mật khẩu' });
+
+  var ids = Array.isArray(data.ids) ? data.ids : (data.id ? [data.id] : []);
+  ids = ids.filter(function(id) { return String(id || '').trim() !== ''; }).map(String);
+  if (!ids.length) return json_({ ok: false, error: 'Thiếu mã bài nộp' });
+
+  var idSet = {};
+  ids.forEach(function(id) { idSet[String(id)] = true; });
+  var sheet = sheet_();
+  ensureHeader_(sheet);
+  var rows = sheet.getDataRange().getValues();
+  var deleted = 0;
+
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (idSet[String(rows[i][0])]) {
+      sheet.deleteRow(i + 1);
+      deleted++;
+    }
+  }
+
+  return json_({ ok: true, deleted: deleted, deletedIds: ids });
 }

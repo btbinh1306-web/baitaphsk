@@ -204,6 +204,24 @@ export async function gradeServerSubmission(payload: {
   return { ok: false };
 }
 
+export async function deleteServerSubmissions(ids: string[]): Promise<boolean> {
+  const normalizedIds = Array.from(new Set(ids.map(String).map((id) => id.trim()).filter(Boolean)));
+  if (normalizedIds.length === 0) return true;
+
+  try {
+    const res = await fetch('/api/submissions/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: normalizedIds })
+    });
+    const data = await res.json();
+    return Boolean(data && data.ok);
+  } catch (err) {
+    console.warn('Failed to delete submissions on server', err);
+    return false;
+  }
+}
+
 // --- MEDIA UPLOADS ---
 export async function uploadMediaFile(
   fileData: string,
