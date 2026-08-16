@@ -150,6 +150,19 @@ export async function fetchServerSubmissions(): Promise<SubmissionData[]> {
   return [];
 }
 
+export async function fetchServerDeletedSubmissionIds(): Promise<string[]> {
+  try {
+    const res = await fetch('/api/deleted-submission-ids');
+    const data = await res.json();
+    if (data && data.ok && Array.isArray(data.deletedIds)) {
+      return data.deletedIds.map(String);
+    }
+  } catch (err) {
+    console.warn('Failed to fetch deleted submission IDs from server', err);
+  }
+  return [];
+}
+
 export async function fetchServerSubmissionById(id: string): Promise<SubmissionData | null> {
   try {
     const res = await fetch(`/api/submissions/${encodeURIComponent(id)}`);

@@ -5,6 +5,7 @@ var SUBMISSION_FOLDER_ID = '1S39P7i1nXiX6JeSXXRiS4Y1I4zIJr_qw';
 var LESSON_FOLDER_ID = '1MK2ZlsjR7sCguyLMZT0pt5KLLS0X2bN9';
 var GV_PASSWORD = 'tbtt123';
 var DELETED_EXAM_IDS_PROPERTY = 'HSK_DELETED_EXAM_IDS';
+var DELETED_SUBMISSION_IDS_PROPERTY = 'HSK_DELETED_SUBMISSION_IDS';
 
 var HEADERS = [
   'ID', 'Thời gian', 'Họ tên', 'Lớp', 'Bài', 'Số câu đúng', 'Đã làm', 'Tổng', 'Phần trăm',
@@ -41,6 +42,29 @@ function setDeletedExamIds_(ids) {
     DELETED_EXAM_IDS_PROPERTY,
     JSON.stringify(Array.from(new Set((ids || []).map(function(id) { return String(id); }))))
   );
+}
+
+function getDeletedSubmissionIds_() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(DELETED_SUBMISSION_IDS_PROPERTY);
+    var parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.map(function(id) { return String(id).trim(); }).filter(Boolean)
+      : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setDeletedSubmissionIds_(ids) {
+  PropertiesService.getScriptProperties().setProperty(
+    DELETED_SUBMISSION_IDS_PROPERTY,
+    JSON.stringify(Array.from(new Set((ids || []).map(function(id) { return String(id).trim(); }).filter(Boolean))))
+  );
+}
+
+function isDeletedSubmission_(id) {
+  return getDeletedSubmissionIds_().indexOf(String(id || '').trim()) >= 0;
 }
 
 function doGet(e) {
@@ -315,15 +339,18 @@ function listTeacherSubmissions_(pass) {
   ensureHeader_(sheet);
   var rows = sheet.getDataRange().getValues();
   var head = rows.shift() || HEADERS;
+  var deletedIds = getDeletedSubmissionIds_();
   var list = rows.map(function(row) {
+    if (deletedIds.indexOf(String(row[0] || '').trim()) >= 0) return null;
     var item = {};
     head.forEach(function(key, index) { item[key] = normalizeDriveLinks_(row[index]); });
     return item;
-  });
+  }).filter(Boolean);
   return json_({ ok: true, rows: list });
 }
 
 function findResult_(id) {
+  if (isDeletedSubmission_(id)) return json_({ ok: false, error: 'Không tìm thấy mã này' });
   var sheet = sheet_();
   ensureHeader_(sheet);
   var rows = sheet.getDataRange().getValues();
@@ -340,6 +367,7 @@ function findResult_(id) {
 
 function gradeSubmission_(data) {
   if (String(data.pass || '') !== String(GV_PASSWORD)) return json_({ ok: false, error: 'Sai mật khẩu' });
+  if (isDeletedSubmission_(data.id)) return json_({ ok: false, error: 'Không tìm thấy ID' });
   var sheet = sheet_();
   ensureHeader_(sheet);
   var rows = sheet.getDataRange().getValues();
@@ -363,6 +391,11 @@ function deleteSubmissions_(data) {
 
   var idSet = {};
   ids.forEach(function(id) { idSet[String(id)] = true; });
+  var deletedIds = getDeletedSubmissionIds_();
+  ids.forEach(function(id) {
+    if (deletedIds.indexOf(String(id).trim()) < 0) deletedIds.push(String(id).trim());
+  });
+  setDeletedSubmissionIds_(deletedIds);
   var sheet = sheet_();
   ensureHeader_(sheet);
   var rows = sheet.getDataRange().getValues();

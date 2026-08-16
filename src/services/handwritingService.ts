@@ -84,8 +84,10 @@ export const getHandwritingSubmissions = (): HandwritingSubmission[] => {
 };
 
 export const deleteHandwritingSubmissions = (ids: string[]): void => {
-  const idSet = new Set(ids.map(String));
-  const updated = getHandwritingSubmissions().filter((submission) => !idSet.has(String(submission.id)));
+  const idSet = new Set(ids.map((id) => String(id).trim().toLowerCase()));
+  const updated = getHandwritingSubmissions().filter(
+    (submission) => !idSet.has(String(submission.id).trim().toLowerCase())
+  );
   safeSetLocalStorage(SUBMISSIONS_STORAGE_KEY, updated);
 };
 

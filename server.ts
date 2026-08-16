@@ -26,6 +26,7 @@ const CUSTOM_EXAMS_FILE = path.join(DATA_DIR, 'custom_exams.json');
 const DELETED_EXAMS_FILE = path.join(DATA_DIR, 'deleted_exam_ids.json');
 const HANDWRITING_EXERCISES_FILE = path.join(DATA_DIR, 'handwriting_exercises.json');
 const SUBMISSIONS_FILE = path.join(DATA_DIR, 'submissions.json');
+const DELETED_SUBMISSIONS_FILE = path.join(DATA_DIR, 'deleted_submission_ids.json');
 
 // Helper functions for reading/writing JSON files
 function readJsonFile<T>(filePath: string, fallback: T): T {
@@ -48,6 +49,20 @@ function writeJsonFile<T>(filePath: string, data: T): boolean {
     console.error(`Error writing ${filePath}:`, err);
     return false;
   }
+}
+
+function normalizeSubmissionId(id: unknown): string {
+  return String(id || '').trim().toLowerCase();
+}
+
+function getDeletedSubmissionIds(): string[] {
+  return Array.from(
+    new Set(
+      readJsonFile<unknown[]>(DELETED_SUBMISSIONS_FILE, [])
+        .map(normalizeSubmissionId)
+        .filter(Boolean)
+    )
+  );
 }
 
 // Media file upload & serving
@@ -257,13 +272,24 @@ app.delete('/api/handwriting-exercises/:id', (req, res) => {
 });
 
 // --- API ENDPOINTS FOR SUBMISSIONS ---
+app.get('/api/deleted-submission-ids', (req, res) => {
+  res.json({ ok: true, deletedIds: getDeletedSubmissionIds() });
+});
+
 app.get('/api/submissions', (req, res) => {
-  const submissions = readJsonFile<any[]>(SUBMISSIONS_FILE, []);
+  const deletedIds = new Set(getDeletedSubmissionIds());
+  const submissions = readJsonFile<any[]>(SUBMISSIONS_FILE, []).filter(
+    (submission) => !deletedIds.has(normalizeSubmissionId(submission.id))
+  );
   res.json({ ok: true, submissions });
 });
 
 app.get('/api/submissions/:id', (req, res) => {
   const subId = String(req.params.id).trim().toLowerCase();
+  if (getDeletedSubmissionIds().includes(subId)) {
+    res.status(404).json({ ok: false, error: 'Submission deleted' });
+    return;
+  }
   const submissions = readJsonFile<any[]>(SUBMISSIONS_FILE, []);
   const match = submissions.find((s) => String(s.id).trim().toLowerCase() === subId);
 
@@ -284,6 +310,10 @@ app.post('/api/submissions', (req, res) => {
 
     const currentSubs = readJsonFile<any[]>(SUBMISSIONS_FILE, []);
     const subId = subData.id || Math.random().toString(36).substring(2, 10);
+    if (getDeletedSubmissionIds().includes(normalizeSubmissionId(subId))) {
+      res.status(410).json({ ok: false, error: 'Submission was deleted' });
+      return;
+    }
     const updatedSub = { ...subData, id: subId };
 
     const idx = currentSubs.findIndex((s) => String(s.id) === String(subId));
@@ -305,6 +335,11 @@ app.post('/api/submissions/grade', (req, res) => {
     const { id, speakScore, comment, teacherComment, correctedImages, audios } = req.body;
     if (!id) {
       res.status(400).json({ ok: false, error: 'Missing submission ID' });
+      return;
+    }
+
+    if (getDeletedSubmissionIds().includes(normalizeSubmissionId(id))) {
+      res.status(404).json({ ok: false, error: 'Submission was deleted' });
       return;
     }
 
@@ -357,8 +392,10 @@ app.post('/api/submissions/delete', (req, res) => {
     const currentSubs = readJsonFile<any[]>(SUBMISSIONS_FILE, []);
     const idSet = new Set(ids.map((id) => id.toLowerCase()));
     const updatedSubs = currentSubs.filter((sub) => !idSet.has(String(sub.id).trim().toLowerCase()));
+    const deletedIds = Array.from(new Set([...getDeletedSubmissionIds(), ...ids.map(normalizeSubmissionId)]));
+    const deletedSaved = writeJsonFile(DELETED_SUBMISSIONS_FILE, deletedIds);
     const saved = writeJsonFile(SUBMISSIONS_FILE, updatedSubs);
-    if (!saved) {
+    if (!saved || !deletedSaved) {
       res.status(500).json({ ok: false, error: 'Could not delete submissions' });
       return;
     }
