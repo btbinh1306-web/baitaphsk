@@ -82,6 +82,33 @@ const normalizeLessonFilterValue = (value: string): string =>
     .trim()
     .toLocaleLowerCase('vi');
 
+type TeacherWrongAnswerDetail = {
+  category: string;
+  prompt: string;
+  userAnswer: string;
+  correctAnswer: string;
+  raw: string;
+};
+
+const parseTeacherWrongDetails = (wrong?: string): TeacherWrongAnswerDetail[] => {
+  if (!wrong || wrong === 'Không có câu sai') return [];
+
+  const lines = wrong.includes('\n') ? wrong.split('\n') : wrong.split(' | ');
+  return lines.map((line) => {
+    const raw = line.trim();
+    const bracketMatch = raw.match(/^\[(.*?)\]\s*:?\s*(.*)$/);
+    const bracketContent = bracketMatch?.[1]?.trim() || '';
+    const body = bracketMatch?.[2]?.trim() || raw;
+    const promptMatch = bracketContent.match(/^(.*?):\s*["“](.*?)["”]$/);
+    const prompt = promptMatch?.[2]?.trim() || body.match(/["“](.*?)["”]/)?.[1]?.trim() || '';
+    const category = promptMatch?.[1]?.trim() || bracketContent || 'Câu sai';
+    const userAnswer = body.match(/(?:Bạn chọn|Bạn nhập|Bạn xếp|Bạn điền)\s*\[(.*?)\]/i)?.[1]?.trim() || '';
+    const correctAnswer = body.match(/Đáp án đúng\s*\[(.*?)\]/i)?.[1]?.trim() || '';
+
+    return { category, prompt, userAnswer, correctAnswer, raw };
+  });
+};
+
 interface TeacherPortalProps {
   customExams?: ExamLesson[];
   deletedExamIds?: string[];
@@ -1334,6 +1361,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       }, new Map())
       .entries()
   ).sort(([labelA], [labelB]) => labelA.localeCompare(labelB, 'vi'));
+  const selectedWrongDetails = parseTeacherWrongDetails(selectedSub?.wrong);
 
   if (!isAuthenticated) {
     return (
@@ -3284,11 +3312,48 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </div>
 
             {/* Wrong Answers List if any */}
-            {selectedSub.wrong && selectedSub.wrong !== 'Không có câu sai' && (
-              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-1">
-                <span className="text-xs font-bold text-rose-800 block">Chi tiết các câu làm sai:</span>
-                <p className="text-xs text-rose-900 whitespace-pre-wrap font-mono leading-relaxed">{selectedSub.wrong}</p>
-              </div>
+            {selectedWrongDetails.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <h4 className="text-sm font-bold text-slate-800">
+                    Các câu học sinh làm sai ({selectedWrongDetails.length})
+                  </h4>
+                  <span className="text-xs text-slate-500">Câu hỏi và đáp án đối chiếu</span>
+                </div>
+
+                <div className="space-y-3">
+                  {selectedWrongDetails.map((item, idx) => (
+                    <article key={`${item.category}-${idx}`} className="border border-slate-200 rounded-lg p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                        <span className="font-bold text-slate-800">Câu sai #{idx + 1}</span>
+                        <span className="text-xs text-slate-500">{item.category}</span>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 mb-1">Câu hỏi gốc</p>
+                        <div className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm font-semibold text-slate-800 leading-relaxed">
+                          {item.prompt || item.raw}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="border-l-2 border-slate-300 pl-3">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">Học sinh chọn / nhập</p>
+                          <p className="text-sm font-semibold text-rose-700 leading-relaxed">
+                            {item.userAnswer || 'Không chọn / Để trống'}
+                          </p>
+                        </div>
+                        <div className="border-l-2 border-slate-400 pl-3">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">Đáp án đúng</p>
+                          <p className="text-sm font-semibold text-emerald-700 leading-relaxed">
+                            {item.correctAnswer || '—'}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
             )}
 
             {/* Essay Responses */}

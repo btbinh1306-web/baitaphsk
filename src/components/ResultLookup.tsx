@@ -946,68 +946,53 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
               {/* Detailed Wrong Questions */}
               {wrongList.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wide flex items-center gap-1.5">
-                    <XCircle className="w-4 h-4 text-rose-600" /> Chi Tiết Các Câu Làm Sai (Trắc nghiệm / Điền từ / Sắp xếp):
-                  </h4>
+                <section className="space-y-3 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <XCircle className="w-4 h-4 text-slate-500" /> Các câu bạn làm sai ({wrongList.length})
+                    </h4>
+                    <span className="text-xs text-slate-500">Câu hỏi và đáp án đối chiếu</span>
+                  </div>
+
                   <div className="space-y-3">
                     {wrongList.map((wrongLine, idx) => {
                       const item = parseWrongLineItem(wrongLine);
                       return (
-                        <div
-                          key={idx}
-                          className="p-4 bg-white border border-rose-200 rounded-xl shadow-2xs space-y-2.5"
-                        >
-                          {/* Header Badge & Title */}
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-100 pb-2">
-                            <span className="font-bold text-white bg-rose-600 px-2.5 py-0.5 rounded-md text-[11px] shrink-0 uppercase tracking-wide">
-                              Câu sai #{idx + 1} • {item.title}
-                            </span>
+                        <article key={idx} className="border border-slate-200 rounded-lg p-4 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                            <span className="font-bold text-slate-800">Câu sai #{idx + 1}</span>
+                            <span className="text-xs text-slate-500">{item.title}</span>
                           </div>
 
-                          {/* Question Prompt */}
-                          {item.prompt ? (
-                            <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-lg text-sm text-slate-900 font-bold leading-snug">
-                              <span className="text-red-700 font-extrabold mr-1.5">[Câu hỏi gốc]:</span>
-                              <span>{item.prompt}</span>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 mb-1">Câu hỏi gốc</p>
+                            <div className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm font-semibold text-slate-800 leading-relaxed">
+                              {item.prompt || item.raw}
                             </div>
-                          ) : (
-                            <p className="text-xs text-slate-700 font-medium p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-                              {item.raw}
-                            </p>
-                          )}
+                          </div>
 
-                          {/* Side-by-side Red & Green Answer Cards */}
                           {(item.userAns || item.correctAns) && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                              {/* Student Answer Box (Red) */}
-                              <div className="p-3 bg-rose-50/90 border border-rose-200 rounded-lg text-xs space-y-1">
-                                <span className="font-bold text-rose-800 flex items-center gap-1">
-                                  <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                  Học sinh chọn / nhập:
-                                </span>
-                                <p className="font-bold text-rose-950 text-xs sm:text-sm pl-4 leading-normal">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="border-l-2 border-slate-300 pl-3">
+                                <p className="text-xs font-semibold text-slate-500 mb-1">Bạn chọn / nhập</p>
+                                <p className="text-sm font-semibold text-rose-700 leading-relaxed">
                                   {item.userAns || 'Không chọn / Để trống'}
                                 </p>
                               </div>
 
-                              {/* Correct Answer Box (Green) */}
-                              <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-lg text-xs space-y-1">
-                                <span className="font-bold text-emerald-800 flex items-center gap-1">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                  Đáp án đúng chính xác:
-                                </span>
-                                <p className="font-bold text-emerald-950 text-xs sm:text-sm pl-4 leading-normal">
+                              <div className="border-l-2 border-slate-400 pl-3">
+                                <p className="text-xs font-semibold text-slate-500 mb-1">Đáp án đúng</p>
+                                <p className="text-sm font-semibold text-emerald-700 leading-relaxed">
                                   {item.correctAns || '—'}
                                 </p>
                               </div>
                             </div>
                           )}
-                        </div>
+                        </article>
                       );
                     })}
                   </div>
-                </div>
+                </section>
               )}
 
               {/* Detailed Essay Answers with Immediate Per-Item Teacher Comments */}
