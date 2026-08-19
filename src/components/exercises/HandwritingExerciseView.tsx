@@ -5,7 +5,7 @@ import {
   saveHandwritingSubmission
 } from '../../services/handwritingService';
 import { submitToGas, getLocalSubmissions, cleanImageTagsFromText } from '../../services/gasService';
-import { fileToCompressedDataUrl } from '../../utils/imageUtils';
+import { fileToCompressedDataUrl, normalizeImageList } from '../../utils/imageUtils';
 import { uploadMediaFile } from '../../services/apiService';
 import { ImageLightboxModal } from '../ImageLightboxModal';
 import { getDriveMediaPlayerUrl } from '../../utils/audioUtils';
@@ -96,7 +96,7 @@ export const HandwritingExerciseView = React.forwardRef(
         exerciseTitle: existing?.exerciseTitle || localMain?.lesson || exercise.title,
         studentName: existing?.studentName || localMain?.name || studentName,
         studentClass: existing?.studentClass || localMain?.class || studentClass,
-        submissionImages: subImages.length > 0 ? subImages : (existing?.submissionImages || []),
+        submissionImages: normalizeImageList(subImages.length > 0 ? subImages : existing?.submissionImages),
         status: isGraded ? 'graded' : 'submitted',
         submittedAt: existing?.submittedAt || localMain?.time || new Date().toISOString(),
         correctedImages: corrImages,
@@ -136,7 +136,7 @@ export const HandwritingExerciseView = React.forwardRef(
         const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type, 'submission');
         newImages.push(uploadedUrl || compressed);
       }
-      setSubmissionImages((prev) => [...prev, ...newImages]);
+      setSubmissionImages((prev) => normalizeImageList([...prev, ...newImages]));
     } catch (err) {
       console.error('Lỗi tải ảnh bài làm:', err);
       alert('Không thể đọc ảnh. Vui lòng thử lại.');
@@ -176,6 +176,7 @@ export const HandwritingExerciseView = React.forwardRef(
 
     setIsSubmitting(true);
 
+    const normalizedSubmissionImages = normalizeImageList(submissionImages);
     const fallbackSubId = currentSub?.id || `SUB_HW_${Math.floor(100000 + Math.random() * 900000)}`;
     const nowStr = new Date().toLocaleString('vi-VN');
 
@@ -189,15 +190,15 @@ export const HandwritingExerciseView = React.forwardRef(
         class: finalClass,
         lesson: submissionLessonTitle,
         correct: 0,
-        done: submissionImages.length,
-        total: submissionImages.length || 1,
+        done: normalizedSubmissionImages.length,
+        total: normalizedSubmissionImages.length || 1,
         percent: 0,
         wrongCount: 0,
         notDone: 0,
         wrong: '',
-        essays: `[Nộp bài chép từ mới] Bài: ${finalTopic} (${submissionImages.length} ảnh)`,
+        essays: `[Nộp bài chép từ mới] Bài: ${finalTopic} (${normalizedSubmissionImages.length} ảnh)`,
         isHandwriting: true,
-        submissionImages: submissionImages
+        submissionImages: normalizedSubmissionImages
       });
 
       if (gasRes && gasRes.ok && gasRes.id) {
@@ -214,7 +215,7 @@ export const HandwritingExerciseView = React.forwardRef(
       lessonTopic: finalTopic,
       studentName: finalName,
       studentClass: finalClass,
-      submissionImages: submissionImages,
+      submissionImages: normalizedSubmissionImages,
       status: currentSub?.status === 'graded' ? 'graded' : 'submitted',
       submittedAt: currentSub?.submittedAt || nowStr,
       correctedImages: currentSub?.correctedImages,
@@ -254,7 +255,7 @@ export const HandwritingExerciseView = React.forwardRef(
             <head>
               <title>${title}</title>
               <style>
-                body { margin: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #fff; font-family: sans-serif; }
+                body { margin: 0; background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #1e293b; font-family: sans-serif; }
                 img { max-width: 100%; max-height: 100vh; object-fit: contain; }
               </style>
             </head>
@@ -279,7 +280,7 @@ export const HandwritingExerciseView = React.forwardRef(
       if (!url || typeof url !== 'string') return;
       const trimmed = url.trim();
       if (trimmed.length > 10 && !trimmed.startsWith('[') && !resultUrls.includes(trimmed)) {
-        resultUrls.push(getDriveMediaPlayerUrl(trimmed));
+        resultUrls.push(trimmed);
       }
     };
 
@@ -313,7 +314,7 @@ export const HandwritingExerciseView = React.forwardRef(
       }
     });
 
-    return resultUrls;
+    return normalizeImageList(resultUrls).map(getDriveMediaPlayerUrl);
   };
 
   const handleDownloadImage = (url: string, filename: string) => {

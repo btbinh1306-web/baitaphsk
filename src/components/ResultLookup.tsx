@@ -5,6 +5,7 @@ import { getHandwritingSubmissions } from '../services/handwritingService';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { ImageLightboxModal } from './ImageLightboxModal';
+import { normalizeImageList } from '../utils/imageUtils';
 import {
   Search,
   CheckCircle2,
@@ -55,7 +56,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
             <head>
               <title>${title}</title>
               <style>
-                body { margin: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #fff; font-family: sans-serif; }
+                body { margin: 0; background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #1e293b; font-family: sans-serif; }
                 img { max-width: 100%; max-height: 100vh; object-fit: contain; }
               </style>
             </head>
@@ -80,7 +81,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       if (!url || typeof url !== 'string') return;
       const trimmed = url.trim().replace(/^["'\\]+|["'\\]+$/g, '');
       if (trimmed.length > 10 && !trimmed.startsWith('[') && !resultUrls.includes(trimmed)) {
-        resultUrls.push(getDriveMediaPlayerUrl(trimmed));
+        resultUrls.push(trimmed);
       }
     };
 
@@ -128,7 +129,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       }
     });
 
-    return resultUrls;
+    return normalizeImageList(resultUrls).map(getDriveMediaPlayerUrl);
   };
 
   const handleDownloadImage = (url: string, filename: string) => {
@@ -562,10 +563,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                       {submissionImgs.map((imgUrl, idx) => (
                         <div
                           key={idx}
-                          className="flex flex-col rounded-xl overflow-hidden border-2 border-teal-200 bg-slate-950 shadow-sm hover:border-teal-500 transition"
+                          className="flex flex-col rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm hover:border-teal-500 transition"
                         >
                           <div
-                            className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                            className="relative w-full aspect-4/3 bg-slate-50 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
                             onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
                           >
                             <img
@@ -573,12 +574,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                               alt={`Submission ${idx + 1}`}
                               className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
                             />
-                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-slate-900/90 text-teal-300 font-extrabold text-[11px] shadow-sm border border-teal-500/40">
+                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-white/95 text-slate-700 font-extrabold text-[11px] shadow-sm border border-slate-200">
                               Trang {idx + 1}
                             </div>
                           </div>
 
-                          <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                          <div className="p-2 bg-white border-t border-slate-200 flex items-center justify-between gap-1.5">
                             <button
                               type="button"
                               onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
@@ -639,7 +640,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                           }}
                           className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
                         >
-                          <Download className="w-3.5 h-3.5" /> Tải tất cả ({correctedImgs.length})
+                          <Download className="w-3.5 h-3.5" /> Tải hàng loạt ảnh ({correctedImgs.length})
                         </button>
                       </div>
                     </div>
@@ -648,10 +649,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                       {correctedImgs.map((imgUrl, idx) => (
                         <div
                           key={idx}
-                          className="flex flex-col rounded-xl overflow-hidden border-2 border-emerald-400 bg-slate-950 shadow-md transition hover:border-emerald-600"
+                          className="flex flex-col rounded-xl overflow-hidden border border-emerald-200 bg-white shadow-sm transition hover:border-emerald-600"
                         >
                           <div
-                            className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                            className="relative w-full aspect-4/3 bg-slate-50 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
                             onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
                           >
                             <img
@@ -659,12 +660,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                               alt={`Corrected ${idx + 1}`}
                               className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
                             />
-                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-emerald-950/90 text-emerald-200 font-extrabold text-[11px] shadow-sm border border-emerald-600/50">
+                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-white/95 text-emerald-800 font-extrabold text-[11px] shadow-sm border border-emerald-200">
                               Trang chữa {idx + 1}
                             </div>
                           </div>
 
-                          <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                          <div className="p-2 bg-white border-t border-slate-200 flex items-center justify-between gap-1.5">
                             <button
                               type="button"
                               onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
@@ -800,7 +801,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                             }}
                             className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
                           >
-                            <Download className="w-3.5 h-3.5" /> Tải tất cả ({submissionImgs.length})
+                            <Download className="w-3.5 h-3.5" /> Tải hàng loạt ảnh ({submissionImgs.length})
                           </button>
                         </div>
                       </div>
@@ -809,10 +810,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                         {submissionImgs.map((imgUrl, idx) => (
                           <div
                             key={idx}
-                            className="flex flex-col rounded-xl overflow-hidden border-2 border-teal-200 bg-slate-950 shadow-sm hover:border-teal-500 transition"
+                            className="flex flex-col rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm hover:border-teal-500 transition"
                           >
                             <div
-                              className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                              className="relative w-full aspect-4/3 bg-slate-50 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
                               onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
                             >
                               <img
@@ -820,12 +821,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                                 alt={`Submission ${idx + 1}`}
                                 className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
                               />
-                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-slate-900/90 text-teal-300 font-extrabold text-[11px] shadow-sm border border-teal-500/40">
+                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-white/95 text-slate-700 font-extrabold text-[11px] shadow-sm border border-slate-200">
                                 Trang {idx + 1}
                               </div>
                             </div>
 
-                            <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                            <div className="p-2 bg-white border-t border-slate-200 flex items-center justify-between gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => openLightbox(submissionImgs, idx, `Bài nộp - Trang ${idx + 1}`)}
@@ -886,7 +887,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                             }}
                             className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
                           >
-                            <Download className="w-3.5 h-3.5" /> Tải tất cả ({correctedImgs.length})
+                            <Download className="w-3.5 h-3.5" /> Tải hàng loạt ảnh ({correctedImgs.length})
                           </button>
                         </div>
                       </div>
@@ -895,10 +896,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                         {correctedImgs.map((imgUrl, idx) => (
                           <div
                             key={idx}
-                            className="flex flex-col rounded-xl overflow-hidden border-2 border-emerald-400 bg-slate-950 shadow-md transition hover:border-emerald-600"
+                            className="flex flex-col rounded-xl overflow-hidden border border-emerald-200 bg-white shadow-sm transition hover:border-emerald-600"
                           >
                             <div
-                              className="relative w-full aspect-4/3 bg-slate-900 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
+                              className="relative w-full aspect-4/3 bg-slate-50 cursor-pointer flex items-center justify-center p-1 overflow-hidden"
                               onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}
                             >
                               <img
@@ -906,12 +907,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                                 alt={`Corrected ${idx + 1}`}
                                 className="w-full h-full object-contain transition duration-200 hover:scale-[1.02]"
                               />
-                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-emerald-950/90 text-emerald-200 font-extrabold text-[11px] shadow-sm border border-emerald-600/50">
+                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-white/95 text-emerald-800 font-extrabold text-[11px] shadow-sm border border-emerald-200">
                                 Trang chữa {idx + 1}
                               </div>
                             </div>
 
-                            <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                            <div className="p-2 bg-white border-t border-slate-200 flex items-center justify-between gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => openLightbox(correctedImgs, idx, `Ảnh bài chữa - Trang ${idx + 1}`)}

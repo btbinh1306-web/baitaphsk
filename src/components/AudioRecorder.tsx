@@ -10,6 +10,7 @@ interface AudioRecorderProps {
   onCommentChange?: (val: string) => void;
   onAudioRecorded: (record: AudioRecordItem | null) => void;
   showAudioSample?: boolean;
+  compact?: boolean;
 }
 
 export const AudioRecorder: React.FC<AudioRecorderProps> = ({
@@ -18,7 +19,8 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   comment,
   onCommentChange,
   onAudioRecorded,
-  showAudioSample = false
+  showAudioSample = false,
+  compact = false
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -162,36 +164,38 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   };
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <div>
-              <span className="font-semibold text-slate-800 text-sm sm:text-base">{label}</span>
-              {pinyin && (
-                <p className="mt-1 text-sm sm:text-base font-mono font-medium text-indigo-600 whitespace-pre-line">
-                  Pinyin: {pinyin}
-                </p>
+    <div className={compact ? 'p-0' : 'bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all'}>
+      {!compact && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <div>
+                <span className="font-semibold text-slate-800 text-sm sm:text-base">{label}</span>
+                {pinyin && (
+                  <p className="mt-1 text-sm sm:text-base font-mono font-medium text-indigo-600 whitespace-pre-line">
+                    Pinyin: {pinyin}
+                  </p>
+                )}
+              </div>
+              {showAudioSample && (
+                <button
+                  type="button"
+                  onClick={() => speakText(label.replace(/^Câu \d+:\s*/, ''))}
+                  title="Nghe mẫu phát âm"
+                  className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
+                >
+                  <Volume2 className="w-4 h-4" />
+                </button>
               )}
             </div>
-            {showAudioSample && (
-              <button
-                type="button"
-                onClick={() => speakText(label.replace(/^Câu \d+:\s*/, ''))}
-                title="Nghe mẫu phát âm"
-                className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
-              >
-                <Volume2 className="w-4 h-4" />
-              </button>
-            )}
           </div>
+          {audioBlob && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full w-fit">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Đã ghi âm / Tải file xong {recordingTime > 0 ? `(${formatTime(recordingTime)})` : ''}
+            </span>
+          )}
         </div>
-        {audioBlob && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full w-fit">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Đã ghi âm / Tải file xong {recordingTime > 0 ? `(${formatTime(recordingTime)})` : ''}
-          </span>
-        )}
-      </div>
+      )}
 
       {errorMsg && (
         <div className="space-y-2 p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg mb-3">
@@ -208,7 +212,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
               <ExternalLink className="w-3.5 h-3.5" /> Mở ở Tab Mới
             </button>
             <label className="inline-flex items-center gap-1 bg-rose-600 text-white px-2.5 py-1 rounded-md font-semibold text-[11px] hover:bg-rose-700 transition cursor-pointer">
-              <Upload className="w-3.5 h-3.5" /> Tải File Âm Thanh
+              <Upload className="w-3.5 h-3.5" /> {compact ? 'Tải file âm thanh' : 'Tải File Âm Thanh'}
               <input
                 type="file"
                 accept="audio/*"
@@ -234,7 +238,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
               </button>
 
               <label className="inline-flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium text-xs px-3 py-2.5 rounded-lg transition cursor-pointer">
-                <Upload className="w-3.5 h-3.5" /> Tải File Âm Thanh
+                <Upload className="w-3.5 h-3.5" /> {compact ? 'Tải file âm thanh' : 'Tải File Âm Thanh'}
                 <input
                   type="file"
                   accept="audio/*"

@@ -2,6 +2,7 @@ import { HandwritingExercise, HandwritingSubmission } from '../types/handwriting
 import { ExamLesson, SubmissionData } from '../types';
 import { saveLocalSubmission, getLocalSubmissions } from './gasService';
 import { safeSetLocalStorage } from '../utils/storageUtils';
+import { normalizeImageList } from '../utils/imageUtils';
 
 const EXERCISES_STORAGE_KEY = 'hsk_handwriting_exercises_v1';
 const SUBMISSIONS_STORAGE_KEY = 'hsk_handwriting_submissions_v1';
@@ -74,7 +75,11 @@ export const getHandwritingSubmissions = (): HandwritingSubmission[] => {
     if (data) {
       const parsed: HandwritingSubmission[] = JSON.parse(data);
       if (Array.isArray(parsed)) {
-        return parsed;
+        return parsed.map((submission) => ({
+          ...submission,
+          submissionImages: normalizeImageList(submission.submissionImages),
+          correctedImages: normalizeImageList(submission.correctedImages)
+        }));
       }
     }
   } catch (e) {
@@ -110,22 +115,27 @@ export const getHandwritingSubmissionForStudent = (
 export const saveHandwritingSubmission = (
   submission: HandwritingSubmission
 ): HandwritingSubmission => {
+  const normalizedSubmission: HandwritingSubmission = {
+    ...submission,
+    submissionImages: normalizeImageList(submission.submissionImages),
+    correctedImages: normalizeImageList(submission.correctedImages)
+  };
   const list = getHandwritingSubmissions();
-  const index = list.findIndex((s) => s.id === submission.id);
+  const index = list.findIndex((s) => s.id === normalizedSubmission.id);
   let updated: HandwritingSubmission[];
   if (index >= 0) {
     updated = [...list];
-    updated[index] = submission;
+    updated[index] = normalizedSubmission;
   } else {
-    updated = [submission, ...list];
+    updated = [normalizedSubmission, ...list];
   }
 
   safeSetLocalStorage(SUBMISSIONS_STORAGE_KEY, updated);
 
   // Also sync with main SubmissionData store for teacher portal list
-  syncWithMainSubmissions(submission);
+  syncWithMainSubmissions(normalizedSubmission);
 
-  return submission;
+  return normalizedSubmission;
 };
 
 export const gradeHandwritingSubmission = (

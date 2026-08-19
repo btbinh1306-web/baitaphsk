@@ -60,3 +60,41 @@ export const fileToCompressedDataUrl = (
     reader.readAsDataURL(file);
   });
 };
+
+const getDriveFileId = (value: string): string => {
+  const match = value.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
+  return match?.[1] || match?.[2] || '';
+};
+
+/**
+ * Keeps one canonical copy of each image when the same submission is read
+ * from Google Sheets, the server cache, and the local handwriting store.
+ * Remote URLs are authoritative once available; base64 is only a fallback.
+ */
+export const normalizeImageList = (images?: string[]): string[] => {
+  if (!Array.isArray(images)) return [];
+
+  const remoteImages = images.filter(
+    (image): image is string =>
+      typeof image === 'string' && image.trim() !== '' && !image.trim().startsWith('data:') && !image.trim().startsWith('blob:')
+  );
+  const localImages = images.filter(
+    (image): image is string =>
+      typeof image === 'string' && image.trim() !== '' && (image.trim().startsWith('data:') || image.trim().startsWith('blob:'))
+  );
+  const source = remoteImages.length > 0 ? remoteImages : localImages;
+  const seen = new Set<string>();
+
+  return source.reduce<string[]>((result, image) => {
+    const trimmed = image.trim().replace(/[),.;]+$/, '');
+    if (trimmed.length <= 10 || trimmed.startsWith('[')) return result;
+
+    const driveId = getDriveFileId(trimmed);
+    const key = driveId ? `drive:${driveId}` : trimmed;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(trimmed);
+    }
+    return result;
+  }, []);
+};

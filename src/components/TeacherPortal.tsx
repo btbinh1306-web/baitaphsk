@@ -84,6 +84,17 @@ const normalizeLessonFilterValue = (value: string): string =>
     .trim()
     .toLocaleLowerCase('vi');
 
+const matchesCatalogLessonTitle = (submissionLesson: string, catalogTitle: string): boolean => {
+  const submission = normalizeLessonFilterValue(submissionLesson);
+  const catalogTitleValue = normalizeLessonFilterValue(catalogTitle);
+  if (!submission || !catalogTitleValue) return false;
+  if (submission === catalogTitleValue) return true;
+
+  // Handwriting submissions append the student's lesson topic to the catalog title.
+  const suffix = submission.slice(catalogTitleValue.length);
+  return submission.startsWith(catalogTitleValue) && /^[\s(：:–—-]/u.test(suffix);
+};
+
 type TeacherWrongAnswerDetail = {
   category: string;
   prompt: string;
@@ -1333,16 +1344,15 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStatus = statusFilter === 'ALL' || sub.status === statusFilter;
     const normalizedLesson = sub.lesson.trim();
-    const normalizedLessonKey = normalizeLessonFilterValue(normalizedLesson);
+    const isHandwritingSubmission = getIsHandwritingSubmission(sub);
     const selectedLevelGroup = studentExamGroups.find((group) => group.label === lessonLevelFilter);
-    const selectedLevelLessonKeys = new Set(
-      (selectedLevelGroup?.exams || []).map((exam) => normalizeLessonFilterValue(exam.title))
-    );
+    const selectedLevelLessonTitles = (selectedLevelGroup?.exams || []).map((exam) => exam.title);
     const matchesLevel =
       lessonLevelFilter === 'ALL' ||
-      selectedLevelLessonKeys.has(normalizedLessonKey);
+      (lessonLevelFilter === 'Nộp bài viết tay' && isHandwritingSubmission) ||
+      selectedLevelLessonTitles.some((title) => matchesCatalogLessonTitle(normalizedLesson, title));
     const matchesLesson =
-      lessonFilter === 'ALL' || normalizedLessonKey === normalizeLessonFilterValue(lessonFilter);
+      lessonFilter === 'ALL' || matchesCatalogLessonTitle(normalizedLesson, lessonFilter);
 
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =

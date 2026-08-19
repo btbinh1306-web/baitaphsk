@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { HandwritingSubmission } from '../../types/handwriting';
 import { gradeHandwritingSubmission } from '../../services/handwritingService';
 import { gradeSubmissionInGas, getGasConfig } from '../../services/gasService';
-import { fileToCompressedDataUrl } from '../../utils/imageUtils';
+import { fileToCompressedDataUrl, normalizeImageList } from '../../utils/imageUtils';
 import { uploadMediaFile } from '../../services/apiService';
 import { ImageLightboxModal } from '../ImageLightboxModal';
 import { getDriveMediaPlayerUrl } from '../../utils/audioUtils';
@@ -36,7 +36,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
   onClose
 }) => {
   const [correctedImages, setCorrectedImages] = useState<string[]>(
-    submission.correctedImages || []
+    normalizeImageList(submission.correctedImages)
   );
   const [teacherComment, setTeacherComment] = useState<string>(
     submission.teacherComment || ''
@@ -49,6 +49,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [lightboxTitle, setLightboxTitle] = useState<string>('');
+  const submittedImages = normalizeImageList(submission.submissionImages);
 
   const handleCorrectedUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -62,7 +63,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
         const uploadedUrl = await uploadMediaFile(compressed, files[i].name, files[i].type, 'correction');
         newImages.push(uploadedUrl || compressed);
       }
-      setCorrectedImages((prev) => [...prev, ...newImages]);
+      setCorrectedImages((prev) => normalizeImageList([...prev, ...newImages]));
     } catch (err) {
       console.error('Lỗi khi tải ảnh chữa:', err);
       alert('Không thể tải ảnh bài chữa. Vui lòng thử lại.');
@@ -119,6 +120,19 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
     setLightboxImages(images);
     setLightboxIndex(index);
     setLightboxTitle(titleText);
+  };
+
+  const handleDownloadImages = (images: string[], prefix: string) => {
+    normalizeImageList(images).forEach((url, idx) => {
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = getDriveMediaPlayerUrl(url);
+        link.download = `${prefix}_${idx + 1}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, idx * 300);
+    });
   };
 
   return (
@@ -185,22 +199,34 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
 
       {/* STUDENT SUBMITTED PHOTOS */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-teal-600" />
-            Bài học sinh đã nộp ({submission.submissionImages?.length || 0} trang)
+            Bài học sinh đã nộp ({submittedImages.length} trang)
           </h3>
-          <span className="text-xs text-slate-500">Nhấn vào ảnh để xem nét chữ chi tiết</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">Nhấn vào ảnh để xem nét chữ chi tiết</span>
+            {submittedImages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleDownloadImages(submittedImages, `hoc_sinh_${submission.studentName.replace(/[^a-zA-Z0-9_-]/g, '_')}`)}
+                className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Tải toàn bộ ảnh bài học sinh đã nộp"
+              >
+                <Download className="w-3.5 h-3.5" /> Tải hàng loạt ảnh ({submittedImages.length})
+              </button>
+            )}
+          </div>
         </div>
 
-        {submission.submissionImages && submission.submissionImages.length > 0 ? (
+        {submittedImages.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {submission.submissionImages.map((imgUrl, idx) => (
+            {submittedImages.map((imgUrl, idx) => (
               <div
                 key={idx}
                 onClick={() =>
                   openLightbox(
-                    submission.submissionImages,
+                    submittedImages,
                     idx,
                     `Bài làm học sinh ${submission.studentName} - Trang ${idx + 1}`
                   )
@@ -221,7 +247,7 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
                     onClick={(e) => {
                       e.stopPropagation();
                       openLightbox(
-                        submission.submissionImages,
+                        submittedImages,
                         idx,
                         `Bài làm học sinh ${submission.studentName} - Trang ${idx + 1}`
                       );
@@ -265,9 +291,19 @@ export const HandwritingGradingPanel: React.FC<HandwritingGradingPanelProps> = (
             <Sparkles className="w-4 h-4 text-indigo-600" />
             Ảnh bài đã chữa (Giáo viên khoanh/sửa nét chữ & tải lại)
           </h3>
-          <span className="text-xs text-slate-500">
-            {correctedImages.length} ảnh đã đăng
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">{correctedImages.length} ảnh đã đăng</span>
+            {correctedImages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleDownloadImages(correctedImages, `anh_chua_${submission.studentName.replace(/[^a-zA-Z0-9_-]/g, '_')}`)}
+                className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Tải toàn bộ ảnh bài đã chữa"
+              >
+                <Download className="w-3.5 h-3.5" /> Tải hàng loạt ảnh ({correctedImages.length})
+              </button>
+            )}
+          </div>
         </div>
 
         {correctedImages.length > 0 && (

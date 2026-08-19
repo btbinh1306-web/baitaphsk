@@ -13,6 +13,7 @@ import {
 import { DEFAULT_GAS_WEB_APP_URL, getConfiguredGasWebAppUrl, migrateGasWebAppUrl } from './gasConfig';
 import { clearGasCapabilitiesCache, deleteGasSubmissions, getGasCapabilities } from './gasCloudService';
 import { getGasRequestUrl } from './gasTransport';
+import { normalizeImageList } from '../utils/imageUtils';
 
 const DEFAULT_CONFIG_KEY = 'hsk_gas_config';
 const LOCAL_SUBMISSIONS_KEY = 'hsk_local_submissions_v1';
@@ -121,7 +122,7 @@ export const extractImagesFromRawText = (text?: string): string[] => {
     httpMatches.forEach((m) => addUrl(m));
   }
 
-  return urls;
+  return normalizeImageList(urls);
 };
 
 export const extractTeacherFeedbackAudiosFromRawText = (text?: string): AudioRecordItem[] => {
@@ -217,7 +218,9 @@ export const getLocalSubmissions = (): SubmissionData[] => {
       const parsed: SubmissionData[] = JSON.parse(data);
       return parsed.map((sub) => ({
         ...sub,
-        percent: normalizePercent(sub.percent, sub.correct, sub.total)
+        percent: normalizePercent(sub.percent, sub.correct, sub.total),
+        submissionImages: normalizeImageList(sub.submissionImages),
+        correctedImages: normalizeImageList(sub.correctedImages)
       }));
     }
   } catch (e) {
@@ -227,22 +230,27 @@ export const getLocalSubmissions = (): SubmissionData[] => {
 };
 
 export const saveLocalSubmission = (sub: SubmissionData, syncServer = true, replaceId?: string): void => {
+  const normalizedSub: SubmissionData = {
+    ...sub,
+    submissionImages: normalizeImageList(sub.submissionImages),
+    correctedImages: normalizeImageList(sub.correctedImages)
+  };
   const current = getLocalSubmissions();
-  if (replaceId && replaceId !== sub.id) {
+  if (replaceId && replaceId !== normalizedSub.id) {
     const oldIndex = current.findIndex((item) => item.id === replaceId);
     if (oldIndex >= 0) current.splice(oldIndex, 1);
   }
   // Check if exists, update or prepend
-  const idx = current.findIndex((item) => item.id === sub.id);
+  const idx = current.findIndex((item) => item.id === normalizedSub.id);
   if (idx >= 0) {
-    current[idx] = sub;
+    current[idx] = normalizedSub;
   } else {
-    current.unshift(sub);
+    current.unshift(normalizedSub);
   }
   safeSetLocalStorage(LOCAL_SUBMISSIONS_KEY, current);
 
   // Sync with server DB for cross-device access
-  if (syncServer) void saveServerSubmission(sub);
+  if (syncServer) void saveServerSubmission(normalizedSub);
 };
 
 export const deleteSubmissionsInGas = async (
@@ -290,6 +298,7 @@ export const submitToGas = async (
   const fullTime = new Date().toLocaleString('vi-VN');
   const gasCapabilities = await getGasCapabilities();
   const gasMediaEnabled = Boolean(gasCapabilities?.media);
+  const normalizedSubmissionImages = normalizeImageList(payload.submissionImages);
 
   const serverAudios: AudioRecordItem[] = await Promise.all(
     (payload.audios || []).map(async (audio) => {
@@ -305,9 +314,9 @@ export const submitToGas = async (
   );
 
   let essaysFormatted = payload.essays || '';
-  if (payload.submissionImages && payload.submissionImages.length > 0) {
+  if (normalizedSubmissionImages.length > 0) {
     if (!essaysFormatted.includes('[SUBMISSION_IMAGES]')) {
-      essaysFormatted += `\n[SUBMISSION_IMAGES]: ${JSON.stringify(payload.submissionImages)}`;
+      essaysFormatted += `\n[SUBMISSION_IMAGES]: ${JSON.stringify(normalizedSubmissionImages)}`;
     }
   }
 
@@ -327,8 +336,8 @@ export const submitToGas = async (
     wrong: payload.wrong,
     essays: essaysFormatted,
     audios: serverAudios,
-    submissionImages: payload.submissionImages,
-    isHandwriting: payload.isHandwriting || (payload.submissionImages && payload.submissionImages.length > 0),
+    submissionImages: normalizedSubmissionImages,
+    isHandwriting: payload.isHandwriting || normalizedSubmissionImages.length > 0,
     speakScore: '',
     comment: '',
     status: 'Chờ chấm'
@@ -362,7 +371,7 @@ export const submitToGas = async (
       wrong: payload.wrong,
       essays: essaysFormatted,
       audios: gasMediaEnabled ? serverAudios : (payload.audios || []),
-      submissionImages: payload.submissionImages || []
+      submissionImages: normalizedSubmissionImages
     };
 
     const res = await fetch(getGasRequestUrl(config.sheetUrl.trim()), {
@@ -486,8 +495,12 @@ export const fetchTeacherSubmissions = async (
               speakScore: getTeacherExerciseScore(r, existing?.speakScore || ''),
               comment: cleanedComment || existing?.comment || '',
               teacherComment: cleanedComment || existing?.teacherComment || '',
-              submissionImages: extractedSubImgs.length > 0 ? extractedSubImgs : existing?.submissionImages,
-              correctedImages: extractedCorrImgs.length > 0 ? extractedCorrImgs : existing?.correctedImages,
+              submissionImages: normalizeImageList(
+                extractedSubImgs.length > 0 ? extractedSubImgs : existing?.submissionImages
+              ),
+              correctedImages: normalizeImageList(
+                extractedCorrImgs.length > 0 ? extractedCorrImgs : existing?.correctedImages
+              ),
               duplicateIds: existing?.duplicateIds,
               status: (r['Trạng thái'] === 'Đã chấm' || existing?.status === 'Đã chấm') ? 'Đã chấm' : 'Chờ chấm',
               audios: mergeAudioRecords(
@@ -535,7 +548,9 @@ export const fetchTeacherSubmissions = async (
     ? Array.from(subMap.values()).filter((row) => remoteSubmissionIds.has(row.id))
     : Array.from(subMap.values());
   sourceRows.forEach((row) => {
-    const images = (row.submissionImages || []).map(String).filter(Boolean).sort();
+    row.submissionImages = normalizeImageList(row.submissionImages);
+    row.correctedImages = normalizeImageList(row.correctedImages);
+    const images = row.submissionImages.map(String).filter(Boolean).sort();
     const isHandwriting = Boolean(row.isHandwriting || images.length > 0);
     const identity = [
       row.name.trim().toLowerCase(),
@@ -572,12 +587,12 @@ export const fetchTeacherSubmissions = async (
       duplicateIds: Array.from(
         new Set([...(preferred.duplicateIds || []), ...(secondary.duplicateIds || []), preferred.id, secondary.id])
       ),
-      submissionImages: preferred.submissionImages?.length
-        ? preferred.submissionImages
-        : secondary.submissionImages,
-      correctedImages: preferred.correctedImages?.length
-        ? preferred.correctedImages
-        : secondary.correctedImages,
+      submissionImages: normalizeImageList(
+        preferred.submissionImages?.length ? preferred.submissionImages : secondary.submissionImages
+      ),
+      correctedImages: normalizeImageList(
+        preferred.correctedImages?.length ? preferred.correctedImages : secondary.correctedImages
+      ),
       audios: mergeAudioRecords(preferred.audios, secondary.audios),
       comment: preferred.comment || secondary.comment,
       teacherComment: preferred.teacherComment || secondary.teacherComment,
@@ -611,14 +626,12 @@ export const fetchResultById = async (
     localMatch = {
       ...serverMatch,
       audios: mergeAudioRecords(serverMatch.audios, localMatch?.audios),
-      submissionImages: Array.from(new Set([
-        ...(serverMatch.submissionImages || []),
-        ...(localMatch?.submissionImages || [])
-      ])),
-      correctedImages: Array.from(new Set([
-        ...(serverMatch.correctedImages || []),
-        ...(localMatch?.correctedImages || [])
-      ])),
+      submissionImages: normalizeImageList(
+        serverMatch.submissionImages?.length ? serverMatch.submissionImages : localMatch?.submissionImages
+      ),
+      correctedImages: normalizeImageList(
+        serverMatch.correctedImages?.length ? serverMatch.correctedImages : localMatch?.correctedImages
+      ),
       comment: serverMatch.comment || localMatch?.comment,
       teacherComment: serverMatch.teacherComment || localMatch?.teacherComment,
       exerciseId: serverMatch.exerciseId || localMatch?.exerciseId
@@ -702,8 +715,8 @@ export const fetchResultById = async (
         speakScore: getTeacherExerciseScore(r),
         comment: cleanedComment,
         teacherComment: cleanedComment,
-        submissionImages: extractedSubImgs.length > 0 ? extractedSubImgs : undefined,
-        correctedImages: extractedCorrImgs.length > 0 ? extractedCorrImgs : undefined,
+        submissionImages: normalizeImageList(extractedSubImgs),
+        correctedImages: normalizeImageList(extractedCorrImgs),
         audios: mergeAudioRecords(
           extractedFeedbackAudios,
           mergeAudioRecords(driveAudios, localMatch?.audios)
@@ -713,11 +726,11 @@ export const fetchResultById = async (
 
       if (hwMatch) {
         mapped.isHandwriting = true;
-        if (hwMatch.submissionImages && hwMatch.submissionImages.length > 0) {
-          mapped.submissionImages = Array.from(new Set([...(mapped.submissionImages || []), ...hwMatch.submissionImages]));
+        if (!mapped.submissionImages?.length && hwMatch.submissionImages.length > 0) {
+          mapped.submissionImages = normalizeImageList(hwMatch.submissionImages);
         }
-        if (hwMatch.correctedImages && hwMatch.correctedImages.length > 0) {
-          mapped.correctedImages = Array.from(new Set([...(mapped.correctedImages || []), ...hwMatch.correctedImages]));
+        if (!mapped.correctedImages?.length && hwMatch.correctedImages?.length) {
+          mapped.correctedImages = normalizeImageList(hwMatch.correctedImages);
         }
         if (hwMatch.teacherComment) mapped.teacherComment = cleanImageTagsFromText(hwMatch.teacherComment);
         if (hwMatch.status === 'graded') {
@@ -730,11 +743,11 @@ export const fetchResultById = async (
       if (localMatch) {
         mapped.audios = mergeAudioRecords(localMatch.audios, mapped.audios);
         if (localMatch.isHandwriting) mapped.isHandwriting = true;
-        if (localMatch.submissionImages && localMatch.submissionImages.length > 0) {
-          mapped.submissionImages = Array.from(new Set([...(mapped.submissionImages || []), ...localMatch.submissionImages]));
+        if (!mapped.submissionImages?.length && localMatch.submissionImages?.length) {
+          mapped.submissionImages = normalizeImageList(localMatch.submissionImages);
         }
-        if (localMatch.correctedImages && localMatch.correctedImages.length > 0) {
-          mapped.correctedImages = Array.from(new Set([...(mapped.correctedImages || []), ...localMatch.correctedImages]));
+        if (!mapped.correctedImages?.length && localMatch.correctedImages?.length) {
+          mapped.correctedImages = normalizeImageList(localMatch.correctedImages);
         }
         if (localMatch.teacherComment) mapped.teacherComment = cleanImageTagsFromText(localMatch.teacherComment);
         if (localMatch.exerciseId) mapped.exerciseId = localMatch.exerciseId;

@@ -64,7 +64,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             <head>
               <title>${title || 'Ảnh bài làm'}</title>
               <style>
-                body { margin: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #fff; font-family: sans-serif; }
+                body { margin: 0; background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #1e293b; font-family: sans-serif; }
                 img { max-width: 100%; max-height: 100vh; object-fit: contain; }
               </style>
             </head>
@@ -97,21 +97,21 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-between p-2 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-between p-2 sm:p-4 animate-in fade-in duration-200">
       {/* Top Bar */}
-      <div className="w-full flex items-center justify-between text-white py-2 px-3 z-10 bg-slate-900/60 rounded-xl border border-white/10">
+      <div className="w-full flex items-center justify-between text-slate-800 py-2 px-3 z-10 bg-white rounded-lg border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 overflow-hidden">
-          <span className="font-bold text-sm text-teal-400 shrink-0">
+          <span className="font-bold text-sm text-teal-700 shrink-0">
             {images.length > 1 ? `Ảnh ${currentIndex + 1} / ${images.length}` : 'Xem ảnh'}
           </span>
-          {title && <span className="text-xs text-slate-300 truncate border-l border-slate-700 pl-2">{title}</span>}
+          {title && <span className="text-xs text-slate-500 truncate border-l border-slate-200 pl-2">{title}</span>}
         </div>
 
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleOpenNewTab}
-            className="p-2 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition flex items-center gap-1.5 text-xs font-bold bg-slate-800/80 border border-slate-700 cursor-pointer"
+            className="p-2 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition flex items-center gap-1.5 text-xs font-bold bg-white border border-slate-300 cursor-pointer"
             title="Mở ảnh trong thẻ mới để xem rõ hơn"
           >
             <ExternalLink className="w-4 h-4 text-sky-400" />
@@ -121,7 +121,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
           <button
             type="button"
             onClick={handleDownload}
-            className="p-2 hover:bg-white/10 text-teal-300 hover:text-teal-200 rounded-lg transition flex items-center gap-1.5 text-xs font-bold bg-teal-900/40 border border-teal-500/30 cursor-pointer"
+            className="p-2 hover:bg-teal-50 text-teal-700 hover:text-teal-800 rounded-lg transition flex items-center gap-1.5 text-xs font-bold bg-white border border-teal-300 cursor-pointer"
             title="Lưu ảnh về máy"
           >
             <Download className="w-4 h-4" />
@@ -131,7 +131,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
           <button
             type="button"
             onClick={toggleZoom}
-            className="p-2 hover:bg-white/10 rounded-lg transition text-slate-300 hover:text-white flex items-center gap-1 text-xs font-semibold cursor-pointer"
+            className="p-2 hover:bg-slate-100 rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center gap-1 text-xs font-semibold cursor-pointer"
             title="Phóng to / Thu nhỏ"
           >
             {zoomLevel > 1 ? <ZoomOut className="w-4 h-4" /> : <ZoomIn className="w-4 h-4" />}
@@ -140,7 +140,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-white rounded-lg transition cursor-pointer"
+            className="p-2 bg-white hover:bg-red-50 text-red-600 hover:text-red-700 border border-red-200 rounded-lg transition cursor-pointer"
             title="Đóng (Esc)"
           >
             <X className="w-5 h-5" />
@@ -154,7 +154,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
           src={currentImage}
           alt={`Preview ${currentIndex + 1}`}
           style={{ transform: `scale(${zoomLevel})` }}
-          className="max-h-[82vh] max-w-full object-contain transition-transform duration-200 select-none shadow-2xl rounded-lg cursor-zoom-in"
+          className="max-h-[82vh] max-w-full object-contain transition-transform duration-200 select-none border border-slate-200 rounded-lg cursor-zoom-in"
           onClick={toggleZoom}
         />
 
@@ -164,7 +164,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             <button
               type="button"
               onClick={handlePrev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 p-3 rounded-full bg-slate-900/80 hover:bg-teal-600 text-white transition shadow-lg border border-white/10"
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-700 transition shadow-sm border border-slate-300"
               title="Ảnh trước"
             >
               <ChevronLeft className="w-6 h-6" />
@@ -172,7 +172,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             <button
               type="button"
               onClick={handleNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-3 rounded-full bg-slate-900/80 hover:bg-teal-600 text-white transition shadow-lg border border-white/10"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-700 transition shadow-sm border border-slate-300"
               title="Ảnh tiếp theo"
             >
               <ChevronRight className="w-6 h-6" />
@@ -193,7 +193,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
                 setCurrentIndex(idx);
               }}
               className={`relative shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border-2 transition ${
-                idx === currentIndex ? 'border-teal-400 ring-2 ring-teal-400/50 scale-105' : 'border-slate-700 opacity-60 hover:opacity-100'
+                idx === currentIndex ? 'border-teal-500 ring-2 ring-teal-200 scale-105' : 'border-slate-300 opacity-60 hover:opacity-100'
               }`}
             >
           <img src={getDriveMediaPlayerUrl(img)} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />

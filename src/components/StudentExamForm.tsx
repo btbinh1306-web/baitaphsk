@@ -41,6 +41,13 @@ interface StudentExamFormProps {
   onSuccessNavigateToResult: (submissionId: string) => void;
 }
 
+const getTranslationPromptText = (prompt: string): string =>
+  prompt
+    .trim()
+    .replace(/^Dịch(?:\s+sang\s+tiếng\s+Trung)?(?:\s*(?:&|và)\s*Ghi âm(?:\s+phát âm)?)?\s*:\s*/iu, '')
+    .replace(/^\s*[“"](.*)[”"]\s*$/u, '$1')
+    .trim();
+
 export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   customExams = [],
   deletedExamIds = [],
@@ -1377,7 +1384,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 7: TRANSLATION PRACTICE (3 TYPES, NO EMOJIS, NO PINYIN, NO HINTS) */}
             {currentExam.translationQuestions && currentExam.translationQuestions.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-800 font-bold flex items-center justify-center text-sm">
@@ -1395,31 +1402,55 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   </span>
                 </div>
 
-                <div className="space-y-6">
+                {currentExam.translationQuestions.some((question) => question.translationType === 'vi_to_zh_audio') && (
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+                    <p className="text-sm font-bold text-sky-900">
+                      Dạng 1: Dịch Tiếng Việt → Ghi âm Tiếng Trung
+                    </p>
+                    <p className="mt-1 text-xs text-slate-700">
+                      <span className="font-semibold text-sky-900">Dịch câu tiếng Việt sang tiếng Trung</span>, sau đó{' '}
+                      <span className="font-semibold text-rose-700">ghi âm câu tiếng Trung</span> bạn vừa dịch.
+                    </p>
+                    <p className="mt-2 text-[11px] font-medium text-slate-600">
+                      ① Đọc câu tiếng Việt → ② Dịch sang tiếng Trung → ③ Ghi âm câu dịch
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-3">
                   {currentExam.translationQuestions.map((q, idx) => {
                     // Dạng 1: Cho câu tiếng Việt -> Ghi âm câu tiếng Trung
                     if (q.translationType === 'vi_to_zh_audio') {
                       return (
-                        <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-slate-200/80 text-slate-800">
-                              Dạng 1: Dịch Tiếng Việt → Ghi âm Tiếng Trung
+                        <div
+                          key={q.id}
+                          className="grid gap-4 rounded-xl border border-slate-200 bg-white px-4 py-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-center"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-sky-100 px-2 text-sm font-bold text-sky-800">
+                                {idx + 1}
+                              </span>
+                              <span className="text-sm font-bold text-slate-700">Câu {idx + 1}</span>
+                            </div>
+                            <p className="mt-3 text-lg font-bold leading-snug text-slate-900">
+                              {getTranslationPromptText(q.prompt)}
+                            </p>
+                            <span className="mt-2 inline-flex rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-800">
+                              Dịch sang tiếng Trung
                             </span>
                           </div>
 
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">
-                              Câu {idx + 1}: <span className="text-slate-900">{q.prompt}</span>
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">
-                              Hãy đọc thành tiếng câu Tiếng Trung tương ứng và nhấn nút ghi âm bên dưới:
-                            </p>
+                          <div className="md:border-l md:border-slate-200 md:pl-4">
+                            <AudioRecorder
+                              compact
+                              label={`Ghi âm câu dịch ${idx + 1}`}
+                              onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
+                            />
+                            {!audioRecords[q.id] && (
+                              <p className="mt-2 text-xs font-medium text-slate-500">Chưa có bản ghi âm</p>
+                            )}
                           </div>
-
-                          <AudioRecorder
-                            label={`Ghi âm câu dịch ${idx + 1}`}
-                            onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
-                          />
                         </div>
                       );
                     }
@@ -1515,7 +1546,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </>
               ) : (
                 <>
-                  <Send className="w-5 h-5" /> Nộp Bài Tập & Gửi Ghi Âm
+                  <Send className="w-5 h-5" /> Nộp bài tập
                 </>
               )}
             </button>
