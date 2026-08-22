@@ -187,7 +187,7 @@ export default function App() {
         )}
 
         {activeTab === 'LOOKUP' && (
-          <ResultLookup initialSubmissionId={lookupSubmissionId} />
+          <ResultLookup initialSubmissionId={lookupSubmissionId} customExams={customExams} />
         )}
 
         {activeTab === 'SETUP' && <GasSetupModal />}

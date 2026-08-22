@@ -122,6 +122,43 @@ const parseTeacherWrongDetails = (wrong?: string): TeacherWrongAnswerDetail[] =>
   });
 };
 
+const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLesson[]) => {
+  const exam = exams.find(
+    (candidate) => candidate.id === submission.lesson || matchesCatalogLessonTitle(submission.lesson, candidate.title)
+  );
+  const storedPercent = submission.total > 0
+    ? Math.round((submission.correct / submission.total) * 100)
+    : (submission.percent <= 1 && submission.percent > 0 ? Math.round(submission.percent * 100) : submission.percent);
+
+  if (!exam || !submission.wrong || submission.wrong === 'Không có câu sai') {
+    return { correct: submission.correct, percent: storedPercent };
+  }
+
+  const resolvedArrangeAnswers = parseTeacherWrongDetails(submission.wrong)
+    .filter((detail) => isAcceptedArrangeAnswer(detail, exam)).length;
+
+  const correct = submission.correct + resolvedArrangeAnswers;
+  return {
+    correct,
+    percent: submission.total > 0
+      ? Math.round((correct / submission.total) * 100)
+      : (submission.percent <= 1 && submission.percent > 0 ? Math.round(submission.percent * 100) : submission.percent)
+  };
+};
+
+const isAcceptedArrangeAnswer = (detail: TeacherWrongAnswerDetail, exam: ExamLesson): boolean => {
+  const match = detail.category.match(/Sắp xếp\s+Câu\s*(\d+)/i);
+  const question = match ? exam.arrangeQuestions?.[Number(match[1]) - 1] : undefined;
+  if (!question?.acceptableAnswers || !detail.userAnswer) return false;
+
+  const normalizedUserAnswer = detail.userAnswer.replace(/\s+/g, '');
+  return question.acceptableAnswers
+    .split('|')
+    .map((answer) => answer.trim().replace(/\s+/g, ''))
+    .filter(Boolean)
+    .includes(normalizedUserAnswer);
+};
+
 interface TeacherPortalProps {
   customExams?: ExamLesson[];
   deletedExamIds?: string[];
@@ -1376,7 +1413,34 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       }, new Map())
       .entries()
   ).sort(([labelA], [labelB]) => labelA.localeCompare(labelB, 'vi'));
+  const selectedSubmissionExam = selectedSub
+    ? allExams.find((exam) => exam.id === selectedSub.lesson || matchesCatalogLessonTitle(selectedSub.lesson, exam.title))
+    : undefined;
   const selectedWrongDetails = parseTeacherWrongDetails(selectedSub?.wrong);
+  const visibleSelectedWrongDetails = selectedSubmissionExam
+    ? selectedWrongDetails.filter((detail) => !isAcceptedArrangeAnswer(detail, selectedSubmissionExam))
+    : selectedWrongDetails;
+  const selectedSubmissionMetrics = selectedSub ? getRegradedSubmissionMetrics(selectedSub, allExams) : null;
+
+  const getAudioQuestionPrompt = (label: string | undefined, audioIndex: number): string => {
+    const audioLabel = String(label || '');
+    const speakingMatch = audioLabel.match(/Phần nói\s+C(\d+)/i);
+    const translationMatch = audioLabel.match(/Dịch\s*(?:&|và)\s*Ghi âm\s+C(\d+)/i);
+    const questionIndex = speakingMatch || translationMatch
+      ? Number((speakingMatch || translationMatch)?.[1]) - 1
+      : -1;
+
+    const question = speakingMatch
+      ? selectedSubmissionExam?.speakingQuestions?.[questionIndex]
+      : translationMatch
+        ? selectedSubmissionExam?.translationQuestions?.[questionIndex]
+        : undefined;
+
+    if (question?.prompt) return question.prompt;
+
+    const labelPrompt = audioLabel.match(/:\s*(.+)$/)?.[1]?.trim();
+    return labelPrompt || (questionIndex < 0 ? '' : `Câu ${audioIndex + 1}`);
+  };
 
   if (!isAuthenticated) {
     return (
@@ -1630,6 +1694,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                         {groupItems.map((sub) => {
                           const isHw = getIsHandwritingSubmission(sub);
                           const isDeleting = deletingSubmissionId === sub.id;
+                          const regradedMetrics = isHw ? null : getRegradedSubmissionMetrics(sub, allExams);
 
                           return (
                             <tr key={sub.id} className="hover:bg-slate-50/80 transition">
@@ -1646,9 +1711,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                                 ) : (
                                   <div>
                                     <span className="font-bold text-slate-800">
-                                      {sub.total > 0 ? Math.round((sub.correct / sub.total) * 100) : (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
+                                      {regradedMetrics?.percent ?? (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
                                     </span>
-                                    <span className="text-xs text-slate-500 block">({sub.correct}/{sub.total} câu)</span>
+                                    <span className="text-xs text-slate-500 block">({regradedMetrics?.correct ?? sub.correct}/{sub.total} câu)</span>
                                   </div>
                                 )}
                               </td>
@@ -3335,7 +3400,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               <div>
                 <span className="text-slate-500 block">Điểm trắc nghiệm</span>
                 <span className="font-bold text-red-700 text-sm">
-                  {selectedSub.total > 0 ? Math.round((selectedSub.correct / selectedSub.total) * 100) : (selectedSub.percent <= 1 && selectedSub.percent > 0 ? Math.round(selectedSub.percent * 100) : selectedSub.percent)}% ({selectedSub.correct}/{selectedSub.total})
+                  {selectedSubmissionMetrics?.percent ?? selectedSub.percent}% ({selectedSubmissionMetrics?.correct ?? selectedSub.correct}/{selectedSub.total})
                 </span>
               </div>
               <div>
@@ -3345,17 +3410,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </div>
 
             {/* Wrong Answers List if any */}
-            {selectedWrongDetails.length > 0 && (
+            {visibleSelectedWrongDetails.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <h4 className="text-sm font-bold text-slate-800">
-                    Các câu học sinh làm sai ({selectedWrongDetails.length})
+                    Các câu học sinh làm sai ({visibleSelectedWrongDetails.length})
                   </h4>
                   <span className="text-xs text-slate-500">Câu hỏi và đáp án đối chiếu</span>
                 </div>
 
                 <div className="space-y-3">
-                  {selectedWrongDetails.map((item, idx) => (
+                  {visibleSelectedWrongDetails.map((item, idx) => (
                     <article key={`${item.category}-${idx}`} className="border border-slate-200 rounded-lg p-4 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
                         <span className="font-bold text-slate-800">Câu sai #{idx + 1}</span>
@@ -3464,10 +3529,16 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 <div className="space-y-3">
                   {selectedSub.audios.map((aud, idx) => {
                     const audioSrc = getAudioSrcFromObject(aud);
+                    const audioQuestionPrompt = getAudioQuestionPrompt(aud.label, idx);
                     return (
                       <div key={idx} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2 shadow-2xs">
-                        <div className="flex items-center justify-between">
+                        <div className="space-y-1">
                           <span className="text-xs font-bold text-indigo-950">{aud.label || `Ghi âm câu ${idx + 1}`}</span>
+                          {audioQuestionPrompt && (
+                            <p className="text-sm font-semibold leading-relaxed text-slate-800">
+                              Câu hỏi: {audioQuestionPrompt}
+                            </p>
+                          )}
                         </div>
                         {audioSrc ? (
                           <audio controls src={audioSrc} className="w-full h-8" />
@@ -3522,11 +3593,20 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                   {selectedSub.driveLinks.split('\n').filter(Boolean).map((link, idx) => {
                     const rawUrl = link.substring(link.indexOf('http'));
                     const playableUrl = getDriveAudioPlayerUrl(link);
+                    const audioLabel = link.split(':')[0] || `File ghi âm câu ${idx + 1}`;
+                    const audioQuestionPrompt = getAudioQuestionPrompt(audioLabel, idx);
 
                     return (
                       <div key={idx} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-indigo-900">
-                          <span>{link.split(':')[0] || `File ghi âm câu ${idx + 1}`}</span>
+                        <div className="space-y-1 text-xs font-bold text-indigo-900">
+                          <span>{audioLabel}</span>
+                          {audioQuestionPrompt && (
+                            <p className="text-sm font-semibold leading-relaxed text-slate-800">
+                              Câu hỏi: {audioQuestionPrompt}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex justify-end text-xs font-bold text-indigo-900">
                           {rawUrl && (
                             <a
                               href={rawUrl}

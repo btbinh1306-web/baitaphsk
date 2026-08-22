@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SubmissionData } from '../types';
+import { ExamLesson, SubmissionData } from '../types';
 import { fetchResultById, cleanImageTagsFromText, getLocalSubmissions } from '../services/gasService';
 import { getHandwritingSubmissions } from '../services/handwritingService';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
@@ -26,9 +26,10 @@ import {
 
 interface ResultLookupProps {
   initialSubmissionId?: string;
+  customExams?: ExamLesson[];
 }
 
-export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId = '' }) => {
+export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId = '', customExams = [] }) => {
   const [submissionId, setSubmissionId] = useState(initialSubmissionId);
   const [result, setResult] = useState<SubmissionData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -416,11 +417,49 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     return cleaned && cleaned.trim().length > 0;
   });
 
+  const examCatalog = [
+    ...customExams,
+    ...SAMPLE_EXAMS.filter((sampleExam) => !customExams.some((exam) => exam.id === sampleExam.id))
+  ];
+  const resultExam = result
+    ? examCatalog.find((exam) =>
+        exam.id === result.lesson ||
+        exam.title === result.lesson ||
+        exam.title.toLowerCase().includes(result.lesson.toLowerCase()) ||
+        result.lesson.toLowerCase().includes(exam.title.toLowerCase())
+      )
+    : undefined;
+
   const wrongList = parseWrongDetails(result?.wrong);
+  let regradedArrangeCount = 0;
+  const visibleWrongList = wrongList.filter((wrongLine) => {
+    const item = parseWrongLineItem(wrongLine);
+    const arrangeNumberMatch = `${item.title} ${item.raw}`.match(/Sắp xếp(?:\s+Câu)?\s*(\d+)/i);
+    const arrangeQuestionIndex = arrangeNumberMatch ? Number(arrangeNumberMatch[1]) - 1 : -1;
+    const arrangeQuestion = resultExam?.arrangeQuestions?.[arrangeQuestionIndex];
+
+    if (!arrangeQuestion || !item.userAns || !arrangeQuestion.acceptableAnswers) return true;
+
+    const normalizedUserAnswer = item.userAns.trim().replace(/\s+/g, '');
+    const acceptedAnswers = arrangeQuestion.acceptableAnswers
+      .split('|')
+      .map((answer) => answer.trim().replace(/\s+/g, ''))
+      .filter(Boolean);
+
+    if (acceptedAnswers.includes(normalizedUserAnswer)) {
+      regradedArrangeCount++;
+      return false;
+    }
+
+    return true;
+  });
+
+  const displayCorrect = result ? result.correct + regradedArrangeCount : 0;
+  const displayWrongCount = result ? Math.max(0, result.wrongCount - regradedArrangeCount) : 0;
 
   const displayPercent = result
     ? (result.total > 0
-        ? Math.round((result.correct / result.total) * 100)
+        ? Math.round((displayCorrect / result.total) * 100)
         : (result.percent <= 1 && result.percent > 0 ? Math.round(result.percent * 100) : result.percent))
     : 0;
 
@@ -747,7 +786,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                     <span className="text-xs font-semibold text-slate-500 block">Điểm Phần Trắc Nghiệm</span>
                     <span className="text-2xl font-bold text-slate-800">{displayPercent}%</span>
                     <span className="text-xs text-slate-500 block">
-                      Đúng {result.correct}/{result.total} câu
+                      Đúng {displayCorrect}/{result.total} câu
                     </span>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center text-sm shadow-2xs">
@@ -946,17 +985,17 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               )}
 
               {/* Detailed Wrong Questions */}
-              {wrongList.length > 0 && (
+              {visibleWrongList.length > 0 && (
                 <section className="space-y-3 pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                      <XCircle className="w-4 h-4 text-slate-500" /> Các câu bạn làm sai ({wrongList.length})
+                      <XCircle className="w-4 h-4 text-slate-500" /> Các câu bạn làm sai ({displayWrongCount})
                     </h4>
                     <span className="text-xs text-slate-500">Câu hỏi và đáp án đối chiếu</span>
                   </div>
 
                   <div className="space-y-3">
-                    {wrongList.map((wrongLine, idx) => {
+                    {visibleWrongList.map((wrongLine, idx) => {
                       const item = parseWrongLineItem(wrongLine);
                       return (
                         <article key={idx} className="border border-slate-200 rounded-lg p-4 space-y-3">
