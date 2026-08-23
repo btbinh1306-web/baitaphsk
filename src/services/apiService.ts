@@ -165,7 +165,8 @@ export async function fetchServerDeletedSubmissionIds(): Promise<string[]> {
 
 export async function fetchServerSubmissionById(id: string): Promise<SubmissionData | null> {
   try {
-    const res = await fetch(`/api/submissions/${encodeURIComponent(id)}`);
+    const normalizedId = String(id || '').trim().toLowerCase();
+    const res = await fetch(`/api/submissions/${encodeURIComponent(normalizedId)}`);
     const data = await res.json();
     if (data && data.ok && data.submission) {
       return data.submission;

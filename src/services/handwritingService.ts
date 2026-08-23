@@ -75,7 +75,7 @@ export const getHandwritingSubmissions = (): HandwritingSubmission[] => {
     if (data) {
       const parsed: HandwritingSubmission[] = JSON.parse(data);
       if (Array.isArray(parsed)) {
-        return parsed.map((submission) => ({
+        return parsed.filter((submission) => submission && typeof submission === 'object').map((submission) => ({
           ...submission,
           submissionImages: normalizeImageList(submission.submissionImages),
           correctedImages: normalizeImageList(submission.correctedImages)

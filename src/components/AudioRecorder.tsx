@@ -104,6 +104,8 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
   const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Allow selecting the same file again after it has been removed.
+    e.target.value = '';
     if (!file) return;
 
     setErrorMsg(null);
@@ -296,7 +298,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
             title="Xóa và ghi âm lại"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Thu âm lại
+            Xóa bản ghi
           </button>
         </div>
       )}

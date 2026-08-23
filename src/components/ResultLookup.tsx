@@ -29,6 +29,42 @@ interface ResultLookupProps {
   customExams?: ExamLesson[];
 }
 
+const safeText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) return '';
+  return String(value);
+};
+
+const normalizedText = (value: unknown): string => safeText(value).trim().toLowerCase();
+
+const examMatchesLesson = (exam: Partial<ExamLesson> | undefined, lesson: unknown): boolean => {
+  if (!exam) return false;
+
+  const lessonText = normalizedText(lesson);
+  const examId = normalizedText(exam.id);
+  const examTitle = normalizedText(exam.title);
+  if (!lessonText || !examTitle) return false;
+
+  return (
+    examId === lessonText ||
+    examTitle === lessonText ||
+    examTitle.includes(lessonText) ||
+    lessonText.includes(examTitle)
+  );
+};
+
+const stripTeacherCommentMetadata = (value: unknown): string => {
+  const cleaned = cleanImageTagsFromText(safeText(value));
+  if (!cleaned) return '';
+
+  return cleaned
+    .split(/\s*\|\s*|\r?\n/)
+    .map((part) => part.trim())
+    .filter((part) => part && !/^\[(?:Tự luận|Ghi âm)\s*(?:C|câu)?\s*\d+\]:/i.test(part))
+    .join(' | ')
+    .trim();
+};
+
 export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId = '', customExams = [] }) => {
   const [submissionId, setSubmissionId] = useState(initialSubmissionId);
   const [result, setResult] = useState<SubmissionData | null>(null);
@@ -172,13 +208,19 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     setErrorMsg(null);
     setResult(null);
 
-    const res = await fetchResultById(searchId.trim());
-    if (res.ok && res.row) {
-      setResult(res.row);
-    } else {
-      setErrorMsg(res.error || 'Không tìm thấy kết quả cho Mã bài nộp này.');
+    try {
+      const res = await fetchResultById(searchId.trim());
+      if (res.ok && res.row) {
+        setResult(res.row);
+      } else {
+        setErrorMsg(res.error || 'Không tìm thấy kết quả cho Mã bài nộp này.');
+      }
+    } catch (error) {
+      console.error('Không thể hiển thị kết quả tra cứu:', error);
+      setErrorMsg('Không thể tải kết quả. Vui lòng thử lại sau.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const onSubmitForm = (e: React.FormEvent) => {
@@ -188,9 +230,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
   // Helper: Parse only per-item teacher comments for the result details.
   const parseTeacherComment = (commentStr?: string) => {
-    if (!commentStr) return { itemComments: {} as Record<string, string> };
+    const text = safeText(commentStr);
+    if (!text) return { itemComments: {} as Record<string, string> };
 
-    const parts = commentStr.split(' | ');
+    const parts = text.split(' | ');
     const itemComments: Record<string, string> = {};
 
     parts.forEach((part) => {
@@ -211,8 +254,9 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
   // Helper: Parse essay string into individual questions & answers
   const parseEssays = (essaysStr?: string) => {
-    if (!essaysStr || essaysStr === 'Không làm phần tự luận') return [];
-    const chunks = essaysStr.split(/(?=【)/g).filter(Boolean);
+    const text = safeText(essaysStr);
+    if (!text || text === 'Không làm phần tự luận') return [];
+    const chunks = text.split(/(?=【)/g).filter(Boolean);
     return chunks.map((chunk) => {
       const titleMatch = chunk.match(/【(.*?)】/);
       const prompt = titleMatch ? titleMatch[1] : 'Câu tự luận';
@@ -223,8 +267,9 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
   // Helper: Parse wrong details list (can be separated by \n or |)
   const parseWrongDetails = (wrongStr?: string) => {
-    if (!wrongStr || wrongStr === 'Không có câu sai') return [];
-    const rawLines = wrongStr.includes('\n') ? wrongStr.split('\n') : wrongStr.split(' | ');
+    const text = safeText(wrongStr);
+    if (!text || text === 'Không có câu sai') return [];
+    const rawLines = text.includes('\n') ? text.split('\n') : text.split(' | ');
     return rawLines.map(s => s.trim()).filter(Boolean);
   };
 
@@ -282,9 +327,9 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
     // Lookup original question prompt from SAMPLE_EXAMS if missing
     if (!prompt) {
-      const lessonName = result?.lesson || '';
+      const lessonName = safeText(result?.lesson);
       const targetExam = SAMPLE_EXAMS.find(e =>
-        lessonName && (e.title.toLowerCase().includes(lessonName.toLowerCase()) || lessonName.toLowerCase().includes(e.title.toLowerCase()) || e.id === lessonName)
+        examMatchesLesson(e, lessonName)
       ) || SAMPLE_EXAMS[0];
 
       if (targetExam) {
@@ -336,8 +381,14 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     return { title, prompt, userAns, correctAns, raw };
   };
 
-  const lessonLower = (result?.lesson || '').toLowerCase();
-  const essaysLower = (result?.essays || '').toLowerCase();
+  const lessonLower = normalizedText(result?.lesson);
+  const essaysLower = normalizedText(result?.essays);
+  const resultId = normalizedText(result?.id);
+  const resultName = normalizedText(result?.name);
+  const resultSpeakScore =
+    typeof result?.speakScore === 'string' || typeof result?.speakScore === 'number'
+      ? result.speakScore
+      : '';
 
   // Look up in local handwriting store & local submissions store for supplemental images if needed
   const hwListSubmissions = getHandwritingSubmissions();
@@ -346,20 +397,20 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   const hwMatchForLookup = result
     ? hwListSubmissions.find(
         (h) =>
-          String(h.id).trim().toLowerCase() === String(result.id).trim().toLowerCase() ||
-          (result.name &&
-            h.studentName.trim().toLowerCase() === result.name.trim().toLowerCase() &&
-            (h.exerciseTitle.toLowerCase().includes(lessonLower) || lessonLower.includes(h.exerciseTitle.toLowerCase())))
+          normalizedText(h.id) === resultId ||
+          (resultName &&
+            normalizedText(h.studentName) === resultName &&
+            (normalizedText(h.exerciseTitle).includes(lessonLower) || lessonLower.includes(normalizedText(h.exerciseTitle))))
       )
     : undefined;
 
   const localMatchForLookup = result
     ? localListSubmissions.find(
         (l) =>
-          String(l.id).trim().toLowerCase() === String(result.id).trim().toLowerCase() ||
-          (result.name &&
-            l.name.trim().toLowerCase() === result.name.trim().toLowerCase() &&
-            (l.lesson.toLowerCase().includes(lessonLower) || lessonLower.includes(l.lesson.toLowerCase())))
+          normalizedText(l.id) === resultId ||
+          (resultName &&
+            normalizedText(l.name) === resultName &&
+            (normalizedText(l.lesson).includes(lessonLower) || lessonLower.includes(normalizedText(l.lesson))))
       )
     : undefined;
 
@@ -406,8 +457,22 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         essaysLower.includes('chép từ'))
   );
 
-  const { itemComments } = parseTeacherComment(
-    result?.comment || hwMatchForLookup?.teacherComment || localMatchForLookup?.comment
+  const teacherCommentSources = [
+    result?.teacherComment,
+    result?.comment,
+    hwMatchForLookup?.teacherComment,
+    localMatchForLookup?.teacherComment,
+    localMatchForLookup?.comment
+  ];
+  const teacherCommentText = teacherCommentSources
+    .map(stripTeacherCommentMetadata)
+    .find(Boolean) || '';
+  const itemComments = teacherCommentSources.reduce(
+    (comments, source) => {
+      const parsed = parseTeacherComment(source).itemComments;
+      return { ...comments, ...parsed };
+    },
+    {} as Record<string, string>
   );
   const essayList = parseEssays(result?.essays);
 
@@ -417,17 +482,15 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     return cleaned && cleaned.trim().length > 0;
   });
 
+  const validCustomExams = Array.isArray(customExams)
+    ? customExams.filter((exam): exam is ExamLesson => Boolean(exam && typeof exam === 'object'))
+    : [];
   const examCatalog = [
-    ...customExams,
-    ...SAMPLE_EXAMS.filter((sampleExam) => !customExams.some((exam) => exam.id === sampleExam.id))
+    ...validCustomExams,
+    ...SAMPLE_EXAMS.filter((sampleExam) => !validCustomExams.some((exam) => exam.id === sampleExam.id))
   ];
   const resultExam = result
-    ? examCatalog.find((exam) =>
-        exam.id === result.lesson ||
-        exam.title === result.lesson ||
-        exam.title.toLowerCase().includes(result.lesson.toLowerCase()) ||
-        result.lesson.toLowerCase().includes(exam.title.toLowerCase())
-      )
+    ? examCatalog.find((exam) => examMatchesLesson(exam, result.lesson))
     : undefined;
 
   const wrongList = parseWrongDetails(result?.wrong);
@@ -540,6 +603,17 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
             </div>
           </div>
 
+          {teacherCommentText && (
+            <section className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-1.5">
+              <h4 className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-700" /> Nhận xét của giáo viên
+              </h4>
+              <p className="text-sm text-amber-950 whitespace-pre-wrap leading-relaxed">
+                {teacherCommentText}
+              </p>
+            </section>
+          )}
+
           {/* DẠNG BÀI NỘP ẢNH / BÀI VIẾT CHÉP TAY */}
           {isHandwritingType ? (
             <div className="space-y-6">
@@ -552,8 +626,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                   </span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl sm:text-3xl font-extrabold text-teal-950">
-                      {result.speakScore
-                        ? result.speakScore
+                      {resultSpeakScore
+                        ? resultSpeakScore
                         : result.status === 'Đã chấm'
                         ? 'Đã Chấm'
                         : 'Chờ Chấm'}
@@ -799,7 +873,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                   <div>
                     <span className="text-xs font-bold text-indigo-900 block">Điểm Bài Tập Chung (GV chấm)</span>
                     <span className="text-2xl font-bold text-indigo-900">
-                      {result.speakScore || (result.status === 'Đã chấm' ? 'Đã duyệt' : 'Chờ chấm')}
+                      {resultSpeakScore || (result.status === 'Đã chấm' ? 'Đã duyệt' : 'Chờ chấm')}
                     </span>
                     <span className="text-xs text-indigo-700 block font-medium">Kết quả tổng thể do giáo viên chấm</span>
                   </div>

@@ -32,7 +32,8 @@ import {
   Headphones,
   Layers,
   Pencil,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Plus
 } from 'lucide-react';
 
 interface StudentExamFormProps {
@@ -94,6 +95,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     () => initialDraft?.unlockedReference || {}
   );
   const [audioRecords, setAudioRecords] = useState<Record<string, AudioRecordItem>>({});
+  const [additionalAudioSlots, setAdditionalAudioSlots] = useState<
+    Array<{ id: string; record?: AudioRecordItem }>
+  >([]);
 
   // UI status
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -247,6 +251,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     setQuestionComments({});
     setUnlockedReference({});
     setAudioRecords({});
+    setAdditionalAudioSlots([]);
     setSubmittedId(null);
     setSubError(null);
   };
@@ -316,6 +321,20 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }
       return next;
     });
+  };
+
+  const handleAdditionalAudioRecorded = (slotId: string, record: AudioRecordItem | null) => {
+    setAdditionalAudioSlots((prev) => {
+      if (!record) return prev.filter((slot) => slot.id !== slotId);
+      return prev.map((slot) => (slot.id === slotId ? { ...slot, record } : slot));
+    });
+  };
+
+  const addAdditionalAudioSlot = () => {
+    setAdditionalAudioSlots((prev) => [
+      ...prev,
+      { id: `additional-audio-${Date.now()}-${prev.length}` }
+    ]);
   };
 
   // Submit Handler
@@ -557,6 +576,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           }
         });
       }
+
+      additionalAudioSlots.forEach((slot, index) => {
+        if (slot.record) {
+          audioList.push({
+            label: slot.record.label || `File ghi âm bổ sung ${index + 1}`,
+            data: slot.record.data,
+            mime: slot.record.mime
+          });
+        }
+      });
 
       const fullTimeStr = new Date().toLocaleString('vi-VN');
 
@@ -1520,6 +1549,42 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </div>
               </div>
             )}
+
+            {/* ADDITIONAL AUDIO FILES */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-lg">File ghi âm bổ sung</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Có thể thêm nhiều file ngoài các câu hỏi có sẵn. Mỗi file đều có nút nghe lại và xóa.
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full w-fit">
+                  {additionalAudioSlots.filter((slot) => Boolean(slot.record)).length} file bổ sung
+                </span>
+              </div>
+
+              {additionalAudioSlots.length > 0 && (
+                <div className="space-y-3">
+                  {additionalAudioSlots.map((slot, index) => (
+                    <AudioRecorder
+                      key={slot.id}
+                      label={`File ghi âm bổ sung ${index + 1}`}
+                      onAudioRecorded={(record) => handleAdditionalAudioRecorded(slot.id, record)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={addAdditionalAudioSlot}
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm file ghi âm
+              </button>
+            </div>
           </div>
         )}
 
@@ -1616,6 +1681,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   setEssayAnswers({});
                   setUnlockedReference({});
                   setAudioRecords({});
+                  setAdditionalAudioSlots([]);
                   clearDraft();
                 }}
                 className="w-full text-xs text-slate-500 hover:text-slate-800 py-2 transition"

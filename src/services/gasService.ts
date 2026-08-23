@@ -65,9 +65,16 @@ export const normalizePercent = (rawPercent: any, correct: number, total: number
   return parsed;
 };
 
+const normalizeTeacherExerciseScore = (value: unknown, fallback: string | number = ''): string | number => {
+  if ((typeof value === 'string' || typeof value === 'number') && String(value).trim() !== '') {
+    return value;
+  }
+  return (typeof fallback === 'string' || typeof fallback === 'number') ? fallback : '';
+};
+
 const getTeacherExerciseScore = (row: any, fallback: string | number = ''): string | number => {
   const value = row?.['Điểm bài tập (GV)'] ?? row?.['Điểm Bài Tập (GV)'] ?? row?.['Điểm nói (GV)'];
-  return value !== undefined && value !== null && String(value).trim() !== '' ? value : fallback;
+  return normalizeTeacherExerciseScore(value, fallback);
 };
 
 export const extractImagesFromRawText = (text?: string): string[] => {
@@ -163,24 +170,65 @@ export const mergeAudioRecords = (
 ): AudioRecordItem[] | undefined => {
   if ((!primary || primary.length === 0) && (!fallback || fallback.length === 0)) return undefined;
 
-  const length = Math.max(primary?.length || 0, fallback?.length || 0);
-  return Array.from({ length }, (_, index) => {
-    const preferred = primary?.[index];
-    const backup = fallback?.[index];
-    const merged = { ...(backup || {}), ...(preferred || {}) } as AudioRecordItem;
+  const primaryRecords = primary || [];
+  const fallbackRecords = fallback || [];
+  const hasStudentMedia = (record: AudioRecordItem) => Boolean(record.data || record.url);
 
-    // A remote record may intentionally omit local base64 data after upload.
-    if (!preferred?.data && backup?.data) merged.data = backup.data;
-    if (!preferred?.url && backup?.url) merged.url = backup.url;
-    if (!preferred?.teacherFeedbackUrl && backup?.teacherFeedbackUrl) {
-      merged.teacherFeedbackUrl = backup.teacherFeedbackUrl;
+  // Teacher feedback is stored as a sparse list: only recordings that have
+  // feedback are written to the Sheet. Use the complete student-audio list as
+  // the base whenever the preferred list contains feedback-only records.
+  const primaryHasStudentMedia = primaryRecords.some(hasStudentMedia);
+  const fallbackHasStudentMedia = fallbackRecords.some(hasStudentMedia);
+  const baseRecords = primaryHasStudentMedia || !fallbackHasStudentMedia ? primaryRecords : fallbackRecords;
+  const overlayRecords = baseRecords === primaryRecords ? fallbackRecords : primaryRecords;
+  const usedOverlayIndexes = new Set<number>();
+
+  const normalizeLabel = (label?: string) => String(label || '').trim().toLocaleLowerCase();
+  const findOverlayIndex = (baseRecord: AudioRecordItem, baseIndex: number) => {
+    const baseLabel = normalizeLabel(baseRecord.label);
+    if (baseLabel) {
+      const labelIndex = overlayRecords.findIndex(
+        (record, index) => !usedOverlayIndexes.has(index) && normalizeLabel(record.label) === baseLabel
+      );
+      if (labelIndex >= 0) return labelIndex;
     }
-    if (!preferred?.teacherFeedbackLabel && backup?.teacherFeedbackLabel) {
-      merged.teacherFeedbackLabel = backup.teacherFeedbackLabel;
+
+    // Legacy rows may not have labels. Keep the old positional fallback only
+    // for those records; labelled recordings must never be shifted by index.
+    if (!baseLabel && overlayRecords[baseIndex] && !usedOverlayIndexes.has(baseIndex)) {
+      return baseIndex;
+    }
+    return -1;
+  };
+
+  const mergedRecords = baseRecords.map((baseRecord, baseIndex) => {
+    const overlayIndex = findOverlayIndex(baseRecord, baseIndex);
+    const overlay = overlayIndex >= 0 ? overlayRecords[overlayIndex] : undefined;
+    if (overlayIndex >= 0) usedOverlayIndexes.add(overlayIndex);
+
+    const merged = { ...(baseRecord || {}), ...(overlay || {}) } as AudioRecordItem;
+
+    // Feedback-only records intentionally omit the student's media payload.
+    if (!merged.data && baseRecord.data) merged.data = baseRecord.data;
+    if (!merged.url && baseRecord.url) merged.url = baseRecord.url;
+    if (overlay && !hasStudentMedia(overlay) && baseRecord.mime) merged.mime = baseRecord.mime;
+    if (!merged.mime && baseRecord.mime) merged.mime = baseRecord.mime;
+    if (!merged.teacherFeedbackUrl && baseRecord.teacherFeedbackUrl) {
+      merged.teacherFeedbackUrl = baseRecord.teacherFeedbackUrl;
+    }
+    if (!merged.teacherFeedbackLabel && baseRecord.teacherFeedbackLabel) {
+      merged.teacherFeedbackLabel = baseRecord.teacherFeedbackLabel;
     }
 
     return merged;
   });
+
+  // Do not silently drop a labelled record that exists only in one source.
+  overlayRecords.forEach((record, index) => {
+    if (!usedOverlayIndexes.has(index)) mergedRecords.push(record);
+  });
+
+  return mergedRecords;
 };
 
 const extractAudioRecordsFromDriveLinks = (rawLinks?: string): AudioRecordItem[] => {
@@ -216,9 +264,10 @@ export const getLocalSubmissions = (): SubmissionData[] => {
     const data = localStorage.getItem(LOCAL_SUBMISSIONS_KEY);
     if (data) {
       const parsed: SubmissionData[] = JSON.parse(data);
-      return parsed.map((sub) => ({
+      return parsed.filter((sub) => sub && typeof sub === 'object').map((sub) => ({
         ...sub,
         percent: normalizePercent(sub.percent, sub.correct, sub.total),
+        speakScore: normalizeTeacherExerciseScore(sub.speakScore),
         submissionImages: normalizeImageList(sub.submissionImages),
         correctedImages: normalizeImageList(sub.correctedImages)
       }));
@@ -611,17 +660,18 @@ export const fetchResultById = async (
   id: string
 ): Promise<{ ok: boolean; row?: SubmissionData; error?: string }> => {
   const config = getGasConfig();
+  const normalizedId = id.trim().toLowerCase();
 
   // Try local first
   const locals = getLocalSubmissions();
-  let localMatch = locals.find((item) => String(item.id).trim().toLowerCase() === id.trim().toLowerCase());
+  let localMatch = locals.find((item) => String(item.id).trim().toLowerCase() === normalizedId);
 
   const deletedServerIds = await fetchServerDeletedSubmissionIds();
-  if (deletedServerIds.some((deletedId) => String(deletedId).trim().toLowerCase() === id.trim().toLowerCase())) {
+  if (deletedServerIds.some((deletedId) => String(deletedId).trim().toLowerCase() === normalizedId)) {
     return { ok: false, error: 'Bài nộp này đã được giáo viên xoá' };
   }
 
-  const serverMatch = await fetchServerSubmissionById(id.trim());
+  const serverMatch = await fetchServerSubmissionById(normalizedId);
   if (serverMatch) {
     localMatch = {
       ...serverMatch,
@@ -639,7 +689,7 @@ export const fetchResultById = async (
   }
 
   const hwList = getHandwritingSubmissions();
-  const hwMatch = hwList.find((item) => String(item.id).trim().toLowerCase() === id.trim().toLowerCase());
+  const hwMatch = hwList.find((item) => String(item.id).trim().toLowerCase() === normalizedId);
 
   if (!localMatch && hwMatch) {
     localMatch = {
@@ -677,7 +727,7 @@ export const fetchResultById = async (
   try {
     const url = new URL(config.sheetUrl.trim());
     url.searchParams.append('mode', 'result');
-    url.searchParams.append('id', id.trim());
+    url.searchParams.append('id', normalizedId);
 
     const res = await fetch(getGasRequestUrl(url.toString()), {
       method: 'GET'
@@ -698,7 +748,7 @@ export const fetchResultById = async (
       const cleanedComment = cleanImageTagsFromText(rawComment);
 
       const mapped: SubmissionData = {
-        id: String(r['ID'] || id),
+        id: String(r['ID'] || normalizedId),
         time: String(r['Thời gian'] || ''),
         name: String(r['Họ tên'] || ''),
         class: String(r['Lớp'] || ''),
@@ -752,7 +802,8 @@ export const fetchResultById = async (
         if (localMatch.teacherComment) mapped.teacherComment = cleanImageTagsFromText(localMatch.teacherComment);
         if (localMatch.exerciseId) mapped.exerciseId = localMatch.exerciseId;
         if (localMatch.status === 'Đã chấm') mapped.status = 'Đã chấm';
-        if (localMatch.speakScore && !mapped.speakScore) mapped.speakScore = localMatch.speakScore;
+        const localSpeakScore = normalizeTeacherExerciseScore(localMatch.speakScore);
+        if (localSpeakScore && !mapped.speakScore) mapped.speakScore = localSpeakScore;
         if (localMatch.comment && !mapped.comment) mapped.comment = cleanImageTagsFromText(localMatch.comment);
       }
 
