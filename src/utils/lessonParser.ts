@@ -1,5 +1,9 @@
 import { LessonData, LessonItem, LessonSection } from '../types/lesson';
 import { ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
+import {
+  isStructuredExerciseType,
+  normalizeStructuredOptions
+} from './structuredExercises';
 
 export const STANDARD_CONVERTED_TYPES = new Set([
   'vocab',
@@ -82,6 +86,16 @@ export function convertExamLessonToLessonData(exam: ExamLesson): LessonData {
       ...exam.mcQuestions.map((question) => questionToLessonItem(question, 'mc'))
     ]
   );
+
+  (exam.sections || []).forEach((section, index) => {
+    if (section.items.length > 0) {
+      sections.push({
+        ...section,
+        id: section.id || `custom-section-${index + 1}`,
+        items: section.items.map((item) => ({ ...item, data: { ...item.data } }))
+      });
+    }
+  });
   addSection(
     'imported-fill-arrange',
     'Điền từ & Sắp xếp câu',
@@ -445,6 +459,11 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
       }
 
       // Filter out standard types that belong in specific question arrays
+      // Keep the HSK structured fill block in sections so its shared word bank
+      // and choice renderer are not split into the legacy fill form.
+      if ((type === 'fill' || type === 'fill_in_blank') && Array.isArray(itemData.items)) {
+        return true;
+      }
       if (STANDARD_CONVERTED_TYPES.has(type)) {
         return false;
       }
@@ -601,9 +620,13 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
 
       // Fill in blank
       if (type === 'fill' || type === 'fill_in_blank') {
-        const itemWordBank = Array.isArray(itemData.wordBank)
-          ? itemData.wordBank.map(String).filter(Boolean)
-          : undefined;
+        // Structured HSK fill items stay in the section renderer; the legacy
+        // fillQuestions array cannot preserve a shared answer bank.
+        if (Array.isArray(itemData.items)) return;
+        const bankOptions = normalizeStructuredOptions(itemData.wordBank);
+        const itemWordBank = bankOptions.length > 0
+          ? bankOptions.map((option) => option.text || option.id).filter(Boolean)
+          : (Array.isArray(itemData.wordBank) ? itemData.wordBank.map(String).filter(Boolean) : undefined);
         const itemTier = itemData.tier === 'tier1' || itemData.tier === 'tier2' || itemData.tier === 'tier3'
           ? itemData.tier
           : (itemWordBank?.length ? 'tier1' : 'tier2');
@@ -689,6 +712,9 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
         });
         return;
       }
+
+      // Structured HSK blocks stay in sections so shared options are stored once.
+      if (isStructuredExerciseType(type)) return;
 
       // Standard Multiple Choice or Fallback for MC / Unsupported types
       mcQuestions.push({

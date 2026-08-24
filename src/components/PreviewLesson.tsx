@@ -1,6 +1,8 @@
 import React from 'react';
 import { BookOpen, Layers, HelpCircle, Check, AlertTriangle } from 'lucide-react';
 import { LessonData, LessonItem } from '../types/lesson';
+import { ExerciseRenderer } from './ExerciseRenderer';
+import { STRUCTURED_EXERCISE_TYPES } from '../utils/structuredExercises';
 
 interface PreviewLessonProps {
   lessonData: LessonData;
@@ -43,7 +45,8 @@ export const PreviewLesson: React.FC<PreviewLessonProps> = ({ lessonData, onImpo
     'pronunciation',
     'translation',
     'translate',
-    'translate_vi_zh'
+    'translate_vi_zh',
+    ...STRUCTURED_EXERCISE_TYPES
   ]);
 
   sections.forEach((sec) => {
@@ -191,6 +194,21 @@ export const PreviewLesson: React.FC<PreviewLessonProps> = ({ lessonData, onImpo
             );
           })}
         </div>
+      </div>
+
+      <div className="space-y-4 border-t border-slate-200 pt-5">
+        <div>
+          <h4 className="font-bold text-slate-900 text-sm">Xem trước đúng giao diện học sinh</h4>
+          <p className="text-xs text-slate-500 mt-0.5">Dùng cùng renderer với trang làm bài; ví dụ không được tính vào số câu.</p>
+        </div>
+        {sections.map((section, sectionIndex) => (
+          <section key={section.id || sectionIndex} className="space-y-3">
+            {section.title && <h5 className="font-bold text-slate-800">{section.title}</h5>}
+            {section.items.map((item) => (
+              <ExerciseRenderer key={item.id} item={item} />
+            ))}
+          </section>
+        ))}
       </div>
     </div>
   );

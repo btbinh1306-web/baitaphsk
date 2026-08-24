@@ -16,7 +16,7 @@ import type { GasMediaFolder } from './gasCloudService';
  */
 
 // --- CUSTOM EXAMS ---
-export async function fetchServerCustomExams(): Promise<ExamLesson[]> {
+export async function fetchServerCustomExams(): Promise<ExamLesson[] | null> {
   const gasExams = await fetchGasExams();
   if (gasExams !== null) return gasExams;
 
@@ -29,7 +29,7 @@ export async function fetchServerCustomExams(): Promise<ExamLesson[]> {
   } catch (err) {
     console.warn('Failed to fetch server custom exams, falling back to local', err);
   }
-  return [];
+  return null;
 }
 
 export async function saveServerCustomExam(exam: ExamLesson): Promise<boolean> {
@@ -43,7 +43,9 @@ export async function saveServerCustomExam(exam: ExamLesson): Promise<boolean> {
     });
     const data = await res.json();
     const localSaved = Boolean(data && data.ok);
-    return gasSaved === true || localSaved;
+    // A failed Apps Script write must not be reported as a successful shared
+    // save just because the local Express fallback accepted the payload.
+    return gasSaved === null ? localSaved : gasSaved === true;
   } catch (err) {
     console.warn('Failed to save custom exam on server', err);
     return gasSaved === true;

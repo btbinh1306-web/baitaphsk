@@ -10,6 +10,8 @@ import { SpeakingRecord } from './exercises/SpeakingRecord';
 import { ListeningExercise } from './exercises/ListeningExercise';
 import { HandwritingExerciseView } from './exercises/HandwritingExerciseView';
 import { UnsupportedExercise } from './exercises/UnsupportedExercise';
+import { HskStructuredExercise } from './exercises/HskStructuredExercise';
+import { StructuredAnswerMap, isStructuredExerciseItem } from '../utils/structuredExercises';
 
 export const exerciseTypes = {
   multiple_choice: MultipleChoice,
@@ -32,9 +34,15 @@ export const exerciseTypes = {
 
 interface ExerciseRendererProps {
   item: LessonItem;
+  answers?: StructuredAnswerMap;
+  onAnswerChange?: (key: string, answer: string) => void;
 }
 
-export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({ item }) => {
+export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({ item, answers, onAnswerChange }) => {
+  if (isStructuredExerciseItem(item)) {
+    return <HskStructuredExercise item={item} answers={answers} onAnswerChange={onAnswerChange} />;
+  }
+
   switch (item.type) {
     case 'multiple_choice':
     case 'mc':

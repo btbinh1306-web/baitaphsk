@@ -7,6 +7,7 @@ import { parseLessonToExam } from '../utils/lessonParser';
 import { ValidationResult } from '../types/lesson';
 import { ExamLesson } from '../types';
 import { FileCode, CheckCircle2 } from 'lucide-react';
+import { STRUCTURED_EXERCISE_TEMPLATES } from '../utils/structuredExercises';
 
 interface ImportLessonProps {
   onSaveCustomExam?: (exam: ExamLesson) => void;
@@ -89,6 +90,15 @@ const SAMPLE_LESSON_JSON = JSON.stringify(
             }
           }
         ]
+      },
+      {
+        id: 'sec4',
+        title: 'Các dạng bài HSK có cấu trúc',
+        items: STRUCTURED_EXERCISE_TEMPLATES.map((template, index) => ({
+          id: `hsk_structured_${index + 1}`,
+          type: template.type,
+          data: template.data
+        }))
       }
     ]
   },

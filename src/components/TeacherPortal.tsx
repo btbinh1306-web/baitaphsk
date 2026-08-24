@@ -9,7 +9,7 @@ import {
   saveLocalSubmission
 } from '../services/gasService';
 import { speakText } from '../utils/tts';
-import { parseLessonToExam, sanitizeExamSections } from '../utils/lessonParser';
+import { convertExamLessonToLessonData, parseLessonToExam, sanitizeExamSections } from '../utils/lessonParser';
 import { validateLesson } from '../utils/validateLesson';
 import { LessonData } from '../types/lesson';
 import { groupExamsForSelection } from '../utils/examGrouping';
@@ -162,7 +162,7 @@ const isAcceptedArrangeAnswer = (detail: TeacherWrongAnswerDetail, exam: ExamLes
 interface TeacherPortalProps {
   customExams?: ExamLesson[];
   deletedExamIds?: string[];
-  onSaveCustomExam?: (exam: ExamLesson) => void;
+  onSaveCustomExam?: (exam: ExamLesson) => Promise<boolean> | void;
   onDeleteCustomExam?: (examId: string) => Promise<boolean> | void;
 }
 
@@ -930,6 +930,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     setIsGrading(false);
   };
 
+  const persistExamSnapshot = async (exam: ExamLesson): Promise<boolean> => {
+    if (!onSaveCustomExam) return true;
+
+    const saved = await onSaveCustomExam(sanitizeExamSections(exam));
+    if (saved === false) {
+      alert('Bài đã cập nhật ở máy này nhưng chưa đồng bộ được lên Apps Script. Vui lòng kiểm tra cấu hình Google Sheet rồi lưu lại.');
+      return false;
+    }
+    return true;
+  };
+
   // Save changes to current exam
   const handleSaveExamChanges = async () => {
     let examToSave = editingExam;
@@ -949,11 +960,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       return;
     }
 
-    // Publish the same normalized shape that StudentExamForm consumes.
-    const examToPublish = sanitizeExamSections(examToSave);
     if (onSaveCustomExam) {
-      await onSaveCustomExam(examToPublish);
-      alert(`Đã lưu thành công bài thi: "${examToPublish.title}"! Học sinh có thể làm bài ngay.`);
+      const saved = await persistExamSnapshot(examToSave);
+      if (!saved) return;
+      alert(`Đã lưu thành công bài thi: "${examToSave.title}"! Học sinh có thể làm bài ngay.`);
     }
   };
 
@@ -1112,6 +1122,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       (question.tier || 'tier1') === tier ? { ...question, wordBank } : question
     );
     setEditingExam({ ...editingExam, fillQuestions: updatedFill });
+  };
+
+  const handleFillWordBankBlur = () => {
+    void persistExamSnapshot(editingExam);
   };
 
   // Add Sentence Arrangement Question
@@ -1978,6 +1992,32 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </div>
           )}
 
+          {!editingExam.sourceLessonData && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+              <div>
+                <p className="text-sm font-bold text-indigo-950">Các dạng bài HSK theo đề giáo trình</p>
+                <p className="text-xs text-indigo-800 mt-0.5">Tạo bài nghe chọn hình, ghép hình, nối câu, ngân hàng từ và đọc hiểu ngay trong trình soạn.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const sourceLessonData = convertExamLessonToLessonData(editingExam);
+                  if (sourceLessonData.sections.length === 0) {
+                    sourceLessonData.sections.push({
+                      id: 'hsk-structured-section',
+                      title: 'Bài tập HSK',
+                      items: []
+                    });
+                  }
+                  setEditingExam({ ...editingExam, sourceLessonData });
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-700 px-3.5 py-2 text-xs font-bold text-white hover:bg-indigo-800 shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Mở trình soạn dạng HSK
+              </button>
+            </div>
+          )}
+
           {editingExam.sourceLessonData && (
             <LessonDataEditor
               title="Chỉnh sửa toàn bộ bài học đã nhập"
@@ -2255,6 +2295,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     <textarea
                       value={wordBank.join(', ')}
                       onChange={(event) => handleUpdateFillWordBank(tier, event.target.value)}
+                      onBlur={handleFillWordBankBlur}
                       placeholder="老师, 学生, 谢谢... (cách nhau bằng dấu phẩy)"
                       rows={2}
                       className="w-full px-3 py-2 border border-emerald-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500 resize-y"

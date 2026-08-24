@@ -60,6 +60,7 @@ export default function App() {
       const serverDeleted = await fetchServerDeletedExamIds();
       const mergedDeleted = Array.from(new Set([...serverDeleted, ...localDeleted]));
       const deletedSet = new Set(mergedDeleted);
+      const remoteExams = serverExams || [];
 
       // The lazy sync below can take several seconds on a cold Apps Script request.
       // Cached lessons keep the last known audio links visible while it refreshes.
@@ -69,17 +70,19 @@ export default function App() {
       localExams
         .filter((exam) => !deletedSet.has(exam.id))
         .forEach((e) => examMap.set(e.id, e));
-      serverExams
+      remoteExams
         .filter((exam) => !deletedSet.has(exam.id))
         .forEach((e) => examMap.set(e.id, sanitizeExamSections(e)));
 
       // Migrate older local-only exams without overwriting server versions.
-      const serverExamIds = new Set(serverExams.map((exam) => exam.id));
-      await Promise.all(
-        localExams
-          .filter((exam) => !deletedSet.has(exam.id) && !serverExamIds.has(exam.id))
-          .map((exam) => saveServerCustomExam(exam))
-      );
+      if (serverExams !== null) {
+        const serverExamIds = new Set(remoteExams.map((exam) => exam.id));
+        await Promise.all(
+          localExams
+            .filter((exam) => !deletedSet.has(exam.id) && !serverExamIds.has(exam.id))
+            .map((exam) => saveServerCustomExam(exam))
+        );
+      }
 
       const mergedExams = Array.from(examMap.values());
 
@@ -96,12 +99,43 @@ export default function App() {
     initData();
   }, []);
 
+  // Keep an already-open student page current after the teacher publishes an
+  // edit from another browser or device. Apps Script is the shared source of
+  // truth; the local cache is only used when the remote read is unavailable.
+  useEffect(() => {
+    if (activeTab !== 'STUDENT') return;
+
+    let cancelled = false;
+    const refreshExamCatalog = async () => {
+      const serverExams = await fetchServerCustomExams();
+      if (cancelled || serverExams === null) return;
+
+      const refreshedExams = serverExams.map((exam) => sanitizeExamSections(exam));
+      setCustomExams(refreshedExams);
+      try {
+        localStorage.setItem(CUSTOM_EXAMS_STORAGE_KEY, JSON.stringify(refreshedExams));
+      } catch (error) {
+        console.warn('Failed to refresh cached exams locally:', error);
+      }
+    };
+
+    void refreshExamCatalog();
+    window.addEventListener('focus', refreshExamCatalog);
+    const refreshTimer = window.setInterval(refreshExamCatalog, 30_000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshExamCatalog);
+      window.clearInterval(refreshTimer);
+    };
+  }, [activeTab]);
+
   // Save custom exam handler
-  const handleSaveCustomExam = async (rawExam: ExamLesson) => {
+  const handleSaveCustomExam = async (rawExam: ExamLesson): Promise<boolean> => {
     const newExam = sanitizeExamSections(rawExam);
 
     // Save to server
-    await saveServerCustomExam(newExam);
+    const savedToSharedStorage = await saveServerCustomExam(newExam);
 
     setCustomExams((prev) => {
       const idx = prev.findIndex((e) => e.id === newExam.id);
@@ -128,6 +162,8 @@ export default function App() {
       } catch (err) {}
       return updated;
     });
+
+    return savedToSharedStorage;
   };
 
   // Delete custom exam handler

@@ -1,0 +1,527 @@
+{
+  "version": "1.0",
+  "lesson": {
+    "id": "hsk1-mock-01",
+    "title": "HSK 1 - Đề luyện thi số 01 (khung mới)",
+    "level": "HSK 1",
+    "description": "Bộ đề luyện HSK 1 bám cấu trúc mẫu 40 câu: nghe 20 câu, đọc 20 câu. Ảnh minh họa do bộ đề tự tạo; file MP3 để giáo viên bổ sung sau.",
+    "metadata": {
+      "examVersion": "HSK 3.0 / mẫu cấu trúc 2026-07",
+      "sourcePdf": "新版HSK（1-6级）考试结构与样题示例.pdf",
+      "sourceAudio": "新版HSK（一级）听力音频.wav",
+      "audioPolicy": "Không tạo MP3 trong gói dữ liệu này; giáo viên tải file thật vào đúng đường dẫn trước khi mở đề.",
+      "imagePolicy": "Ảnh tự tạo, không dùng ảnh ngẫu nhiên trên Internet.",
+      "audioFilesExpected": 20,
+      "audioFilesStatus": "pending"
+    }
+  },
+  "sections": [
+    {
+      "id": "listening-part-1",
+      "title": "Phần 1: Nghe và chọn hình (Câu 1–5)",
+      "items": [
+        {
+          "id": "listening-p1",
+          "type": "listening_image_choice",
+          "data": {
+            "instruction": "Nghe mỗi câu và chọn hình phù hợp nhất.",
+            "shuffleImages": true,
+            "showPinyin": false,
+            "showTranscript": false,
+            "playCount": 2,
+            "limitPlayCount": false,
+            "items": [
+              {
+                "id": "q01",
+                "number": 1,
+                "audio": "/audio/hsk1-mock-01/q01.mp3",
+                "audioStatus": "pending",
+                "transcript": "我喝牛奶。",
+                "options": [
+                  { "id": "A", "image": "/images/hsk1-mock-01/water.webp", "alt": "Một cốc nước" },
+                  { "id": "B", "image": "/images/hsk1-mock-01/milk.webp", "alt": "Một cốc và một hộp sữa" },
+                  { "id": "C", "image": "/images/hsk1-mock-01/apples.webp", "alt": "Ba quả táo" }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q02",
+                "number": 2,
+                "audio": "/audio/hsk1-mock-01/q02.mp3",
+                "audioStatus": "pending",
+                "transcript": "我有三本书。",
+                "options": [
+                  { "id": "A", "image": "/images/hsk1-mock-01/books.webp", "alt": "Một chồng sách" },
+                  { "id": "B", "image": "/images/hsk1-mock-01/phone.webp", "alt": "Một chiếc điện thoại" },
+                  { "id": "C", "image": "/images/hsk1-mock-01/chair.webp", "alt": "Một chiếc ghế" }
+                ],
+                "correctAnswer": "A"
+              },
+              {
+                "id": "q03",
+                "number": 3,
+                "audio": "/audio/hsk1-mock-01/q03.mp3",
+                "audioStatus": "pending",
+                "transcript": "她是学生。",
+                "options": [
+                  { "id": "A", "image": "/images/hsk1-mock-01/teacher.webp", "alt": "Một cô giáo" },
+                  { "id": "B", "image": "/images/hsk1-mock-01/doctor.webp", "alt": "Một bác sĩ" },
+                  { "id": "C", "image": "/images/hsk1-mock-01/student.webp", "alt": "Một học sinh đeo ba lô" }
+                ],
+                "correctAnswer": "C"
+              },
+              {
+                "id": "q04",
+                "number": 4,
+                "audio": "/audio/hsk1-mock-01/q04.mp3",
+                "audioStatus": "pending",
+                "transcript": "他在学校。",
+                "options": [
+                  { "id": "A", "image": "/images/hsk1-mock-01/school.webp", "alt": "Một trường học" },
+                  { "id": "B", "image": "/images/hsk1-mock-01/hospital.webp", "alt": "Một bệnh viện" },
+                  { "id": "C", "image": "/images/hsk1-mock-01/office.webp", "alt": "Một tòa nhà văn phòng" }
+                ],
+                "correctAnswer": "A"
+              },
+              {
+                "id": "q05",
+                "number": 5,
+                "audio": "/audio/hsk1-mock-01/q05.mp3",
+                "audioStatus": "pending",
+                "transcript": "他坐出租车。",
+                "options": [
+                  { "id": "A", "image": "/images/hsk1-mock-01/airplane.webp", "alt": "Một chiếc máy bay" },
+                  { "id": "B", "image": "/images/hsk1-mock-01/taxi.webp", "alt": "Một chiếc taxi màu vàng" },
+                  { "id": "C", "image": "/images/hsk1-mock-01/train.webp", "alt": "Một đoàn tàu" }
+                ],
+                "correctAnswer": "B"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "listening-part-2",
+      "title": "Phần 2: Nghe câu và chọn đáp án (Câu 6–10)",
+      "items": [
+        {
+          "id": "listening-p2",
+          "type": "listening_text_choice",
+          "data": {
+            "instruction": "Nghe câu hỏi và chọn câu trả lời đúng.",
+            "shuffleOptions": true,
+            "showPinyin": false,
+            "showTranscript": false,
+            "playCount": 2,
+            "limitPlayCount": false,
+            "items": [
+              {
+                "id": "q06",
+                "number": 6,
+                "audio": "/audio/hsk1-mock-01/q06.mp3",
+                "audioStatus": "pending",
+                "transcript": "你叫什么名字？",
+                "prompt": "你叫什么名字？",
+                "options": [
+                  { "id": "A", "text": "我叫王明。", "pinyin": "Wǒ jiào Wáng Míng." },
+                  { "id": "B", "text": "我是老师。", "pinyin": "Wǒ shì lǎoshī." },
+                  { "id": "C", "text": "我在学校。", "pinyin": "Wǒ zài xuéxiào." }
+                ],
+                "correctAnswer": "A"
+              },
+              {
+                "id": "q07",
+                "number": 7,
+                "audio": "/audio/hsk1-mock-01/q07.mp3",
+                "audioStatus": "pending",
+                "transcript": "你喝什么？",
+                "prompt": "你喝什么？",
+                "options": [
+                  { "id": "A", "text": "我看书。", "pinyin": "Wǒ kàn shū." },
+                  { "id": "B", "text": "我坐车。", "pinyin": "Wǒ zuò chē." },
+                  { "id": "C", "text": "我喝水。", "pinyin": "Wǒ hē shuǐ." }
+                ],
+                "correctAnswer": "C"
+              },
+              {
+                "id": "q08",
+                "number": 8,
+                "audio": "/audio/hsk1-mock-01/q08.mp3",
+                "audioStatus": "pending",
+                "transcript": "现在几点？",
+                "prompt": "现在几点？",
+                "options": [
+                  { "id": "A", "text": "今天星期六。", "pinyin": "Jīntiān xīngqīliù." },
+                  { "id": "B", "text": "现在三点。", "pinyin": "Xiànzài sān diǎn." },
+                  { "id": "C", "text": "我三岁。", "pinyin": "Wǒ sān suì." }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q09",
+                "number": 9,
+                "audio": "/audio/hsk1-mock-01/q09.mp3",
+                "audioStatus": "pending",
+                "transcript": "你在哪儿学习？",
+                "prompt": "你在哪儿学习？",
+                "options": [
+                  { "id": "A", "text": "我喝茶。", "pinyin": "Wǒ hē chá." },
+                  { "id": "B", "text": "我喜欢猫。", "pinyin": "Wǒ xǐhuan māo." },
+                  { "id": "C", "text": "我在家学习。", "pinyin": "Wǒ zài jiā xuéxí." }
+                ],
+                "correctAnswer": "C"
+              },
+              {
+                "id": "q10",
+                "number": 10,
+                "audio": "/audio/hsk1-mock-01/q10.mp3",
+                "audioStatus": "pending",
+                "transcript": "这本书多少钱？",
+                "prompt": "这本书多少钱？",
+                "options": [
+                  { "id": "A", "text": "三个人。", "pinyin": "Sān ge rén." },
+                  { "id": "B", "text": "十元。", "pinyin": "Shí yuán." },
+                  { "id": "C", "text": "三点。", "pinyin": "Sān diǎn." }
+                ],
+                "correctAnswer": "B"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "listening-part-3",
+      "title": "Phần 3: Nghe hội thoại và chọn hình (Câu 11–15)",
+      "items": [
+        {
+          "id": "listening-p3",
+          "type": "listening_shared_image_match",
+          "data": {
+            "instruction": "Nghe từng đoạn hội thoại và chọn một hình trong bảng dùng chung.",
+            "shuffleOptions": true,
+            "shuffleImages": true,
+            "showPinyin": false,
+            "showTranscript": false,
+            "playCount": 2,
+            "limitPlayCount": false,
+            "sharedOptions": [
+              { "id": "A", "image": "/images/hsk1-mock-01/listening-p3-a.webp", "alt": "Cô giáo đứng trước bảng" },
+              { "id": "B", "image": "/images/hsk1-mock-01/listening-p3-b.webp", "alt": "Một bát sủi cảo" },
+              { "id": "C", "image": "/images/hsk1-mock-01/listening-p3-c.webp", "alt": "Một bệnh viện" },
+              { "id": "D", "image": "/images/hsk1-mock-01/listening-p3-d.webp", "alt": "Mây đang mưa" },
+              { "id": "E", "image": "/images/hsk1-mock-01/listening-p3-e.webp", "alt": "Hai con mèo" },
+              { "id": "F", "image": "/images/hsk1-mock-01/listening-p3-f.webp", "alt": "Một chiếc điện thoại bàn" }
+            ],
+            "items": [
+              {
+                "id": "q11",
+                "number": 11,
+                "audio": "/audio/hsk1-mock-01/q11.mp3",
+                "audioStatus": "pending",
+                "transcript": "你是老师吗？——是，我是老师。",
+                "correctAnswer": "A"
+              },
+              {
+                "id": "q12",
+                "number": 12,
+                "audio": "/audio/hsk1-mock-01/q12.mp3",
+                "audioStatus": "pending",
+                "transcript": "你喜欢吃什么？——我喜欢吃饺子。",
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q13",
+                "number": 13,
+                "audio": "/audio/hsk1-mock-01/q13.mp3",
+                "audioStatus": "pending",
+                "transcript": "他在哪儿？——他在医院。",
+                "correctAnswer": "C"
+              },
+              {
+                "id": "q14",
+                "number": 14,
+                "audio": "/audio/hsk1-mock-01/q14.mp3",
+                "audioStatus": "pending",
+                "transcript": "今天下雨吗？——下雨。",
+                "correctAnswer": "D"
+              },
+              {
+                "id": "q15",
+                "number": 15,
+                "audio": "/audio/hsk1-mock-01/q15.mp3",
+                "audioStatus": "pending",
+                "transcript": "你家有几只猫？——我家有两只猫。",
+                "correctAnswer": "E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "listening-part-4",
+      "title": "Phần 4: Nghe và trả lời (Câu 16–20)",
+      "items": [
+        {
+          "id": "listening-p4",
+          "type": "listening_comprehension_choice",
+          "data": {
+            "instruction": "Nghe đoạn ngắn và câu hỏi, sau đó chọn đáp án đúng.",
+            "shuffleOptions": true,
+            "showPinyin": false,
+            "showTranscript": false,
+            "playCount": 2,
+            "limitPlayCount": false,
+            "questions": [
+              {
+                "id": "q16",
+                "number": 16,
+                "audio": "/audio/hsk1-mock-01/q16.mp3",
+                "audioStatus": "pending",
+                "transcript": "我是医生。问题：他是什么人？",
+                "question": "他是什么人？",
+                "options": [
+                  { "id": "A", "text": "老师", "pinyin": "lǎoshī" },
+                  { "id": "B", "text": "医生", "pinyin": "yīshēng" },
+                  { "id": "C", "text": "学生", "pinyin": "xuésheng" }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q17",
+                "number": 17,
+                "audio": "/audio/hsk1-mock-01/q17.mp3",
+                "audioStatus": "pending",
+                "transcript": "我在书店买书。问题：他在哪儿？",
+                "question": "他在哪儿？",
+                "options": [
+                  { "id": "A", "text": "医院", "pinyin": "yīyuàn" },
+                  { "id": "B", "text": "学校", "pinyin": "xuéxiào" },
+                  { "id": "C", "text": "书店", "pinyin": "shūdiàn" }
+                ],
+                "correctAnswer": "C"
+              },
+              {
+                "id": "q18",
+                "number": 18,
+                "audio": "/audio/hsk1-mock-01/q18.mp3",
+                "audioStatus": "pending",
+                "transcript": "现在八点。问题：现在几点？",
+                "question": "现在几点？",
+                "options": [
+                  { "id": "A", "text": "六点", "pinyin": "liù diǎn" },
+                  { "id": "B", "text": "八点", "pinyin": "bā diǎn" },
+                  { "id": "C", "text": "十点", "pinyin": "shí diǎn" }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q19",
+                "number": 19,
+                "audio": "/audio/hsk1-mock-01/q19.mp3",
+                "audioStatus": "pending",
+                "transcript": "我想买苹果。问题：他想买什么？",
+                "question": "他想买什么？",
+                "options": [
+                  { "id": "A", "text": "水", "pinyin": "shuǐ" },
+                  { "id": "B", "text": "牛奶", "pinyin": "niúnǎi" },
+                  { "id": "C", "text": "苹果", "pinyin": "píngguǒ" }
+                ],
+                "correctAnswer": "C"
+              },
+              {
+                "id": "q20",
+                "number": 20,
+                "audio": "/audio/hsk1-mock-01/q20.mp3",
+                "audioStatus": "pending",
+                "transcript": "你喝茶吗？——喝，我喝茶。问题：他喝什么？",
+                "question": "他喝什么？",
+                "options": [
+                  { "id": "A", "text": "牛奶", "pinyin": "niúnǎi" },
+                  { "id": "B", "text": "茶", "pinyin": "chá" },
+                  { "id": "C", "text": "水", "pinyin": "shuǐ" }
+                ],
+                "correctAnswer": "B"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "reading-part-1",
+      "title": "Phần 1: Đọc và chọn hình (Câu 21–25)",
+      "items": [
+        {
+          "id": "reading-p1",
+          "type": "reading_shared_image_match",
+          "data": {
+            "instruction": "Đọc câu và chọn hình phù hợp trong bảng dùng chung.",
+            "shuffleImages": true,
+            "showPinyin": true,
+            "showTranscript": false,
+            "sharedOptions": [
+              { "id": "A", "image": "/images/hsk1-mock-01/reading-p1-a.webp", "alt": "Một người đang đọc sách" },
+              { "id": "B", "image": "/images/hsk1-mock-01/reading-p1-b.webp", "alt": "Một người đang uống nước" },
+              { "id": "C", "image": "/images/hsk1-mock-01/reading-p1-c.webp", "alt": "Một người ngồi trong taxi" },
+              { "id": "D", "image": "/images/hsk1-mock-01/reading-p1-d.webp", "alt": "Một người đang nấu ăn" },
+              { "id": "E", "image": "/images/hsk1-mock-01/reading-p1-e.webp", "alt": "Một người đang xem phim" },
+              { "id": "F", "image": "/images/hsk1-mock-01/reading-p1-f.webp", "alt": "Một người đang ngủ" }
+            ],
+            "items": [
+              { "id": "q21", "number": 21, "text": "他在看书。", "pinyin": "Tā zài kàn shū.", "correctAnswer": "A" },
+              { "id": "q22", "number": 22, "text": "他在喝水。", "pinyin": "Tā zài hē shuǐ.", "correctAnswer": "B" },
+              { "id": "q23", "number": 23, "text": "他坐出租车。", "pinyin": "Tā zuò chūzūchē.", "correctAnswer": "C" },
+              { "id": "q24", "number": 24, "text": "她在做饭。", "pinyin": "Tā zài zuò fàn.", "correctAnswer": "D" },
+              { "id": "q25", "number": 25, "text": "他在看电影。", "pinyin": "Tā zài kàn diànyǐng.", "correctAnswer": "E" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "reading-part-2",
+      "title": "Phần 2: Nối câu hỏi với câu trả lời (Câu 26–30)",
+      "items": [
+        {
+          "id": "reading-p2",
+          "type": "sentence_matching",
+          "data": {
+            "instruction": "Chọn câu trả lời phù hợp cho từng câu hỏi. Có một đáp án thừa.",
+            "shuffleOptions": true,
+            "showPinyin": true,
+            "answerBank": [
+              { "id": "A", "text": "我叫李明。", "pinyin": "Wǒ jiào Lǐ Míng." },
+              { "id": "B", "text": "我在学校学习。", "pinyin": "Wǒ zài xuéxiào xuéxí." },
+              { "id": "C", "text": "现在九点。", "pinyin": "Xiànzài jiǔ diǎn." },
+              { "id": "D", "text": "十元。", "pinyin": "Shí yuán." },
+              { "id": "E", "text": "不客气！", "pinyin": "Bú kèqi!" },
+              { "id": "F", "text": "我喜欢苹果。", "pinyin": "Wǒ xǐhuan píngguǒ." }
+            ],
+            "items": [
+              { "id": "q26", "number": 26, "text": "你叫什么名字？", "pinyin": "Nǐ jiào shénme míngzi?", "correctAnswer": "A" },
+              { "id": "q27", "number": 27, "text": "你在哪儿学习？", "pinyin": "Nǐ zài nǎr xuéxí?", "correctAnswer": "B" },
+              { "id": "q28", "number": 28, "text": "现在几点？", "pinyin": "Xiànzài jǐ diǎn?", "correctAnswer": "C" },
+              { "id": "q29", "number": 29, "text": "这本书多少钱？", "pinyin": "Zhè běn shū duōshao qián?", "correctAnswer": "D" },
+              { "id": "q30", "number": 30, "text": "谢谢你！", "pinyin": "Xièxie nǐ!", "correctAnswer": "E" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "reading-part-3",
+      "title": "Phần 3: Chọn từ điền vào chỗ trống (Câu 31–35)",
+      "items": [
+        {
+          "id": "reading-p3",
+          "type": "fill",
+          "data": {
+            "instruction": "Chọn từ thích hợp trong ngân hàng từ chung. Có một từ thừa.",
+            "shuffleOptions": true,
+            "showPinyin": true,
+            "wordBank": [
+              { "id": "A", "text": "叫", "pinyin": "jiào" },
+              { "id": "B", "text": "是", "pinyin": "shì" },
+              { "id": "C", "text": "上", "pinyin": "shàng" },
+              { "id": "D", "text": "想", "pinyin": "xiǎng" },
+              { "id": "E", "text": "正在", "pinyin": "zhèngzài" },
+              { "id": "F", "text": "有", "pinyin": "yǒu" }
+            ],
+            "items": [
+              { "id": "q31", "number": 31, "prompt": "我___王明。", "pinyin": "Wǒ ___ Wáng Míng.", "correctAnswer": "A" },
+              { "id": "q32", "number": 32, "prompt": "她___老师。", "pinyin": "Tā ___ lǎoshī.", "correctAnswer": "B" },
+              { "id": "q33", "number": 33, "prompt": "书在桌子___。", "pinyin": "Shū zài zhuōzi ___.", "correctAnswer": "C" },
+              { "id": "q34", "number": 34, "prompt": "我___喝茶。", "pinyin": "Wǒ ___ hē chá.", "correctAnswer": "D" },
+              { "id": "q35", "number": 35, "prompt": "他___看书。", "pinyin": "Tā ___ kàn shū.", "correctAnswer": "E" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "reading-part-4",
+      "title": "Phần 4: Đọc hiểu (Câu 36–40)",
+      "items": [
+        {
+          "id": "reading-p4",
+          "type": "reading_comprehension_choice",
+          "data": {
+            "instruction": "Đọc đoạn văn và chọn đáp án đúng.",
+            "shuffleOptions": true,
+            "showPinyin": true,
+            "showTranscript": false,
+            "passage": {
+              "text": "小明是学生。他在学校学习。今天是星期六，他不去学校。他在家看书。桌子上有两个苹果。姐姐在家看书。爸爸在公司工作。",
+              "pinyin": "Xiǎo Míng shì xuésheng. Tā zài xuéxiào xuéxí. Jīntiān shì xīngqīliù, tā bú qù xuéxiào. Tā zài jiā kàn shū. Zhuōzi shàng yǒu liǎng ge píngguǒ. Jiějie zài jiā kàn shū. Bàba zài gōngsī gōngzuò."
+            },
+            "questions": [
+              {
+                "id": "q36",
+                "number": 36,
+                "question": "小明是什么人？",
+                "pinyin": "Xiǎo Míng shì shénme rén?",
+                "options": [
+                  { "id": "A", "text": "老师", "pinyin": "lǎoshī" },
+                  { "id": "B", "text": "学生", "pinyin": "xuésheng" },
+                  { "id": "C", "text": "医生", "pinyin": "yīshēng" }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q37",
+                "number": 37,
+                "question": "今天星期几？",
+                "pinyin": "Jīntiān xīngqī jǐ?",
+                "options": [
+                  { "id": "A", "text": "星期五", "pinyin": "xīngqīwǔ" },
+                  { "id": "B", "text": "星期六", "pinyin": "xīngqīliù" },
+                  { "id": "C", "text": "星期日", "pinyin": "xīngqīrì" }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q38",
+                "number": 38,
+                "question": "桌子上有几个苹果？",
+                "pinyin": "Zhuōzi shàng yǒu jǐ ge píngguǒ?",
+                "options": [
+                  { "id": "A", "text": "一个", "pinyin": "yí ge" },
+                  { "id": "B", "text": "两个", "pinyin": "liǎng ge" },
+                  { "id": "C", "text": "三个", "pinyin": "sān ge" }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q39",
+                "number": 39,
+                "question": "姐姐在做什么？",
+                "pinyin": "Jiějie zài zuò shénme?",
+                "options": [
+                  { "id": "A", "text": "看电视", "pinyin": "kàn diànshì" },
+                  { "id": "B", "text": "看书", "pinyin": "kàn shū" },
+                  { "id": "C", "text": "喝水", "pinyin": "hē shuǐ" }
+                ],
+                "correctAnswer": "B"
+              },
+              {
+                "id": "q40",
+                "number": 40,
+                "question": "爸爸在哪儿工作？",
+                "pinyin": "Bàba zài nǎr gōngzuò?",
+                "options": [
+                  { "id": "A", "text": "医院", "pinyin": "yīyuàn" },
+                  { "id": "B", "text": "公司", "pinyin": "gōngsī" },
+                  { "id": "C", "text": "学校", "pinyin": "xuéxiào" }
+                ],
+                "correctAnswer": "B"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

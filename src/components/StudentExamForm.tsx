@@ -8,6 +8,7 @@ import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUt
 import { sanitizeExamSections } from '../utils/lessonParser';
 import { groupExamsForSelection } from '../utils/examGrouping';
 import { ExerciseRenderer } from './ExerciseRenderer';
+import { gradeStructuredSections, StructuredAnswerMap } from '../utils/structuredExercises';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
 import { loadFormDraft, useStudentFormDraft } from '../hooks/useStudentFormDraft';
 import { useStudentExamCatalog } from '../hooks/useStudentExamCatalog';
@@ -98,6 +99,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const [additionalAudioSlots, setAdditionalAudioSlots] = useState<
     Array<{ id: string; record?: AudioRecordItem }>
   >([]);
+  const [structuredAnswers, setStructuredAnswers] = useState<StructuredAnswerMap>(
+    () => initialDraft?.structuredAnswers || {}
+  );
 
   // UI status
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,6 +123,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       essayAnswers,
       questionComments,
       unlockedReference,
+      structuredAnswers,
     },
     !!submittedId
   );
@@ -195,44 +200,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       g.questions.push(q);
     });
     return groups.map((group) => {
-      const nonEmptyWordBanks = group.questions
-        .map((question) => question.wordBank?.map((word) => word.trim()).filter(Boolean) || [])
-        .filter((wordBank) => wordBank.length > 0);
-
-      if (nonEmptyWordBanks.length === 0) return group;
-
-      const getWordBankKey = (wordBank: string[]) =>
-        Array.from(new Set(wordBank)).sort().join("\u0001");
-      const sharedWordBankKey = getWordBankKey(nonEmptyWordBanks[0]);
-      const hasSharedWordBank = nonEmptyWordBanks.every(
-        (wordBank) => getWordBankKey(wordBank) === sharedWordBankKey,
-      );
-
-      if (!hasSharedWordBank) {
-        return {
-          ...group,
-          wordBank: shuffleWordBank(group.wordBank || []),
-        };
-      }
-
-      // A repeated bank can be the lesson vocabulary list rather than the actual
-      // choices for every question. Keep only the words used as accepted answers.
-      const acceptedAnswers = new Set(
-        group.questions.flatMap((question) => {
-          const rawAnswer = question.acceptableAnswers ?? question.answer;
-          const answerText = typeof rawAnswer === "string" ? rawAnswer : "";
-          return answerText
-            .split("|")
-            .map((answer) => answer.trim())
-            .filter(Boolean);
-        }),
-      );
-      const sharedWordBank = nonEmptyWordBanks[0];
-      const answerWords = sharedWordBank.filter((word) => acceptedAnswers.has(word));
-
       return {
         ...group,
-        wordBank: shuffleWordBank(answerWords.length > 0 ? answerWords : sharedWordBank),
+        // Show exactly the words published by the teacher. A word may be a
+        // phrase (for example, 什么名字) or may have multiple valid answers,
+        // so filtering by exact answer text can silently hide legitimate choices.
+        wordBank: shuffleWordBank(group.wordBank || []),
       };
     });
   }, [currentExam.fillQuestions]);
@@ -252,6 +225,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     setUnlockedReference({});
     setAudioRecords({});
     setAdditionalAudioSlots([]);
+    setStructuredAnswers({});
     setSubmittedId(null);
     setSubError(null);
   };
@@ -510,11 +484,18 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         });
       }
 
+      const structuredGrade = gradeStructuredSections(currentExam.sections, structuredAnswers);
+      correctCount += structuredGrade.correct;
+      wrongCount += structuredGrade.wrong;
+      notDoneCount += structuredGrade.notDone;
+      wrongDetails.push(...structuredGrade.wrongDetails);
+
       let totalMc =
         currentExam.mcQuestions.length +
         (currentExam.fillQuestions?.length || 0) +
         (currentExam.arrangeQuestions?.length || 0) +
         listeningQuestionItems.length;
+      totalMc += structuredGrade.total;
 
       if (currentExam.readingPassages) {
         currentExam.readingPassages.forEach(p => {
@@ -913,7 +894,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     </div>
                     <div className="space-y-6">
                       {sec.items.map((item) => (
-                        <ExerciseRenderer key={item.id} item={item} />
+                        <ExerciseRenderer
+                          key={item.id}
+                          item={item}
+                          answers={structuredAnswers}
+                          onAnswerChange={(key, answer) => {
+                            setStructuredAnswers((current) => ({ ...current, [key]: answer }));
+                          }}
+                        />
                       ))}
                     </div>
                   </div>
@@ -1682,6 +1670,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   setUnlockedReference({});
                   setAudioRecords({});
                   setAdditionalAudioSlots([]);
+                  setStructuredAnswers({});
                   clearDraft();
                 }}
                 className="w-full text-xs text-slate-500 hover:text-slate-800 py-2 transition"

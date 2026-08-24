@@ -2,11 +2,55 @@ import { ExamLesson } from '../types';
 import { HSK1_BAI1_TO_5_EXAMS } from './hsk1Bai1To5';
 import { HSK1_BAI6_TO_15_EXAMS } from './hsk1Bai6To15';
 import { HSK2_BAI1_WORD_EXAMS } from './hsk2Bai1Word';
+import { HSK1_MOCK_01_EXAM } from './hsk1Mock01';
 
-export const SAMPLE_EXAMS: ExamLesson[] = [
+const LOCAL_AUDIO_BY_QUESTION_ID: Record<string, string> = {
+  hsk1_bai2_listen_05: '/audio/HSK1_B02/HSK1_B02_05.wav',
+  hsk1_bai3_listen_01: '/audio/HSK1_B03/HSK1_B03_01.mp3',
+  hsk1_bai3_listen_02: '/audio/HSK1_B03/HSK1_B03_02.mp3',
+  hsk1_bai3_listen_03: '/audio/HSK1_B03/HSK1_B03_03.mp3',
+  hsk1_bai3_listen_04: '/audio/HSK1_B03/HSK1_B03_04.mp3',
+  hsk1_bai3_listen_05: '/audio/HSK1_B03/HSK1_B03_05.wav',
+  hsk1_bai4_listen_01: '/audio/HSK1_B04/HSK1_B04_01.mp3',
+  hsk1_bai4_listen_02: '/audio/HSK1_B04/HSK1_B04_02.mp3',
+  hsk1_bai4_listen_03: '/audio/HSK1_B04/HSK1_B04_03.mp3',
+  hsk1_bai4_listen_04: '/audio/HSK1_B04/HSK1_B04_04.mp3',
+  hsk1_bai4_listen_05: '/audio/HSK1_B04/HSK1_B04_05.wav',
+  hsk1_bai5_listen_01: '/audio/HSK1_B05/HSK1_B05_01.mp3',
+  hsk1_bai5_listen_02: '/audio/HSK1_B05/HSK1_B05_02.mp3',
+  hsk1_bai5_listen_03: '/audio/HSK1_B05/HSK1_B05_03.mp3',
+  hsk1_bai5_listen_04: '/audio/HSK1_B05/HSK1_B05_04.mp3',
+  hsk1_bai5_listen_05: '/audio/HSK1_B05/HSK1_B05_05.wav',
+  hsk1_b6_listen_01: '/audio/HSK1_B06/HSK1_B06_01.mp3',
+  hsk1_b6_listen_02: '/audio/HSK1_B06/HSK1_B06_02.mp3',
+  hsk1_b6_listen_03: '/audio/HSK1_B06/HSK1_B06_03.mp3',
+  hsk1_b6_listen_04: '/audio/HSK1_B06/HSK1_B06_04.mp3',
+  hsk1_b6_listen_05: '/audio/HSK1_B06/HSK1_B06_05.mp3',
+  hsk1_b7_listen_01: '/audio/HSK1_B07/HSK1_B07_01.mp3',
+  hsk1_b7_listen_02: '/audio/HSK1_B07/HSK1_B07_02.mp3',
+  hsk1_b7_listen_03: '/audio/HSK1_B07/HSK1_B07_03.mp3',
+  hsk1_b7_listen_04: '/audio/HSK1_B07/HSK1_B07_04.mp3',
+  hsk1_b7_listen_05: '/audio/HSK1_B07/HSK1_B07_05.mp3',
+  hsk1_b8_listen_01: '/audio/HSK1_B08/HSK1_B08_01.mp3',
+  hsk1_b8_listen_02: '/audio/HSK1_B08/HSK1_B08_02.mp3',
+  hsk1_b8_listen_03: '/audio/HSK1_B08/HSK1_B08_03.mp3',
+  hsk1_b8_listen_04: '/audio/HSK1_B08/HSK1_B08_04.mp3',
+  hsk1_b8_listen_05: '/audio/HSK1_B08/HSK1_B08_05.mp3'
+};
+
+const attachLocalAudio = (exam: ExamLesson): ExamLesson => ({
+  ...exam,
+  listeningQuestions: exam.listeningQuestions?.map((question) => {
+    const audioUrl = LOCAL_AUDIO_BY_QUESTION_ID[question.id];
+    return audioUrl ? { ...question, audioUrl } : question;
+  })
+});
+
+const SAMPLE_EXAMS_WITH_LOCAL_AUDIO: ExamLesson[] = [
   ...HSK1_BAI1_TO_5_EXAMS,
   ...HSK1_BAI6_TO_15_EXAMS,
   ...HSK2_BAI1_WORD_EXAMS,
+  HSK1_MOCK_01_EXAM,
   {
     id: 'hsk1-b1-ai-xiaoyu',
     title: 'HSK 1 - Bài 1: 小语，你好！ (Đọc câu, Nối từ, Xếp câu & Dịch thuật)',
@@ -887,3 +931,5 @@ export const SAMPLE_EXAMS: ExamLesson[] = [
     ]
   }
 ];
+
+export const SAMPLE_EXAMS: ExamLesson[] = SAMPLE_EXAMS_WITH_LOCAL_AUDIO.map(attachLocalAudio);

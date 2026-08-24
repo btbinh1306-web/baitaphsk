@@ -13,6 +13,7 @@ export interface ExamFormDraft {
   essayAnswers?: Record<string, string>;
   questionComments?: Record<string, string>;
   unlockedReference?: Record<string, boolean>;
+  structuredAnswers?: Record<string, string>;
   updatedAt?: number;
 }
 
@@ -73,6 +74,7 @@ export function useStudentFormDraft(currentFormState: ExamFormDraft, isSubmitted
     currentFormState.essayAnswers,
     currentFormState.questionComments,
     currentFormState.unlockedReference,
+    currentFormState.structuredAnswers,
     isSubmitted
   ]);
 
