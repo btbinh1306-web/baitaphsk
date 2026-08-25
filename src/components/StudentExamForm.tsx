@@ -333,8 +333,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     ? Math.max(1, Math.round(currentExam.timeLimitMinutes || 0))
     : 0;
   const isTimedExam = timeLimitMinutes > 0;
+  const hasRequiredStudentInfo = Boolean(studentName.trim() && studentClass.trim());
+  const isExamContentVisible = Boolean(
+    selectedExamId && (!isTimedExam || (hasRequiredStudentInfo && timeLimitStartedAt))
+  );
   const canStartTimedExam = Boolean(
-    selectedExamId && studentName.trim() && studentClass.trim() && isVocabDone
+    selectedExamId && hasRequiredStudentInfo && isVocabDone
   );
 
   const resetExamProgress = () => {
@@ -375,6 +379,21 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const handleUnlockExam = () => {
     setVocabUnlocked((prev) => ({ ...prev, [currentExam.id]: true }));
     setShowVocabTable(false);
+  };
+
+  const handleStartTimedExam = () => {
+    if (!canStartTimedExam || timeLimitStartedAt) return;
+
+    const startedAt = Date.now();
+    setTimeLimitStartedAt(startedAt);
+    saveListeningProgress({
+      studentName,
+      studentClass,
+      selectedExamGroupLabel,
+      selectedExamId,
+      submissionId,
+      timeLimitStartedAt: startedAt
+    });
   };
 
   const handleMcSelect = (qId: string, optionIdx: number) => {
@@ -862,24 +881,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   };
 
   useEffect(() => {
-    if (!isTimedExam || !canStartTimedExam || submittedId) {
+    if (!isTimedExam || !canStartTimedExam || !timeLimitStartedAt || submittedId) {
       setRemainingSeconds(null);
       return;
     }
 
-    const startedAt = timeLimitStartedAt || Date.now();
-    if (!timeLimitStartedAt) {
-      setTimeLimitStartedAt(startedAt);
-      saveListeningProgress({
-        studentName,
-        studentClass,
-        selectedExamGroupLabel,
-        selectedExamId,
-        submissionId,
-        timeLimitStartedAt: startedAt
-      });
-    }
-
+    const startedAt = timeLimitStartedAt;
     const deadline = startedAt + timeLimitMinutes * 60 * 1000;
     const updateTimer = () => {
       const nextSeconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
@@ -969,7 +976,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Banner / Header */}
-      {selectedExamId && (
+      {isExamContentVisible && (
         <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-700 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
           <div className="relative z-10">
             <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-emerald-100 mb-3">
@@ -981,7 +988,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         </div>
       )}
 
-      {selectedExamId && isTimedExam && !submittedId && (
+      {isExamContentVisible && isTimedExam && !submittedId && (
         <div className={`sticky top-2 z-20 rounded-xl border p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 ${
           remainingSeconds !== null && remainingSeconds <= 60
             ? 'bg-rose-50 border-rose-300 text-rose-950'
@@ -1105,7 +1112,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         {selectedExamId ? (
           <>
         {/* SECTION 0: VOCABULARY LEARNING SHEET & LOCK SYSTEM */}
-        {hasVocabList && (
+        {(!isTimedExam || hasRequiredStudentInfo) && hasVocabList && (
           <div className="bg-white rounded-xl border border-teal-200 p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-teal-100 pb-3">
               <div className="flex items-center gap-2">
@@ -1187,13 +1194,34 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         )}
 
         {/* EXERCISES CONTAINER - LOCKED WHEN VOCAB IS NOT DONE */}
-        {!isVocabDone ? (
+        {isTimedExam && !hasRequiredStudentInfo ? (
+          <div className="p-8 text-center bg-amber-50 border border-amber-300 rounded-2xl text-amber-950 space-y-2">
+            <Clock className="w-8 h-8 text-amber-700 mx-auto" />
+            <p className="font-bold text-base">Vui lòng nhập đủ họ tên và lớp học để mở bài</p>
+            <p className="text-sm text-amber-900/80">Đồng hồ chưa bắt đầu. Sau khi đủ thông tin, bạn sẽ thấy nút Bắt đầu.</p>
+          </div>
+        ) : !isVocabDone ? (
           <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-slate-500 space-y-2">
             <Lock className="w-8 h-8 text-slate-400 mx-auto" />
             <p className="font-bold text-slate-700 text-base">Toàn bộ câu hỏi bài tập đang tạm khóa</p>
             <p className="text-xs text-slate-500">
               Vui lòng xem kỹ bảng từ vựng ở trên và bấm nút "Đã học xong" để mở bài tập.
             </p>
+          </div>
+        ) : isTimedExam && !timeLimitStartedAt ? (
+          <div className="p-8 text-center bg-amber-50 border border-amber-300 rounded-2xl text-amber-950 space-y-4">
+            <Clock className="w-8 h-8 text-amber-700 mx-auto" />
+            <div className="space-y-1">
+              <p className="font-bold text-base">Thông tin đã đủ, sẵn sàng bắt đầu bài thi?</p>
+              <p className="text-sm text-amber-900/80">Sau khi bấm Bắt đầu, đề thi sẽ hiện ra và đồng hồ {timeLimitMinutes} phút sẽ chạy.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleStartTimedExam}
+              className="inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-bold text-base px-8 py-3 rounded-xl shadow-md transition cursor-pointer"
+            >
+              <ArrowRight className="w-5 h-5" /> Bắt đầu
+            </button>
           </div>
         ) : currentExam.isHandwriting || currentExam.type === 'handwriting_submission' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
@@ -2025,10 +2053,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-slate-500 space-y-2">
             <BookOpen className="w-8 h-8 text-teal-500 mx-auto" />
             <p className="font-bold text-slate-700 text-base">
-              Vui lòng chọn cấp bậc và bài học / đề thi để bắt đầu.
+              Vui lòng điền họ tên, lớp học và chọn cấp bậc / bài học / đề thi để bắt đầu.
             </p>
             <p className="text-xs text-slate-500">
-              Chọn bước 1 trước, sau đó chọn bài cụ thể ở bước 2.
+              Điền thông tin học sinh trước, sau đó chọn bước 1 và chọn bài cụ thể ở bước 2.
             </p>
           </div>
         )}
