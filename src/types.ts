@@ -32,6 +32,7 @@ export interface Question {
   referenceImages?: string[]; // for handwriting_submission
   pinyin?: string;
   options?: string[];
+  optionImages?: Array<{ id: string; url: string; alt?: string }>;
   answer?: number | string; // index for mc
   wordChips?: string[]; // array of word chips for sentence arrangement
   acceptableAnswers?: string; // pipe-separated options, e.g. "6月13号|6月13日|六月十三号|六月十三日"
@@ -45,6 +46,25 @@ export interface Question {
   items?: (string | Record<string, unknown>)[];
   questions?: Record<string, unknown>[];
   subQuestions?: Question[]; // Multiple questions sharing one listening/audio prompt
+  // Structured teacher-review metadata for open-ended language production.
+  taskGroup?: 'reading_aloud' | 'written_translation' | 'oral_translation' | 'self_introduction' | 'picture_speaking' | string;
+  taskGroupTitle?: string;
+  sourceLessons?: number[];
+  knowledgeTargets?: string[];
+  combinedKnowledgePoints?: number;
+  difficulty?: 'basic' | 'intermediate' | 'advanced' | string;
+  referenceAnswers?: string[];
+  requiredElements?: string[];
+  acceptedVariants?: string[];
+  acceptedPatterns?: string[];
+  targetElements?: string[];
+  teacherReviewRequired?: boolean;
+  grammarTargets?: string[];
+  preparationSeconds?: number;
+  responseSeconds?: number;
+  hidePinyinByDefault?: boolean;
+  rubric?: Array<{ id: string; label: string; maxScore: number }>;
+  uploadFormats?: string[];
 }
 
 export interface ReadingPassage {
@@ -59,6 +79,8 @@ export interface ExamLesson {
   title: string;
   level: 'HSK 1' | 'HSK 2' | 'HSK 3' | 'HSK 4' | 'HSK 5' | 'HSK 6' | 'Luyện nói';
   description: string;
+  timeLimitEnabled?: boolean;
+  timeLimitMinutes?: number;
   type?: string; // e.g. 'handwriting_submission' or undefined
   isHandwriting?: boolean;
   instruction?: string;
@@ -82,6 +104,8 @@ export interface AudioRecordItem {
   label: string;
   data: string; // base64 string
   mime: string;
+  questionId?: string;
+  taskGroup?: string;
   duration?: number;
   url?: string; // local blob URL for instant preview
   teacherFeedbackUrl?: string; // Shared URL of the teacher's pronunciation correction
@@ -103,6 +127,7 @@ export interface SubmissionData {
   notDone: number;
   wrong: string; // JSON or formatted text of wrong details
   essays: string; // Essay answers formatted
+  answerSnapshot?: string; // JSON snapshot of each question's answer/status for result review and PDF export
   audios?: AudioRecordItem[];
   driveLinks?: string; // Links returned or parsed
   speakScore?: string | number; // Overall exercise score entered by the teacher
@@ -117,6 +142,18 @@ export interface SubmissionData {
   handwritingStatus?: 'not_submitted' | 'submitted' | 'graded';
   submittedAt?: string;
   gradedAt?: string;
+}
+
+export type AnswerSnapshotStatus = 'correct' | 'wrong' | 'unanswered' | 'manual';
+
+export interface AnswerSnapshotItem {
+  id: string;
+  section: string;
+  number?: number;
+  prompt: string;
+  userAnswer?: string;
+  correctAnswer?: string;
+  status: AnswerSnapshotStatus;
 }
 
 export * from './types/handwriting';

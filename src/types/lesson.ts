@@ -3,6 +3,8 @@ export interface LessonMetadata {
   title: string;
   level?: string;
   description?: string;
+  timeLimitEnabled?: boolean;
+  timeLimitMinutes?: number;
   [key: string]: unknown;
 }
 

@@ -14,6 +14,7 @@ import { DEFAULT_GAS_WEB_APP_URL, getConfiguredGasWebAppUrl, migrateGasWebAppUrl
 import { clearGasCapabilitiesCache, deleteGasSubmissions, getGasCapabilities } from './gasCloudService';
 import { getGasRequestUrl } from './gasTransport';
 import { normalizeImageList } from '../utils/imageUtils';
+import { getAudioLinkLabel } from '../utils/audioUtils';
 
 const DEFAULT_CONFIG_KEY = 'hsk_gas_config';
 const LOCAL_SUBMISSIONS_KEY = 'hsk_local_submissions_v1';
@@ -236,7 +237,7 @@ const extractAudioRecordsFromDriveLinks = (rawLinks?: string): AudioRecordItem[]
     .split('\n')
     .filter(Boolean)
     .map((link, index) => ({
-      label: link.split(':')[0] || `Ghi âm câu ${index + 1}`,
+      label: getAudioLinkLabel(link, `Ghi âm câu ${index + 1}`),
       data: '',
       mime: 'audio/webm',
       url: link.substring(link.indexOf('http'))
@@ -339,11 +340,12 @@ export const deleteSubmissionsInGas = async (
 export const submitToGas = async (
   payload: Omit<SubmissionData, 'id' | 'status'> & {
     action?: string;
+    submissionId?: string;
     audios?: Array<{ data: string; mime: string; label: string }>;
   }
 ): Promise<{ ok: boolean; id?: string; error?: string }> => {
   const config = getGasConfig();
-  const localId = Math.random().toString(36).substring(2, 10);
+  const localId = payload.submissionId || Math.random().toString(36).substring(2, 10);
   const fullTime = new Date().toLocaleString('vi-VN');
   const gasCapabilities = await getGasCapabilities();
   const gasMediaEnabled = Boolean(gasCapabilities?.media);
@@ -363,6 +365,9 @@ export const submitToGas = async (
   );
 
   let essaysFormatted = payload.essays || '';
+  if (payload.answerSnapshot && !essaysFormatted.includes('[ANSWER_SNAPSHOT]')) {
+    essaysFormatted += `\n[ANSWER_SNAPSHOT]: ${payload.answerSnapshot}`;
+  }
   if (normalizedSubmissionImages.length > 0) {
     if (!essaysFormatted.includes('[SUBMISSION_IMAGES]')) {
       essaysFormatted += `\n[SUBMISSION_IMAGES]: ${JSON.stringify(normalizedSubmissionImages)}`;
@@ -384,6 +389,7 @@ export const submitToGas = async (
     notDone: payload.notDone,
     wrong: payload.wrong,
     essays: essaysFormatted,
+    answerSnapshot: payload.answerSnapshot,
     audios: serverAudios,
     submissionImages: normalizedSubmissionImages,
     isHandwriting: payload.isHandwriting || normalizedSubmissionImages.length > 0,

@@ -5,7 +5,10 @@ const DRAFT_KEY = 'hsk_student_exam_draft_v1';
 export interface ExamFormDraft {
   studentName?: string;
   studentClass?: string;
+  selectedExamGroupLabel?: string;
   selectedExamId?: string;
+  submissionId?: string;
+  timeLimitStartedAt?: number;
   vocabUnlocked?: Record<string, boolean>;
   mcAnswers?: Record<string, number>;
   fillAnswers?: Record<string, string>;
@@ -14,6 +17,7 @@ export interface ExamFormDraft {
   questionComments?: Record<string, string>;
   unlockedReference?: Record<string, boolean>;
   structuredAnswers?: Record<string, string>;
+  listeningPlayCounts?: Record<string, number>;
   updatedAt?: number;
 }
 
@@ -41,6 +45,13 @@ export function saveFormDraft(draft: ExamFormDraft): void {
   }
 }
 
+export function saveListeningProgress(progress: Partial<ExamFormDraft>): void {
+  saveFormDraft({
+    ...(loadFormDraft() || {}),
+    ...progress,
+  });
+}
+
 export function clearFormDraft(): void {
   try {
     localStorage.removeItem(DRAFT_KEY);
@@ -66,7 +77,10 @@ export function useStudentFormDraft(currentFormState: ExamFormDraft, isSubmitted
   }, [
     currentFormState.studentName,
     currentFormState.studentClass,
+    currentFormState.selectedExamGroupLabel,
     currentFormState.selectedExamId,
+    currentFormState.submissionId,
+    currentFormState.timeLimitStartedAt,
     currentFormState.vocabUnlocked,
     currentFormState.mcAnswers,
     currentFormState.fillAnswers,
@@ -75,6 +89,7 @@ export function useStudentFormDraft(currentFormState: ExamFormDraft, isSubmitted
     currentFormState.questionComments,
     currentFormState.unlockedReference,
     currentFormState.structuredAnswers,
+    currentFormState.listeningPlayCounts,
     isSubmitted
   ]);
 

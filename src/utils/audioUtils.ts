@@ -16,6 +16,15 @@ const getActualUrl = (rawLink: string): string => {
   return urlMatch ? urlMatch[0] : trimmed;
 };
 
+/** Keeps labels such as "Câu 22: ..." intact when a Sheet stores "label: URL". */
+export const getAudioLinkLabel = (rawLink: string, fallback = ''): string => {
+  const trimmed = String(rawLink || '').trim();
+  if (!trimmed) return fallback;
+  const urlMatch = trimmed.match(/https?:\/\/[^\s"']+/);
+  if (!urlMatch || urlMatch.index === undefined) return trimmed;
+  return trimmed.slice(0, urlMatch.index).replace(/:\s*$/, '').trim() || fallback;
+};
+
 const getDriveFileInfo = (rawLink: string): { fileId: string; resourceKey: string } => {
   const trimmed = rawLink.trim();
   const directId = /^[a-zA-Z0-9_-]{25,60}$/.test(trimmed) ? trimmed : '';

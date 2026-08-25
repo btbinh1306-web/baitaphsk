@@ -127,9 +127,11 @@ const lesson: LessonData = {
 };
 
 const exam = parseLessonToExam(lesson);
-assert.equal(exam.fillQuestions?.length, 2, 'word bank fill must reuse the existing fill engine');
-assert.deepEqual(exam.fillQuestions?.[0].wordBank, ['想', '忙', '名字']);
-assert.equal(exam.fillQuestions?.[0].acceptableAnswers, '忙');
+assert.equal(exam.fillQuestions?.length, 0, 'structured word-bank fill must stay in sections');
+const fillItem = exam.sections?.flatMap((section) => section.items).find((item) => item.id === 'fill-bank');
+assert.ok(fillItem);
+assert.deepEqual(getStructuredQuestionRows(fillItem)[0].options.map((option) => option.text), ['想', '忙', '名字']);
+assert.equal(getStructuredQuestionRows(fillItem)[0].correctAnswer, 'B');
 assert.equal(getStructuredQuestionCount(exam.sections), 18, 'all seven new objective types must preserve all questions');
 
 const sharedItem = exam.sections?.flatMap((section) => section.items).find((item) => item.id === 'shared-listen');

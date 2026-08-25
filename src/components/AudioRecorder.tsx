@@ -5,6 +5,8 @@ import { speakText } from '../utils/tts';
 
 interface AudioRecorderProps {
   label: string;
+  questionId?: string;
+  taskGroup?: string;
   pinyin?: string;
   comment?: string;
   onCommentChange?: (val: string) => void;
@@ -15,6 +17,8 @@ interface AudioRecorderProps {
 
 export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   label,
+  questionId,
+  taskGroup,
   pinyin,
   comment,
   onCommentChange,
@@ -82,6 +86,8 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
             label,
             data: base64Clean,
             mime: mimeType,
+            questionId,
+            taskGroup,
             duration: recordingTime,
             url
           });
@@ -125,6 +131,8 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         label,
         data: base64Clean,
         mime: mimeType,
+        questionId,
+        taskGroup,
         duration: 0,
         url
       });
@@ -217,7 +225,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
               <Upload className="w-3.5 h-3.5" /> {compact ? 'Tải file âm thanh' : 'Tải File Âm Thanh'}
               <input
                 type="file"
-                accept="audio/*"
+                accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/webm"
                 onChange={handleAudioFileUpload}
                 className="hidden"
               />
@@ -243,7 +251,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
                 <Upload className="w-3.5 h-3.5" /> {compact ? 'Tải file âm thanh' : 'Tải File Âm Thanh'}
                 <input
                   type="file"
-                  accept="audio/*"
+                  accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/webm"
                   onChange={handleAudioFileUpload}
                   className="hidden"
                 />
@@ -298,7 +306,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
             title="Xóa và ghi âm lại"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Xóa bản ghi
+            Ghi âm lại
           </button>
         </div>
       )}

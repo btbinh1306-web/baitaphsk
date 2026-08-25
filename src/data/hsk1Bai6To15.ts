@@ -14,7 +14,9 @@ const fillQuestion = (id: string, prompt: string, answer: string, wordBank: stri
   type: 'fill',
   tier: 'tier1',
   prompt,
-  wordBank,
+  // These HSK1 sections have one shared answer table for the six blanks;
+  // keep one correct word per question instead of showing the whole lesson vocabulary.
+  wordBank: [answer],
   answer,
   acceptableAnswers: answer
 });
@@ -279,8 +281,8 @@ const b7Fill = [
   fillQuestion('hsk1_b7_fill_06', '明天____。', '见', b7WordBank)
 ];
 const b7Arrange = [
-  arrangeQuestion('hsk1_b7_arrange_01', 'Sắp xếp câu nói giờ:', ['现在', '两', '点', '半', '。'], '现在两点半。|现在两点半'),
-  arrangeQuestion('hsk1_b7_arrange_02', 'Sắp xếp câu có trạng ngữ thời gian:', ['她', '上午', '十点半', '上课', '。'], '她上午十点半上课。|她上午十点半上课')
+  arrangeQuestion('hsk1_b7_arrange_01', 'Sắp xếp câu nói giờ:', ['半', '点', '现在', '。', '两'], '现在两点半。|现在两点半'),
+  arrangeQuestion('hsk1_b7_arrange_02', 'Sắp xếp câu có trạng ngữ thời gian:', ['十点半', '。', '她', '上课', '上午'], '她上午十点半上课。|她上午十点半上课')
 ];
 const b7Reading = [readingPassage(
   'hsk1_b7_reading',

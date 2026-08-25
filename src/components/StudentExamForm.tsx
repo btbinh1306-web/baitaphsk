@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { AudioRecorder } from './AudioRecorder';
-import { AudioRecordItem, ExamLesson, Question } from '../types';
+import { AnswerSnapshotItem, AudioRecordItem, ExamLesson, Question } from '../types';
 import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
@@ -10,7 +10,7 @@ import { groupExamsForSelection } from '../utils/examGrouping';
 import { ExerciseRenderer } from './ExerciseRenderer';
 import { gradeStructuredSections, StructuredAnswerMap } from '../utils/structuredExercises';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
-import { loadFormDraft, useStudentFormDraft } from '../hooks/useStudentFormDraft';
+import { loadFormDraft, saveListeningProgress, useStudentFormDraft } from '../hooks/useStudentFormDraft';
 import { useStudentExamCatalog } from '../hooks/useStudentExamCatalog';
 import {
   Send,
@@ -34,7 +34,8 @@ import {
   Layers,
   Pencil,
   Image as ImageIcon,
-  Plus
+  Plus,
+  Clock
 } from 'lucide-react';
 
 interface StudentExamFormProps {
@@ -49,6 +50,23 @@ const getTranslationPromptText = (prompt: string): string =>
     .replace(/^Dịch(?:\s+sang\s+tiếng\s+Trung)?(?:\s*(?:&|và)\s*Ghi âm(?:\s+phát âm)?)?\s*:\s*/iu, '')
     .replace(/^\s*[“"](.*)[”"]\s*$/u, '$1')
     .trim();
+
+const createSubmissionId = (): string =>
+  `submission-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+const formatRemainingTime = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+};
+
+const answerTextForQuestion = (question: Question, answer: unknown): string => {
+  if (answer === undefined || answer === null || answer === '') return '';
+  if (typeof answer === 'number' && question.options) {
+    return question.options[answer] || `Đáp án ${String.fromCharCode(65 + answer)}`;
+  }
+  return String(answer);
+};
 
 export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   customExams = [],
@@ -65,8 +83,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
   const [studentName, setStudentName] = useState(() => initialDraft?.studentName || '');
   const [studentClass, setStudentClass] = useState(() => initialDraft?.studentClass || '');
-  const [selectedExamGroupLabel, setSelectedExamGroupLabel] = useState('');
-  const [selectedExamId, setSelectedExamId] = useState('');
+  const [selectedExamGroupLabel, setSelectedExamGroupLabel] = useState(() => {
+    if (initialDraft?.selectedExamGroupLabel) return initialDraft.selectedExamGroupLabel;
+    return examGroups.find((group) => group.exams.some((exam) => exam.id === initialDraft?.selectedExamId))?.label || '';
+  });
+  const [selectedExamId, setSelectedExamId] = useState(() => initialDraft?.selectedExamId || '');
   const examsInSelectedGroup =
     examGroups.find((group) => group.label === selectedExamGroupLabel)?.exams || [];
 
@@ -96,26 +117,42 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     () => initialDraft?.unlockedReference || {}
   );
   const [audioRecords, setAudioRecords] = useState<Record<string, AudioRecordItem>>({});
+  const [showSpeakingPinyin, setShowSpeakingPinyin] = useState(false);
   const [additionalAudioSlots, setAdditionalAudioSlots] = useState<
     Array<{ id: string; record?: AudioRecordItem }>
   >([]);
   const [structuredAnswers, setStructuredAnswers] = useState<StructuredAnswerMap>(
     () => initialDraft?.structuredAnswers || {}
   );
+  const [submissionId, setSubmissionId] = useState(() => initialDraft?.submissionId || createSubmissionId());
+  const [listeningPlayCounts, setListeningPlayCounts] = useState<Record<string, number>>(
+    () => initialDraft?.listeningPlayCounts || {}
+  );
+  const listeningPlayCountsRef = useRef<Record<string, number>>(initialDraft?.listeningPlayCounts || {});
+  const [timeLimitStartedAt, setTimeLimitStartedAt] = useState<number | null>(
+    () => initialDraft?.timeLimitStartedAt || null
+  );
 
   // UI status
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subError, setSubError] = useState<string | null>(null);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [autoSubmitted, setAutoSubmitted] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const handwritingViewRef = useRef<HandwritingExerciseViewHandle>(null);
+  const timedSubmitRef = useRef<() => void>(() => undefined);
+  const timedSubmitTriggeredRef = useRef(false);
 
   // Persist form draft automatically in localStorage
   const { clearDraft } = useStudentFormDraft(
     {
       studentName,
       studentClass,
+      selectedExamGroupLabel,
       selectedExamId,
+      submissionId,
+      timeLimitStartedAt: timeLimitStartedAt || undefined,
       vocabUnlocked,
       mcAnswers,
       fillAnswers,
@@ -124,6 +161,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       questionComments,
       unlockedReference,
       structuredAnswers,
+      listeningPlayCounts,
     },
     !!submittedId
   );
@@ -131,12 +169,53 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const rawCurrentExam: ExamLesson =
     allExams.find((e) => e.id === selectedExamId) || allExams[0] || SAMPLE_EXAMS[0];
 
-  const currentExam: ExamLesson = useMemo(() => sanitizeExamSections(rawCurrentExam), [rawCurrentExam]);
+  const currentExam: ExamLesson = useMemo(() => {
+    const exam = sanitizeExamSections(rawCurrentExam);
+    if (exam.id === 'hsk1-mock-02' || /đề tổng hợp 1-15/i.test(exam.title)) {
+      return { ...exam, timeLimitEnabled: false, timeLimitMinutes: 0 };
+    }
+    return exam;
+  }, [rawCurrentExam]);
+
+  const speakingTaskGroups = useMemo(() => {
+    const groups = new Map<string, { title: string; questions: Question[] }>();
+    currentExam.speakingQuestions.forEach((question) => {
+      const key = question.taskGroup || 'speaking';
+      const existing = groups.get(key);
+      if (existing) existing.questions.push(question);
+      else groups.set(key, { title: question.taskGroupTitle || 'Kỹ năng nói', questions: [question] });
+    });
+    return Array.from(groups.entries()).map(([key, group]) => ({ key, ...group }));
+  }, [currentExam.speakingQuestions]);
 
   const listeningQuestionItems = useMemo(
     () => currentExam.listeningQuestions.flatMap((question) => question.subQuestions?.length ? question.subQuestions : [question]),
     [currentExam.listeningQuestions]
   );
+
+  const structuredAudioScope = useMemo(() => {
+    const studentId = `${studentName.trim().toLocaleLowerCase()}::${studentClass.trim().toLocaleLowerCase()}`;
+    return `${studentId || 'anonymous'}::${submissionId}::${currentExam.id}`;
+  }, [studentName, studentClass, submissionId, currentExam.id]);
+
+  const handleStructuredAudioAttempt = (key: string): { allowed: boolean; count: number } => {
+    const current = listeningPlayCountsRef.current[key] || 0;
+    const max = 2;
+    if (current >= max) return { allowed: false, count: current };
+
+    const next = { ...listeningPlayCountsRef.current, [key]: current + 1 };
+    listeningPlayCountsRef.current = next;
+    setListeningPlayCounts(next);
+    saveListeningProgress({
+      studentName,
+      studentClass,
+      selectedExamGroupLabel,
+      selectedExamId,
+      submissionId,
+      listeningPlayCounts: next
+    });
+    return { allowed: true, count: current + 1 };
+  };
 
   const shuffledArrangeChips = useMemo(() => {
     const pools = new Map<string, string[]>();
@@ -158,6 +237,34 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
     return pools;
   }, [currentExam.arrangeQuestions]);
+
+  const shuffledChoiceOptions = useMemo(() => {
+    const pools = new Map<string, Array<{ text: string; originalIndex: number }>>();
+    const addQuestion = (question: Question) => {
+      if (!question.options || question.options.length < 2) return;
+
+      const options = question.options.map((text, originalIndex) => ({ text, originalIndex }));
+      for (let index = options.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [options[index], options[randomIndex]] = [options[randomIndex], options[index]];
+      }
+
+      if (options.every((option, index) => option.originalIndex === index)) {
+        [options[0], options[options.length - 1]] = [options[options.length - 1], options[0]];
+      }
+
+      pools.set(question.id, options);
+    };
+
+    currentExam.mcQuestions.forEach(addQuestion);
+    currentExam.listeningQuestions.forEach((question) => {
+      addQuestion(question);
+      question.subQuestions?.forEach(addQuestion);
+    });
+    currentExam.readingPassages?.forEach((passage) => passage.questions.forEach(addQuestion));
+
+    return pools;
+  }, [currentExam.mcQuestions, currentExam.listeningQuestions, currentExam.readingPassages]);
 
   const groupedFillQuestions = useMemo(() => {
     if (!currentExam.fillQuestions) return [];
@@ -200,19 +307,34 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       g.questions.push(q);
     });
     return groups.map((group) => {
+      const showAnswerOnlyWordBank = /^hsk1-bai(?:6|7|8|9|10|11|12|13|14|15)(?:-|$)/i.test(currentExam.id);
+      const answerWords = group.questions
+        .map((question) => {
+          const answer = typeof question.answer === 'string'
+            ? question.answer
+            : question.acceptableAnswers?.split('|')[0];
+          return answer?.trim();
+        })
+        .filter((word): word is string => Boolean(word));
+
       return {
         ...group,
-        // Show exactly the words published by the teacher. A word may be a
-        // phrase (for example, 什么名字) or may have multiple valid answers,
-        // so filtering by exact answer text can silently hide legitimate choices.
-        wordBank: shuffleWordBank(group.wordBank || []),
+        wordBank: shuffleWordBank(showAnswerOnlyWordBank ? answerWords : (group.wordBank || [])),
       };
     });
-  }, [currentExam.fillQuestions]);
+  }, [currentExam.id, currentExam.fillQuestions]);
 
-  const hasVocabList = !!(currentExam.vocabList && currentExam.vocabList.length > 0);
+  const isAggregateExam = /tổng hợp|tong-hop/i.test(`${currentExam.id} ${currentExam.title}`);
+  const hasVocabList = !isAggregateExam && !!(currentExam.vocabList && currentExam.vocabList.length > 0);
   // Strictly enforce: if exam has vocab list, questions MUST stay locked until user clicks "Đã học xong"
   const isVocabDone = !hasVocabList || !!vocabUnlocked[currentExam.id];
+  const timeLimitMinutes = currentExam.timeLimitEnabled && Number.isFinite(currentExam.timeLimitMinutes)
+    ? Math.max(1, Math.round(currentExam.timeLimitMinutes || 0))
+    : 0;
+  const isTimedExam = timeLimitMinutes > 0;
+  const canStartTimedExam = Boolean(
+    selectedExamId && studentName.trim() && studentClass.trim() && isVocabDone
+  );
 
   const resetExamProgress = () => {
     setVocabUnlocked({});
@@ -226,8 +348,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     setAudioRecords({});
     setAdditionalAudioSlots([]);
     setStructuredAnswers({});
+    listeningPlayCountsRef.current = {};
+    setListeningPlayCounts({});
+    setSubmissionId(createSubmissionId());
+    setTimeLimitStartedAt(null);
     setSubmittedId(null);
     setSubError(null);
+    setRemainingSeconds(null);
+    setAutoSubmitted(false);
+    timedSubmitRef.current = () => undefined;
+    timedSubmitTriggeredRef.current = false;
   };
 
   const handleSelectExam = (examId: string) => {
@@ -356,10 +486,23 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       let wrongCount = 0;
       let notDoneCount = 0;
       const wrongDetails: string[] = [];
+      const answerSnapshot: AnswerSnapshotItem[] = [];
+      const addAnswerSnapshot = (item: AnswerSnapshotItem) => answerSnapshot.push(item);
 
       // 1. Grade MC Questions
       currentExam.mcQuestions.forEach((q, idx) => {
         const userAns = mcAnswers[q.id];
+        const isUnanswered = userAns === undefined;
+        const isCorrect = !isUnanswered && userAns === q.answer;
+        addAnswerSnapshot({
+          id: q.id,
+          section: 'Trắc nghiệm',
+          number: idx + 1,
+          prompt: q.prompt,
+          userAnswer: answerTextForQuestion(q, userAns),
+          correctAnswer: answerTextForQuestion(q, q.answer),
+          status: isUnanswered ? 'unanswered' : (isCorrect ? 'correct' : 'wrong')
+        });
         if (userAns === undefined) {
           notDoneCount++;
         } else if (userAns === q.answer) {
@@ -380,10 +523,28 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             if (!q.options || q.options.length === 0) {
               const ans = essayAnswers[q.id] || '(Chưa làm)';
               readingEssayParts.push(`【${q.prompt}】\nBài làm: ${ans}`);
+              addAnswerSnapshot({
+                id: q.id,
+                section: `Đọc hiểu · ${passage.title}`,
+                number: qIdx + 1,
+                prompt: q.prompt,
+                userAnswer: ans === '(Chưa làm)' ? '' : ans,
+                correctAnswer: q.suggestedAnswer || q.acceptableAnswers || '',
+                status: 'manual'
+              });
               return;
             }
 
             const userAns = mcAnswers[q.id];
+            addAnswerSnapshot({
+              id: q.id,
+              section: `Đọc hiểu · ${passage.title}`,
+              number: qIdx + 1,
+              prompt: q.prompt,
+              userAnswer: answerTextForQuestion(q, userAns),
+              correctAnswer: answerTextForQuestion(q, q.answer),
+              status: userAns === undefined ? 'unanswered' : (userAns === q.answer ? 'correct' : 'wrong')
+            });
             if (userAns === undefined) {
               notDoneCount++;
             } else if (userAns === q.answer) {
@@ -402,6 +563,20 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       if (currentExam.fillQuestions) {
         currentExam.fillQuestions.forEach((q, idx) => {
           const userAns = (fillAnswers[q.id] || '').trim().replace(/\s+/g, '');
+          const validOptions = (q.acceptableAnswers || '')
+            .split('|')
+            .map((s) => s.trim().replace(/\s+/g, ''))
+            .filter(Boolean);
+          const isCorrect = Boolean(userAns) && validOptions.includes(userAns);
+          addAnswerSnapshot({
+            id: q.id,
+            section: 'Điền từ',
+            number: idx + 1,
+            prompt: q.prompt,
+            userAnswer: userAns,
+            correctAnswer: validOptions[0] || q.acceptableAnswers || '',
+            status: !userAns ? 'unanswered' : (isCorrect ? 'correct' : 'wrong')
+          });
           if (!userAns) {
             notDoneCount++;
           } else {
@@ -424,6 +599,20 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         currentExam.arrangeQuestions.forEach((q, idx) => {
           const userOrdered = arrangeAnswers[q.id] || [];
           const userSentence = userOrdered.join('').trim().replace(/\s+/g, '');
+          const validOptions = (q.acceptableAnswers || '')
+            .split('|')
+            .map((s) => s.trim().replace(/\s+/g, ''))
+            .filter(Boolean);
+          const isCorrect = Boolean(userSentence) && validOptions.includes(userSentence);
+          addAnswerSnapshot({
+            id: q.id,
+            section: 'Sắp xếp câu',
+            number: idx + 1,
+            prompt: q.prompt,
+            userAnswer: userSentence,
+            correctAnswer: validOptions[0] || q.acceptableAnswers || '',
+            status: !userSentence ? 'unanswered' : (isCorrect ? 'correct' : 'wrong')
+          });
           if (userOrdered.length === 0) {
             notDoneCount++;
           } else {
@@ -446,6 +635,23 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         listeningQuestionItems.forEach((q, idx) => {
           if (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') {
             const userText = (fillAnswers[q.id] || '').trim();
+            const acceptableList = (q.acceptableAnswers || (typeof q.answer === 'string' ? q.answer : q.suggestedAnswer) || '')
+              .split('|')
+              .map((s) => s.trim())
+              .filter(Boolean);
+            const cleanUser = userText.toLowerCase().replace(/\s+/g, '');
+            const isCorrect = Boolean(userText) && acceptableList.some((answer) => (
+              answer.toLowerCase().replace(/\s+/g, '') === cleanUser
+            ));
+            addAnswerSnapshot({
+              id: q.id,
+              section: 'Bài nghe',
+              number: idx + 1,
+              prompt: q.prompt,
+              userAnswer: userText,
+              correctAnswer: acceptableList[0] || q.acceptableAnswers || q.answer?.toString() || '',
+              status: !userText ? 'unanswered' : (isCorrect || acceptableList.length === 0 ? 'correct' : 'wrong')
+            });
             if (!userText) {
               notDoneCount++;
             } else {
@@ -469,6 +675,15 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             }
           } else {
             const userAns = mcAnswers[q.id];
+            addAnswerSnapshot({
+              id: q.id,
+              section: 'Bài nghe',
+              number: idx + 1,
+              prompt: q.prompt,
+              userAnswer: answerTextForQuestion(q, userAns),
+              correctAnswer: answerTextForQuestion(q, q.answer),
+              status: userAns === undefined ? 'unanswered' : (userAns === q.answer ? 'correct' : 'wrong')
+            });
             if (userAns === undefined) {
               notDoneCount++;
             } else if (userAns === q.answer) {
@@ -489,6 +704,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       wrongCount += structuredGrade.wrong;
       notDoneCount += structuredGrade.notDone;
       wrongDetails.push(...structuredGrade.wrongDetails);
+      answerSnapshot.push(...structuredGrade.answerDetails);
 
       let totalMc =
         currentExam.mcQuestions.length +
@@ -511,6 +727,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         ...readingEssayParts,
         ...currentExam.essayQuestions.map((q) => {
         const ans = essayAnswers[q.id] || '(Chưa làm)';
+        answerSnapshot.push({
+          id: q.id,
+          section: 'Tự luận',
+          prompt: q.prompt,
+          userAnswer: ans === '(Chưa làm)' ? '' : ans,
+          correctAnswer: q.suggestedAnswer || q.acceptableAnswers || '',
+          status: 'manual'
+        });
         return `【${q.prompt}】\nBài làm: ${ans}`;
         })
       ];
@@ -519,6 +743,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         currentExam.translationQuestions.forEach((q, idx) => {
           if (q.translationType === 'vi_to_zh_text' || q.translationType === 'zh_to_vi_text') {
             const ans = essayAnswers[q.id] || '(Chưa làm)';
+            answerSnapshot.push({
+              id: q.id,
+              section: q.translationType === 'vi_to_zh_text' ? 'Dịch viết' : 'Dịch Hán - Việt',
+              prompt: q.prompt,
+              userAnswer: ans === '(Chưa làm)' ? '' : ans,
+              correctAnswer: q.suggestedAnswer || q.acceptableAnswers || '',
+              status: 'manual'
+            });
             const label =
               q.translationType === 'vi_to_zh_text'
                 ? `[Dịch TV -> Hán] ${q.prompt}`
@@ -531,14 +763,24 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       const essayFormatted = essayParts.join('\n\n');
 
       // Package Audio Recordings (Speaking + Translation Audio)
-      const audioList: Array<{ data: string; mime: string; label: string }> = [];
+      const audioList: AudioRecordItem[] = [];
       currentExam.speakingQuestions.forEach((q, idx) => {
         const rec = audioRecords[q.id];
+        answerSnapshot.push({
+          id: q.id,
+          section: q.taskGroupTitle || 'Luyện nói',
+          prompt: q.prompt,
+          userAnswer: rec ? 'Đã ghi âm' : '',
+          correctAnswer: q.referenceAnswers?.[0] || q.suggestedAnswer || '',
+          status: 'manual'
+        });
         if (rec) {
           audioList.push({
-            label: `Phần nói C${idx + 1}: ${q.prompt}`,
+            label: `Câu ${idx + 1}: ${q.prompt}`,
             data: rec.data,
-            mime: rec.mime
+            mime: rec.mime,
+            questionId: q.id,
+            taskGroup: q.taskGroup
           });
         }
       });
@@ -547,11 +789,21 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         currentExam.translationQuestions.forEach((q, idx) => {
           if (q.translationType === 'vi_to_zh_audio') {
             const rec = audioRecords[q.id];
+            answerSnapshot.push({
+              id: q.id,
+              section: q.taskGroupTitle || 'Dịch nói',
+              prompt: q.prompt,
+              userAnswer: rec ? 'Đã ghi âm' : '',
+              correctAnswer: q.referenceAnswers?.[0] || q.suggestedAnswer || '',
+              status: 'manual'
+            });
             if (rec) {
               audioList.push({
-                label: `Dịch & Ghi âm C${idx + 1}: ${q.prompt}`,
+                label: `Câu ${idx + 1}: ${getTranslationPromptText(q.prompt)}`,
                 data: rec.data,
-                mime: rec.mime
+                mime: rec.mime,
+                questionId: q.id,
+                taskGroup: q.taskGroup
               });
             }
           }
@@ -563,7 +815,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           audioList.push({
             label: slot.record.label || `File ghi âm bổ sung ${index + 1}`,
             data: slot.record.data,
-            mime: slot.record.mime
+            mime: slot.record.mime,
+            questionId: slot.record.questionId,
+            taskGroup: slot.record.taskGroup
           });
         }
       });
@@ -571,6 +825,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       const fullTimeStr = new Date().toLocaleString('vi-VN');
 
       const res = await submitToGas({
+        submissionId,
         time: fullTimeStr,
         name: studentName.trim(),
         class: studentClass.trim(),
@@ -582,6 +837,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         wrongCount: wrongCount,
         notDone: notDoneCount,
         wrong: wrongDetails.join(' | ') || 'Không có câu sai',
+        answerSnapshot: JSON.stringify(answerSnapshot),
         essays: essayFormatted || 'Không làm phần tự luận',
         audios: audioList
       });
@@ -599,6 +855,57 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  timedSubmitRef.current = () => {
+    void handleSubmit({ preventDefault: () => undefined } as React.FormEvent);
+  };
+
+  useEffect(() => {
+    if (!isTimedExam || !canStartTimedExam || submittedId) {
+      setRemainingSeconds(null);
+      return;
+    }
+
+    const startedAt = timeLimitStartedAt || Date.now();
+    if (!timeLimitStartedAt) {
+      setTimeLimitStartedAt(startedAt);
+      saveListeningProgress({
+        studentName,
+        studentClass,
+        selectedExamGroupLabel,
+        selectedExamId,
+        submissionId,
+        timeLimitStartedAt: startedAt
+      });
+    }
+
+    const deadline = startedAt + timeLimitMinutes * 60 * 1000;
+    const updateTimer = () => {
+      const nextSeconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setRemainingSeconds(nextSeconds);
+      if (nextSeconds === 0 && !timedSubmitTriggeredRef.current && timedSubmitRef.current) {
+        timedSubmitTriggeredRef.current = true;
+        setAutoSubmitted(true);
+        timedSubmitRef.current();
+      }
+    };
+
+    updateTimer();
+    const timerId = window.setInterval(updateTimer, 1000);
+    return () => window.clearInterval(timerId);
+  }, [
+    canStartTimedExam,
+    currentExam.id,
+    isTimedExam,
+    selectedExamGroupLabel,
+    selectedExamId,
+    studentClass,
+    studentName,
+    submissionId,
+    submittedId,
+    timeLimitMinutes,
+    timeLimitStartedAt
+  ]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -630,13 +937,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-        {question.options.map((option, optionIdx) => {
-          const isSelected = mcAnswers[question.id] === optionIdx;
+        {(shuffledChoiceOptions.get(question.id) || question.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: option, originalIndex }) => {
+          const isSelected = mcAnswers[question.id] === originalIndex;
           return (
             <button
               type="button"
-              key={optionIdx}
-              onClick={() => handleMcSelect(question.id, optionIdx)}
+              key={originalIndex}
+              onClick={() => handleMcSelect(question.id, originalIndex)}
               className={`text-left text-sm p-3 rounded-lg border transition cursor-pointer flex items-center gap-2.5 ${
                 isSelected
                   ? 'bg-indigo-50 border-indigo-500 text-indigo-950 font-bold ring-1 ring-indigo-500'
@@ -670,6 +977,33 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">{currentExam.title}</h2>
             <p className="text-teal-100 text-sm mt-1 max-w-2xl">{currentExam.description}</p>
           </div>
+        </div>
+      )}
+
+      {selectedExamId && isTimedExam && !submittedId && (
+        <div className={`sticky top-2 z-20 rounded-xl border p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 ${
+          remainingSeconds !== null && remainingSeconds <= 60
+            ? 'bg-rose-50 border-rose-300 text-rose-950'
+            : 'bg-amber-50 border-amber-300 text-amber-950'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 shrink-0" />
+            <div>
+              <p className="font-bold text-sm">Thời gian làm bài: {timeLimitMinutes} phút</p>
+              <p className="text-xs opacity-80">
+                {autoSubmitted
+                  ? 'Đã hết giờ, hệ thống đang tự động nộp bài.'
+                  : remainingSeconds === null
+                    ? 'Đồng hồ bắt đầu khi em điền đủ họ tên, lớp và mở bài.'
+                    : 'Bài sẽ tự động nộp khi đồng hồ về 00:00.'}
+              </p>
+            </div>
+          </div>
+          {remainingSeconds !== null && (
+            <span className="font-mono text-2xl font-black tracking-wider" aria-label="Thời gian còn lại">
+              {formatRemainingTime(remainingSeconds)}
+            </span>
+          )}
         </div>
       )}
 
@@ -898,6 +1232,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           key={item.id}
                           item={item}
                           answers={structuredAnswers}
+                          studentMode
+                          audioPlayCounts={listeningPlayCounts}
+                          audioScope={structuredAudioScope}
+                          onAudioAttempt={handleStructuredAudioAttempt}
                           onAnswerChange={(key, answer) => {
                             setStructuredAnswers((current) => ({ ...current, [key]: answer }));
                           }}
@@ -944,13 +1282,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                       {q.options && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                          {q.options.map((opt, optIdx) => {
-                            const isSelected = mcAnswers[q.id] === optIdx;
+                          {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
+                            const isSelected = mcAnswers[q.id] === originalIndex;
                             return (
                               <button
                                 type="button"
-                                key={optIdx}
-                                onClick={() => handleMcSelect(q.id, optIdx)}
+                                key={originalIndex}
+                                onClick={() => handleMcSelect(q.id, originalIndex)}
                                 className={`text-left text-sm p-3 rounded-lg border transition cursor-pointer flex items-center gap-2.5 ${
                                   isSelected
                                     ? 'bg-teal-50 border-teal-500 text-teal-900 font-medium ring-1 ring-teal-500'
@@ -1272,13 +1610,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                             </p>
                             {q.options && q.options.length > 0 ? (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                                {q.options.map((opt, optIdx) => {
-                                  const isSelected = mcAnswers[q.id] === optIdx;
+                                {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
+                                  const isSelected = mcAnswers[q.id] === originalIndex;
                                   return (
                                     <button
                                       type="button"
-                                      key={optIdx}
-                                      onClick={() => handleMcSelect(q.id, optIdx)}
+                                      key={originalIndex}
+                                      onClick={() => handleMcSelect(q.id, originalIndex)}
                                       className={`text-left text-xs p-2.5 rounded-lg border transition cursor-pointer flex items-center gap-2 ${
                                         isSelected
                                           ? 'bg-sky-50 border-sky-500 text-sky-900 font-medium ring-1 ring-sky-500'
@@ -1361,40 +1699,87 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               </div>
             )}
 
-            {/* SECTION 6: AUDIO RECORDING FOR SPEAKING */}
-            {currentExam.speakingQuestions.length > 0 && (
+            {/* SECTION 6: PRODUCTION SKILLS */}
+            {speakingTaskGroups.length > 0 && (
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">
                       6
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">Phần Luyện Nói & Ghi Âm</h3>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg">Kỹ năng nói</h3>
+                      <p className="text-xs text-slate-500">Mỗi bài có ghi âm, dừng, nghe lại, ghi âm lại và tải file lên.</p>
+                    </div>
                   </div>
                   <span className="text-xs font-medium text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full">
-                    {Object.keys(audioRecords).length}/{currentExam.speakingQuestions.length} câu đã ghi âm
+                    {Object.keys(audioRecords).length}/{currentExam.speakingQuestions.length} bài nói đã ghi âm
                   </span>
                 </div>
 
-                <div className="space-y-4">
-                  {currentExam.speakingQuestions.map((q, idx) => (
-                    <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                      {q.imageUrl && (
-                        <div className="mb-2">
-                          <img
-                            src={getDriveMediaPlayerUrl(q.imageUrl)}
-                            alt={`Hình ảnh luyện nói câu ${idx + 1}`}
-                            className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
+                {speakingTaskGroups.some((group) => group.key === 'reading_aloud') && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2">
+                    <span className="text-xs text-indigo-900">Pinyin phần 朗读 đang ẩn mặc định.</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSpeakingPinyin((value) => !value)}
+                      className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                    >
+                      {showSpeakingPinyin ? 'Ẩn pinyin' : 'Hiện pinyin'}
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  {speakingTaskGroups.map((group, groupIndex) => {
+                    const questionOffset = speakingTaskGroups
+                      .slice(0, groupIndex)
+                      .reduce((total, previousGroup) => total + previousGroup.questions.length, 0);
+
+                    return (
+                    <section key={group.key} className="space-y-3" aria-label={group.title}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <h4 className="font-bold text-slate-800">{group.title}</h4>
+                        <span className="text-[11px] font-semibold text-slate-500">
+                          {group.questions.length} bài · giáo viên chấm
+                        </span>
+                      </div>
+                      {group.questions.map((q, idx) => {
+                        const questionNumber = questionOffset + idx + 1;
+
+                        return (
+                        <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-slate-500">Câu {questionNumber}</span>
+                            {q.preparationSeconds && (
+                              <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                Chuẩn bị {q.preparationSeconds} giây
+                              </span>
+                            )}
+                          </div>
+                          {q.explanation && group.key === 'self_introduction' && (
+                            <p className="text-sm text-slate-700 leading-relaxed">{q.explanation}</p>
+                          )}
+                          {q.imageUrl && (
+                            <img
+                              src={getDriveMediaPlayerUrl(q.imageUrl)}
+                              alt={`Hình ảnh luyện nói câu ${questionNumber}`}
+                              className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
+                            />
+                          )}
+                          <AudioRecorder
+                            label={q.prompt}
+                            questionId={q.id}
+                            taskGroup={q.taskGroup}
+                            pinyin={group.key === 'reading_aloud' && showSpeakingPinyin ? q.pinyin : undefined}
+                            onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
                           />
                         </div>
-                      )}
-                      <AudioRecorder
-                        label={`Câu ${idx + 1}: ${q.prompt}`}
-                        pinyin={q.pinyin}
-                        onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
-                      />
-                    </div>
-                  ))}
+                        );
+                      })}
+                    </section>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1408,7 +1793,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       7
                     </span>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">Phần Luyện Dịch Thuật</h3>
+                      <h3 className="font-bold text-slate-800 text-lg">Kỹ năng dịch</h3>
                       <p className="text-xs text-slate-500">
                         Bao gồm dịch ghi âm phát âm, dịch câu viết Hán tự và dịch Trung - Việt
                       </p>
@@ -1422,7 +1807,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 {currentExam.translationQuestions.some((question) => question.translationType === 'vi_to_zh_audio') && (
                   <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
                     <p className="text-sm font-bold text-sky-900">
-                      Dạng 1: Dịch Tiếng Việt → Ghi âm Tiếng Trung
+                        Dịch nói Việt → Trung
                     </p>
                     <p className="mt-1 text-xs text-slate-700">
                       <span className="font-semibold text-sky-900">Dịch câu tiếng Việt sang tiếng Trung</span>, sau đó{' '}
@@ -1456,12 +1841,19 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                             <span className="mt-2 inline-flex rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-800">
                               Dịch sang tiếng Trung
                             </span>
+                            {q.preparationSeconds && (
+                              <span className="ml-2 mt-2 inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                                Chuẩn bị {q.preparationSeconds} giây
+                              </span>
+                            )}
                           </div>
 
                           <div className="md:border-l md:border-slate-200 md:pl-4">
                             <AudioRecorder
                               compact
-                              label={`Ghi âm câu dịch ${idx + 1}`}
+                              label={`Câu ${idx + 1}: ${getTranslationPromptText(q.prompt)}`}
+                              questionId={q.id}
+                              taskGroup={q.taskGroup}
                               onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
                             />
                             {!audioRecords[q.id] && (
@@ -1475,28 +1867,28 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     // Dạng 2: Cho câu tiếng Việt -> Viết câu tiếng Trung
                     if (q.translationType === 'vi_to_zh_text') {
                       return (
-                        <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div key={q.id} className="p-5 rounded-xl bg-white border-2 border-sky-200 shadow-sm space-y-4">
                           <div className="flex items-center justify-between">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-slate-200/80 text-slate-800">
-                              Dạng 2: Dịch Tiếng Việt → Viết Tiếng Trung
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-sky-100 border border-sky-200 text-sky-900">
+                              Dịch viết Việt → Trung
                             </span>
                           </div>
 
                           <div>
-                            <p className="text-sm font-bold text-slate-800">
+                            <p className="text-lg font-bold leading-snug text-slate-900">
                               Câu {idx + 1}: <span className="text-slate-900">{q.prompt}</span>
                             </p>
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-sm text-slate-600 mt-2">
                               Hãy gõ câu dịch bằng chữ Hán:
                             </p>
                           </div>
 
                           <textarea
-                            rows={2}
+                            rows={3}
                             value={essayAnswers[q.id] || ''}
                             onChange={(e) => handleEssayChange(q.id, e.target.value)}
                             placeholder="Nhập câu dịch bằng chữ Hán..."
-                            className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-slate-400 outline-none transition"
+                            className="w-full p-3 border border-sky-200 rounded-lg text-base bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
                           />
                         </div>
                       );
@@ -1505,28 +1897,28 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     // Dạng 3: Cho câu tiếng Trung -> Dịch thành tiếng Việt
                     if (q.translationType === 'zh_to_vi_text') {
                       return (
-                        <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div key={q.id} className="p-5 rounded-xl bg-white border-2 border-sky-200 shadow-sm space-y-4">
                           <div className="flex items-center justify-between">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-slate-200/80 text-slate-800">
-                              Dạng 3: Dịch Tiếng Trung → Tiếng Việt
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-sky-100 border border-sky-200 text-sky-900">
+                              Dịch viết Trung → Việt
                             </span>
                           </div>
 
                           <div>
-                            <p className="text-base font-bold text-slate-800">
+                            <p className="text-lg font-bold leading-snug text-slate-900">
                               Câu {idx + 1}: {q.prompt}
                             </p>
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-sm text-slate-600 mt-2">
                               Hãy dịch câu Tiếng Trung trên sang Tiếng Việt chuẩn:
                             </p>
                           </div>
 
                           <textarea
-                            rows={2}
+                            rows={3}
                             value={essayAnswers[q.id] || ''}
                             onChange={(e) => handleEssayChange(q.id, e.target.value)}
                             placeholder="Nhập bản dịch Tiếng Việt của bạn..."
-                            className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-slate-400 outline-none transition"
+                            className="w-full p-3 border border-sky-200 rounded-lg text-base bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
                           />
                         </div>
                       );
@@ -1671,6 +2063,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   setAudioRecords({});
                   setAdditionalAudioSlots([]);
                   setStructuredAnswers({});
+                  listeningPlayCountsRef.current = {};
+                  setListeningPlayCounts({});
+                  setSubmissionId(createSubmissionId());
                   clearDraft();
                 }}
                 className="w-full text-xs text-slate-500 hover:text-slate-800 py-2 transition"

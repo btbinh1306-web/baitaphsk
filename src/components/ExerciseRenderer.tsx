@@ -12,6 +12,7 @@ import { HandwritingExerciseView } from './exercises/HandwritingExerciseView';
 import { UnsupportedExercise } from './exercises/UnsupportedExercise';
 import { HskStructuredExercise } from './exercises/HskStructuredExercise';
 import { StructuredAnswerMap, isStructuredExerciseItem } from '../utils/structuredExercises';
+import type { AnswerSnapshotStatus } from '../types';
 
 export const exerciseTypes = {
   multiple_choice: MultipleChoice,
@@ -35,12 +36,43 @@ export const exerciseTypes = {
 interface ExerciseRendererProps {
   item: LessonItem;
   answers?: StructuredAnswerMap;
+  correctAnswers?: StructuredAnswerMap;
+  answerStatuses?: Record<string, AnswerSnapshotStatus>;
   onAnswerChange?: (key: string, answer: string) => void;
+  studentMode?: boolean;
+  mode?: 'exam' | 'result';
+  audioPlayCounts?: Record<string, number>;
+  audioScope?: string;
+  onAudioAttempt?: (key: string) => { allowed: boolean; count: number };
 }
 
-export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({ item, answers, onAnswerChange }) => {
+export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({
+  item,
+  answers,
+  correctAnswers,
+  answerStatuses,
+  onAnswerChange,
+  studentMode,
+  mode = 'exam',
+  audioPlayCounts,
+  audioScope,
+  onAudioAttempt
+}) => {
   if (isStructuredExerciseItem(item)) {
-    return <HskStructuredExercise item={item} answers={answers} onAnswerChange={onAnswerChange} />;
+    return (
+      <HskStructuredExercise
+        item={item}
+        answers={answers}
+        correctAnswers={correctAnswers}
+        answerStatuses={answerStatuses}
+        onAnswerChange={onAnswerChange}
+        studentMode={studentMode}
+        mode={mode}
+        audioPlayCounts={audioPlayCounts}
+        audioScope={audioScope}
+        onAudioAttempt={onAudioAttempt}
+      />
+    );
   }
 
   switch (item.type) {

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Headphones, Image as ImageIcon } from 'lucide-react';
 import { LessonItem } from '../../types/lesson';
 import {
@@ -10,11 +10,20 @@ import {
   StructuredExerciseType
 } from '../../utils/structuredExercises';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../../utils/audioUtils';
+import { speakText } from '../../utils/tts';
+import type { AnswerSnapshotStatus } from '../../types';
 
 interface HskStructuredExerciseProps {
   item: LessonItem;
   answers?: StructuredAnswerMap;
+  correctAnswers?: StructuredAnswerMap;
+  answerStatuses?: Record<string, AnswerSnapshotStatus>;
   onAnswerChange?: (key: string, answer: string) => void;
+  studentMode?: boolean;
+  mode?: 'exam' | 'result';
+  audioPlayCounts?: Record<string, number>;
+  audioScope?: string;
+  onAudioAttempt?: (key: string) => { allowed: boolean; count: number };
 }
 
 const getText = (value: unknown): string => typeof value === 'string' ? value : '';
@@ -39,12 +48,94 @@ function shuffleAndRelabelOptions(options: StructuredOption[], seed: string): St
   }));
 }
 
-function LimitedAudio({ src, playCount, limit }: { src: string; playCount: number; limit: boolean }) {
+function LimitedAudio({
+  src,
+  fallbackText,
+  playCount,
+  limit,
+  studentMode,
+  audioKey,
+  usedCount = 0,
+  onAttempt
+}: {
+  src: string;
+  fallbackText?: string;
+  playCount: number;
+  limit: boolean;
+  studentMode: boolean;
+  audioKey?: string;
+  usedCount?: number;
+  onAttempt?: (key: string) => { allowed: boolean; count: number };
+}) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [used, setUsed] = useState(0);
-  if (!src) return <span className="text-xs text-slate-500 italic">Chưa gắn file nghe</span>;
+  const [used, setUsed] = useState(usedCount);
+  useEffect(() => setUsed(usedCount), [usedCount]);
 
   const exhausted = limit && used >= playCount;
+  const playOnce = () => {
+    if (exhausted) return;
+    const attempt = limit && onAttempt && audioKey
+      ? onAttempt(audioKey)
+      : { allowed: true, count: Math.min(used + 1, playCount) };
+    if (!attempt.allowed) return;
+
+    setUsed(attempt.count);
+    if (src) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        void audioRef.current.play();
+      }
+    } else if (fallbackText) {
+      speakText(fallbackText);
+    }
+  };
+
+  if (studentMode && limit) {
+    return (
+      <div className="space-y-1">
+        {src && (
+          <audio
+            ref={audioRef}
+            preload="auto"
+            src={getDriveAudioPlayerUrl(src)}
+            className="hidden"
+            aria-hidden="true"
+          />
+        )}
+        {fallbackText || src ? (
+          <button
+            type="button"
+            onClick={playOnce}
+            disabled={exhausted}
+            className="inline-flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-900 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Headphones className="h-3.5 w-3.5" />
+              {exhausted ? 'Đã nghe đủ 2 lần' : used > 0 ? 'Nghe lần cuối' : 'Nghe'}
+            </span>
+            <span className="font-mono text-[11px]">{Math.min(used, playCount)}/{playCount}</span>
+          </button>
+        ) : (
+          <span className="text-xs text-slate-500 italic">Chưa gắn file nghe</span>
+        )}
+      </div>
+    );
+  }
+
+  if (!src) {
+    return fallbackText ? (
+      <button
+        type="button"
+        onClick={() => speakText(fallbackText)}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-700"
+      >
+        <Headphones className="h-3.5 w-3.5" /> Bấm để nghe
+      </button>
+    ) : (
+      <span className="text-xs text-slate-500 italic">Chưa gắn file nghe</span>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <audio
@@ -52,16 +143,9 @@ function LimitedAudio({ src, playCount, limit }: { src: string; playCount: numbe
         controls
         preload="metadata"
         src={getDriveAudioPlayerUrl(src)}
-        className={`w-full h-10 ${exhausted ? 'opacity-50 pointer-events-none' : ''}`}
-        onPlay={() => {
-          if (exhausted) {
-            audioRef.current?.pause();
-            return;
-          }
-          setUsed((current) => current + 1);
-        }}
+        className="w-full h-10"
       />
-      {limit && (
+      {limit && !studentMode && (
         <p className="text-[11px] text-slate-500">
           Lượt nghe: {Math.min(used, playCount)}/{playCount}
         </p>
@@ -73,13 +157,19 @@ function LimitedAudio({ src, playCount, limit }: { src: string; playCount: numbe
 function OptionCard({
   option,
   selected,
+  correct = false,
+  status,
   showPinyin,
-  onSelect
+  onSelect,
+  disabled = false
 }: {
   option: StructuredOption;
   selected: boolean;
+  correct?: boolean;
+  status?: AnswerSnapshotStatus;
   showPinyin: boolean;
   onSelect: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -87,10 +177,15 @@ function OptionCard({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`min-w-0 text-left rounded-lg border p-3 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-        selected
-          ? 'border-teal-600 bg-teal-50 ring-1 ring-teal-600'
-          : 'border-slate-200 bg-white hover:border-slate-400'
+      disabled={disabled}
+      className={`min-w-0 text-left rounded-lg border p-3 transition focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:cursor-default ${
+        selected && correct
+          ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-400'
+          : selected
+            ? 'border-rose-400 bg-rose-50 ring-1 ring-rose-300'
+            : correct
+              ? 'border-emerald-300 bg-emerald-50/50'
+              : 'border-slate-200 bg-white hover:border-slate-400'
       }`}
     >
       {option.image && (
@@ -113,6 +208,13 @@ function OptionCard({
           {showPinyin && option.pinyin && <span className="block text-xs text-indigo-700 mt-0.5">{option.pinyin}</span>}
         </span>
       </div>
+      {status && (selected || correct) && (
+        <span className={`mt-1 block pl-8 text-[11px] font-bold ${
+          correct ? 'text-emerald-800' : 'text-rose-800'
+        }`}>
+          {selected && correct ? 'Bạn đã chọn · Đáp án đúng' : selected ? 'Bạn đã chọn' : 'Đáp án đúng'}
+        </span>
+      )}
     </button>
   );
 }
@@ -120,7 +222,14 @@ function OptionCard({
 export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
   item,
   answers,
-  onAnswerChange
+  correctAnswers,
+  answerStatuses,
+  onAnswerChange,
+  studentMode = false,
+  mode = 'exam',
+  audioPlayCounts = {},
+  audioScope = '',
+  onAudioAttempt
 }) => {
   const [localAnswers, setLocalAnswers] = useState<StructuredAnswerMap>({});
   const data = item.data || {};
@@ -128,11 +237,16 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
   const rows = getStructuredQuestionRows(item);
   const sharedOptions = getStructuredSharedOptions(item);
   const currentAnswers = answers || localAnswers;
+  const readOnly = mode === 'result';
   const showPinyin = data.showPinyin === true;
-  const shouldShuffleOptions = data.shuffleOptions === true;
+  const shouldShuffleOptions = studentMode || data.shuffleOptions === true;
   const shouldShuffleImages = data.shuffleImages === true;
-  const playCount = typeof data.playCount === 'number' && data.playCount > 0 ? data.playCount : 2;
-  const limitPlayCount = data.limitPlayCount === true;
+  const playCount = typeof data.maxPlayCount === 'number' && data.maxPlayCount > 0
+    ? data.maxPlayCount
+    : typeof data.playCount === 'number' && data.playCount > 0
+      ? data.playCount
+      : 2;
+  const limitPlayCount = studentMode && data.limitPlayCount === true;
   const isListening = type.startsWith('listening_');
   const blockAudio = getText(data.audio) || getText(data.audioUrl) || getText(data.audioPromptUrl);
   const blockQuestionAudio = getText(data.questionAudio) || getText(data.questionAudioUrl);
@@ -148,6 +262,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
     : null;
 
   const choose = (key: string, answer: string) => {
+    if (readOnly) return;
     if (onAnswerChange) onAnswerChange(key, answer);
     else setLocalAnswers((current) => ({ ...current, [key]: answer }));
   };
@@ -169,14 +284,14 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
       {blockAudio && (
         <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 space-y-1">
           <p className="text-xs font-semibold text-indigo-900">File nghe dùng chung</p>
-          <LimitedAudio src={blockAudio} playCount={playCount} limit={limitPlayCount} />
+          <LimitedAudio src={blockAudio} playCount={playCount} limit={limitPlayCount} studentMode={studentMode} />
         </div>
       )}
 
       {blockQuestionAudio && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
           <p className="text-xs font-semibold text-slate-700">Âm thanh câu hỏi dùng chung</p>
-          <LimitedAudio src={blockQuestionAudio} playCount={playCount} limit={limitPlayCount} />
+          <LimitedAudio src={blockQuestionAudio} playCount={playCount} limit={limitPlayCount} studentMode={studentMode} />
         </div>
       )}
 
@@ -222,6 +337,10 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
       <div className="space-y-3">
         {rows.map((row, index) => {
           const selected = currentAnswers[row.key] || '';
+          const correctAnswer = correctAnswers?.[row.key] || row.correctAnswer;
+          const rowStatus: AnswerSnapshotStatus = answerStatuses?.[row.key] || (
+            selected ? (selected === correctAnswer ? 'correct' : 'wrong') : 'unanswered'
+          );
           const rowOptionsHaveImages = row.options.some((option) => option.image);
           const options = hasSharedOptions
             ? displayedSharedOptions
@@ -229,7 +348,11 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
               ? shuffleAndRelabelOptions(row.options, row.key)
               : row.options);
           const isSelectLayout = type === 'sentence_matching';
-          const hideListeningPrompt = type === 'listening_text_choice';
+          const hideListeningPrompt = studentMode && isListening && (
+            data.hidePrompt === true ||
+            type === 'listening_text_choice' ||
+            type === 'listening_comprehension_choice'
+          );
           const usesSharedChoiceBank = hasSharedOptions && (
             type === 'fill' ||
             type === 'listening_shared_image_match' || type === 'reading_shared_image_match'
@@ -241,13 +364,37 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                 <div className="min-w-0">
               <p className="font-bold text-slate-900">Câu {row.number ?? index + 1}{prompt ? `: ${prompt}` : ''}</p>
                   {showPinyin && row.pinyin && <p className="text-sm text-indigo-700 mt-1">{row.pinyin}</p>}
-                  {data.showTranscript === true && row.transcript && (
+                  {(!studentMode || data.showTranscript === true) && row.transcript && (
                     <p className="text-xs text-slate-500 mt-1">{row.transcript}</p>
                   )}
                 </div>
                 {row.audio && (
                   <div className="w-full sm:w-72 shrink-0">
-                    <LimitedAudio src={row.audio} playCount={playCount} limit={limitPlayCount} />
+                    <LimitedAudio
+                      src={row.audio}
+                      fallbackText={row.transcript}
+                      playCount={playCount}
+                      limit={limitPlayCount}
+                      studentMode={studentMode}
+                      audioKey={`${audioScope}::${row.key}`}
+                      usedCount={audioPlayCounts[`${audioScope}::${row.key}`] || 0}
+                      onAttempt={onAudioAttempt}
+                    />
+                  </div>
+                )}
+
+                {!row.audio && row.transcript && (
+                  <div className="w-full sm:w-72 shrink-0">
+                    <LimitedAudio
+                      src=""
+                      fallbackText={row.transcript}
+                      playCount={playCount}
+                      limit={limitPlayCount}
+                      studentMode={studentMode}
+                      audioKey={`${audioScope}::${row.key}`}
+                      usedCount={audioPlayCounts[`${audioScope}::${row.key}`] || 0}
+                      onAttempt={onAudioAttempt}
+                    />
                   </div>
                 )}
               </div>
@@ -255,54 +402,107 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
               {row.questionAudio && (
                 <div className="border-t border-slate-200 pt-3">
                   <p className="text-xs font-semibold text-slate-600 mb-1">Âm thanh câu hỏi</p>
-                  <LimitedAudio src={row.questionAudio} playCount={playCount} limit={limitPlayCount} />
+                  <LimitedAudio
+                    src={row.questionAudio}
+                    playCount={playCount}
+                    limit={limitPlayCount}
+                    studentMode={studentMode}
+                    audioKey={`${audioScope}::${row.key}::question`}
+                    usedCount={audioPlayCounts[`${audioScope}::${row.key}::question`] || 0}
+                    onAttempt={onAudioAttempt}
+                  />
                 </div>
               )}
 
               {type === 'fill' && options.length === 0 ? (
-                <input
-                  type="text"
-                  value={selected}
-                  onChange={(event) => choose(row.key, event.target.value)}
-                  placeholder="Nhập câu trả lời bằng chữ Hán..."
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500"
-                  aria-label={`Nhập đáp án cho câu ${index + 1}`}
-                />
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={selected}
+                    readOnly={readOnly}
+                    onChange={(event) => choose(row.key, event.target.value)}
+                    placeholder="Nhập câu trả lời bằng chữ Hán..."
+                    className={`w-full rounded-lg border px-3 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500 ${
+                      readOnly && rowStatus === 'correct'
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : readOnly && rowStatus === 'wrong'
+                          ? 'border-rose-400 bg-rose-50'
+                          : 'border-slate-300 bg-white'
+                    }`}
+                    aria-label={`Nhập đáp án cho câu ${index + 1}`}
+                  />
+                  {readOnly && (
+                    <p className={`text-xs font-bold ${rowStatus === 'correct' ? 'text-emerald-800' : rowStatus === 'wrong' ? 'text-rose-800' : 'text-slate-600'}`}>
+                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctAnswer || 'GV chấm'}` : 'Chưa trả lời'}
+                    </p>
+                  )}
+                </div>
               ) : usesSharedChoiceBank ? (
-                <div
-                  role="radiogroup"
-                  aria-label={`${type === 'fill' ? 'Chọn đáp án' : 'Chọn hình'} cho câu ${index + 1}`}
-                  className="flex flex-wrap gap-2"
-                >
-                  {options.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected === (option.answerId || option.id)}
-                      onClick={() => choose(row.key, option.answerId || option.id)}
-                      className={`min-w-11 rounded-lg border px-4 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                        selected === (option.answerId || option.id)
-                          ? 'border-teal-700 bg-teal-700 text-white'
-                          : 'border-slate-300 bg-white text-slate-800 hover:border-teal-500'
-                      }`}
-                    >
-                      {option.id}
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <div
+                    role="radiogroup"
+                    aria-label={`${type === 'fill' ? 'Chọn đáp án' : 'Chọn hình'} cho câu ${index + 1}`}
+                    className="flex flex-wrap gap-2"
+                  >
+                    {options.map((option) => {
+                      const optionId = option.answerId || option.id;
+                      const optionSelected = selected === optionId;
+                      const optionCorrect = readOnly && correctAnswer === optionId;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={optionSelected}
+                          disabled={readOnly}
+                          onClick={() => choose(row.key, optionId)}
+                          className={`min-w-11 rounded-lg border px-4 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:cursor-default ${
+                            optionSelected && optionCorrect
+                              ? 'border-emerald-600 bg-emerald-600 text-white'
+                              : optionSelected
+                                ? 'border-rose-500 bg-rose-100 text-rose-900'
+                                : optionCorrect
+                                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                                  : 'border-slate-300 bg-white text-slate-800 hover:border-teal-500'
+                          }`}
+                        >
+                          {option.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {readOnly && (
+                    <p className={`text-xs font-bold ${rowStatus === 'correct' ? 'text-emerald-800' : rowStatus === 'wrong' ? 'text-rose-800' : 'text-slate-600'}`}>
+                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctAnswer || 'GV chấm'}` : 'Chưa trả lời'}
+                    </p>
+                  )}
                 </div>
               ) : isSelectLayout ? (
-                <select
-                  value={selected}
-                  onChange={(event) => choose(row.key, event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500"
-                  aria-label={`Chọn đáp án cho câu ${index + 1}`}
-                >
-                  <option value="">Chọn đáp án</option>
-                  {options.map((option) => (
-                    <option key={option.id} value={option.answerId || option.id}>{option.id}. {option.text}</option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  <select
+                    value={selected}
+                    disabled={readOnly}
+                    onChange={(event) => choose(row.key, event.target.value)}
+                    className={`w-full rounded-lg border px-3 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500 ${
+                      readOnly && rowStatus === 'correct'
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : readOnly && rowStatus === 'wrong'
+                          ? 'border-rose-400 bg-rose-50'
+                          : 'border-slate-300 bg-white'
+                    }`}
+                    aria-label={`Chọn đáp án cho câu ${index + 1}`}
+                  >
+                    <option value="">Chọn đáp án</option>
+                    {options.map((option) => (
+                      <option key={option.id} value={option.answerId || option.id}>{option.id}. {option.text}</option>
+                    ))}
+                  </select>
+                  {readOnly && (
+                    <p className={`text-xs font-bold ${rowStatus === 'correct' ? 'text-emerald-800' : rowStatus === 'wrong' ? 'text-rose-800' : 'text-slate-600'}`}>
+                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctAnswer || 'GV chấm'}` : 'Chưa trả lời'}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div role="radiogroup" aria-label={`Lựa chọn câu ${index + 1}`} className={`grid gap-2 ${
                   options.some((option) => option.image)
@@ -314,7 +514,10 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                       <OptionCard
                         option={option}
                         selected={selected === (option.answerId || option.id)}
+                        correct={readOnly && correctAnswer === (option.answerId || option.id)}
+                        status={readOnly ? rowStatus : undefined}
                         showPinyin={showPinyin}
+                        disabled={readOnly}
                         onSelect={() => choose(row.key, option.answerId || option.id)}
                       />
                     </React.Fragment>

@@ -1,4 +1,5 @@
 import { LessonItem, LessonSection } from '../types/lesson';
+import { AnswerSnapshotItem } from '../types';
 
 export const STRUCTURED_EXERCISE_TYPES = [
   'listening_image_choice',
@@ -269,12 +270,13 @@ function optionDisplay(options: StructuredOption[], id: string): string {
 export function gradeStructuredSections(
   sections: LessonSection[] | undefined,
   answers: StructuredAnswerMap
-): { correct: number; wrong: number; notDone: number; total: number; wrongDetails: string[] } {
+): { correct: number; wrong: number; notDone: number; total: number; wrongDetails: string[]; answerDetails: AnswerSnapshotItem[] } {
   let correct = 0;
   let wrong = 0;
   let notDone = 0;
   let total = 0;
   const wrongDetails: string[] = [];
+  const answerDetails: AnswerSnapshotItem[] = [];
 
   (sections || []).forEach((section) => {
     section.items.forEach((item) => {
@@ -284,6 +286,20 @@ export function gradeStructuredSections(
       getStructuredQuestionRows(item).forEach((row, index) => {
         total += 1;
         const userAnswer = textValue(answers[row.key]);
+        const userAnswerText = optionDisplay(row.options, userAnswer);
+        const correctAnswerText = optionDisplay(row.options, row.correctAnswer);
+        const status: AnswerSnapshotItem['status'] = !userAnswer
+          ? 'unanswered'
+          : (userAnswer === row.correctAnswer ? 'correct' : 'wrong');
+        answerDetails.push({
+          id: row.key,
+          section: label,
+          number: row.number || index + 1,
+          prompt: row.prompt,
+          userAnswer: userAnswer ? userAnswerText : '',
+          correctAnswer: correctAnswerText,
+          status
+        });
         if (!userAnswer) {
           notDone += 1;
           return;
@@ -294,11 +310,11 @@ export function gradeStructuredSections(
         }
         wrong += 1;
         wrongDetails.push(
-          `[${label} Câu ${index + 1}: "${row.prompt}"]: Bạn chọn [${optionDisplay(row.options, userAnswer)}] — Đáp án đúng [${optionDisplay(row.options, row.correctAnswer)}]`
+          `[${label} Câu ${index + 1}: "${row.prompt}"]: Bạn chọn [${userAnswerText}] — Đáp án đúng [${correctAnswerText}]`
         );
       });
     });
   });
 
-  return { correct, wrong, notDone, total, wrongDetails };
+  return { correct, wrong, notDone, total, wrongDetails, answerDetails };
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AudioRecordItem, SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
+import { AnswerSnapshotItem, AudioRecordItem, SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import {
   deleteSubmissionsInGas,
@@ -14,7 +14,16 @@ import { validateLesson } from '../utils/validateLesson';
 import { LessonData } from '../types/lesson';
 import { groupExamsForSelection } from '../utils/examGrouping';
 import { useStudentExamCatalog } from '../hooks/useStudentExamCatalog';
-import { getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
+import { getAudioLinkLabel, getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
+import { buildExamCatalog } from '../utils/examCatalog';
+import { getExamAudioQuestions } from '../utils/examAudio';
+import {
+  buildOrderedQuestionList,
+  isAttempted,
+  isIncorrect,
+  requiresTeacherReview,
+  OrderedTeacherQuestion
+} from '../utils/teacherQuestionOrder';
 import { fileToCompressedDataUrl } from '../utils/imageUtils';
 import { ImportLesson } from './ImportLesson';
 import { EditQuestionModal } from './EditQuestionModal';
@@ -84,6 +93,82 @@ const normalizeLessonFilterValue = (value: string): string =>
     .trim()
     .toLocaleLowerCase('vi');
 
+const removeAnswerSnapshot = (value?: string): string =>
+  String(value || '').replace(/\n?\[ANSWER_SNAPSHOT\]:\s*\[[\s\S]*\]\s*$/, '').trim();
+
+const stripTeacherReviewMetadata = (value?: string): string =>
+  removeAnswerSnapshot(value)
+    .split(/\s*\|\s*|\r?\n/)
+    .map((part) => part.trim())
+    .filter((part) => (
+      part &&
+      !/^\[Đánh giá\s+[^\]]+\]$/i.test(part) &&
+      !/^\[(?:Tự luận|Ghi âm)\s*(?:C|câu)?\s*\d+\]:/i.test(part) &&
+      !/^\[[^\]:]+\]:\s*.+$/u.test(part)
+    ))
+    .join(' | ')
+    .trim();
+
+type TeacherReviewStatus = 'Chưa chấm' | 'Đúng' | 'Sai' | 'Cần sửa';
+
+const parseAnswerSnapshot = (value?: string): AnswerSnapshotItem[] => {
+  const match = String(value || '').match(/\[ANSWER_SNAPSHOT\]:\s*(\[[\s\S]*\])\s*$/);
+  if (!match) return [];
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is AnswerSnapshotItem => (
+      item && typeof item === 'object' &&
+      typeof item.id === 'string' &&
+      typeof item.prompt === 'string' &&
+      ['correct', 'wrong', 'unanswered', 'manual'].includes(item.status)
+    ));
+  } catch {
+    return [];
+  }
+};
+
+const normalizeTeacherReviewStatus = (value: string): TeacherReviewStatus => {
+  const normalized = value.trim().toLocaleLowerCase('vi');
+  if (normalized === 'đúng') return 'Đúng';
+  if (normalized === 'sai') return 'Sai';
+  if (normalized === 'cần sửa') return 'Cần sửa';
+  return 'Chưa chấm';
+};
+
+const parseTeacherItemMetadata = (value?: string): {
+  comments: Record<string, string>;
+  statuses: Record<string, TeacherReviewStatus>;
+} => {
+  const comments: Record<string, string> = {};
+  const statuses: Record<string, TeacherReviewStatus> = {};
+  String(value || '').split(/\s*\|\s*|\r?\n/).forEach((part) => {
+    const trimmed = part.trim();
+    const statusMatch = trimmed.match(/^\[Đánh giá\s+([^:]+):\s*(Chưa chấm|Đúng|Sai|Cần sửa)\]$/i);
+    if (statusMatch) {
+      statuses[statusMatch[1].trim()] = normalizeTeacherReviewStatus(statusMatch[2]);
+      return;
+    }
+
+    const commentMatch = trimmed.match(/^\[([^\]:]+)\]:\s*(.+)$/u);
+    if (commentMatch && commentMatch[2].trim()) comments[commentMatch[1].trim()] = commentMatch[2].trim();
+  });
+  return { comments, statuses };
+};
+
+const parseLegacyEssayAnswers = (value?: string): Array<{ prompt: string; answer: string }> => {
+  const text = removeAnswerSnapshot(value);
+  if (!text || text === 'Không làm phần tự luận') return [];
+  return text.split(/(?=【)/g).filter(Boolean).map((chunk) => {
+    const titleMatch = chunk.match(/【(.*?)】/);
+    return {
+      prompt: titleMatch?.[1]?.trim() || '',
+      answer: chunk.replace(/【.*?】\n?/, '').replace(/^Bài làm:\s*/, '').trim()
+    };
+  });
+};
+
 const matchesCatalogLessonTitle = (submissionLesson: string, catalogTitle: string): boolean => {
   const submission = normalizeLessonFilterValue(submissionLesson);
   const catalogTitleValue = normalizeLessonFilterValue(catalogTitle);
@@ -101,6 +186,17 @@ type TeacherWrongAnswerDetail = {
   userAnswer: string;
   correctAnswer: string;
   raw: string;
+};
+
+type TeacherQuestionView = OrderedTeacherQuestion & {
+  snapshot?: AnswerSnapshotItem;
+  answerText: string;
+  correctText: string;
+  audio?: AudioRecordItem;
+  attempted: boolean;
+  incorrect: boolean;
+  reviewRequired: boolean;
+  legacyWrong?: TeacherWrongAnswerDetail;
 };
 
 const parseTeacherWrongDetails = (wrong?: string): TeacherWrongAnswerDetail[] => {
@@ -227,6 +323,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [speakScoreInput, setSpeakScoreInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
   const [itemComments, setItemComments] = useState<Record<string, string>>({});
+  const [itemReviewStatus, setItemReviewStatus] = useState<Record<string, 'Chưa chấm' | 'Đúng' | 'Sai' | 'Cần sửa'>>({});
+  const [gradingViewMode, setGradingViewMode] = useState<'incorrect' | 'teacher_review'>('incorrect');
   const [modalCorrectedImages, setModalCorrectedImages] = useState<string[]>([]);
   const [isUploadingCorrected, setIsUploadingCorrected] = useState(false);
   const [uploadingFeedbackAudio, setUploadingFeedbackAudio] = useState<string | null>(null);
@@ -235,7 +333,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
 
   // All Available Exams
-  const rawExams = [...customExams, ...SAMPLE_EXAMS.filter((s) => !customExams.some((c) => c.id === s.id))];
+  const rawExams = buildExamCatalog(customExams, SAMPLE_EXAMS);
   const allExams = rawExams.filter((e) => !deletedExamIds.includes(e.id));
   const examGroups = groupExamsForSelection(allExams);
   const { allExams: studentCatalogExams } = useStudentExamCatalog(customExams, deletedExamIds);
@@ -296,6 +394,32 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   };
   const replaceEditingExam = (nextExam: ExamLesson) => {
     setEditingHistory({ past: [], present: cloneExam(nextExam), future: [] });
+  };
+  const updateExamTimeLimit = (enabled: boolean, minutes?: number) => {
+    setEditingExam((current) => {
+      const nextMinutes = minutes === undefined ? current.timeLimitMinutes : minutes;
+      const nextExam: ExamLesson = {
+        ...current,
+        timeLimitEnabled: enabled,
+        timeLimitMinutes: nextMinutes
+      };
+
+      if (!current.sourceLessonData) return nextExam;
+
+      return {
+        ...nextExam,
+        sourceLessonData: {
+          ...current.sourceLessonData,
+          lesson: {
+            ...current.sourceLessonData.lesson,
+            timeLimitEnabled: enabled,
+            ...(typeof nextMinutes === 'number' && nextMinutes > 0
+              ? { timeLimitMinutes: nextMinutes }
+              : {})
+          }
+        }
+      };
+    });
   };
   const undoEditingExam = () => {
     setEditingHistory((current) => {
@@ -780,8 +904,23 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     }
     setSelectedSub(sub);
     setSpeakScoreInput(String(sub.speakScore || ''));
-    setCommentInput(sub.comment || '');
-    setItemComments({});
+    const storedReviewMetadata = parseTeacherItemMetadata(sub.comment || sub.teacherComment || '');
+    const submissionExam = allExams.find((exam) => exam.id === sub.lesson || matchesCatalogLessonTitle(sub.lesson, exam.title));
+    const legacyCommentKeyMap = new Map<string, string>();
+    (submissionExam?.essayQuestions || []).forEach((question, index) => {
+      legacyCommentKeyMap.set(`Tự luận C${index + 1}`.toLocaleLowerCase(), question.id);
+    });
+    getExamAudioQuestions(submissionExam).forEach((question, index) => {
+      legacyCommentKeyMap.set(`Ghi âm C${index + 1}`.toLocaleLowerCase(), question.id);
+    });
+    const stableItemComments = Object.entries(storedReviewMetadata.comments).reduce<Record<string, string>>((comments, [key, value]) => {
+      comments[legacyCommentKeyMap.get(key.toLocaleLowerCase()) || key] = value;
+      return comments;
+    }, {});
+    setCommentInput(stripTeacherReviewMetadata(sub.comment || sub.teacherComment || ''));
+    setItemComments(stableItemComments);
+    setItemReviewStatus(storedReviewMetadata.statuses);
+    setGradingViewMode('incorrect');
     setModalCorrectedImages(sub.correctedImages || matchedHw?.correctedImages || []);
     setGradeSuccess(false);
   };
@@ -813,17 +952,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       .split('\n')
       .filter(Boolean)
       .map((link, index) => ({
-        label: link.split(':')[0] || `Ghi âm câu ${index + 1}`,
+        label: getAudioLinkLabel(link, `Ghi âm câu ${index + 1}`),
         data: '',
         mime: 'audio/webm',
         url: getDriveAudioPlayerUrl(link)
       }));
   };
 
-  const handleTeacherFeedbackRecorded = async (audioIndex: number, record: AudioRecordItem | null) => {
+  const handleTeacherFeedbackRecorded = async (audioIndex: number, record: AudioRecordItem | null, questionId?: string) => {
     if (!selectedSub || !record) return;
 
-    const feedbackKey = `audio_${audioIndex}`;
+    const feedbackKey = `audio_${questionId || audioIndex}`;
     setUploadingFeedbackAudio(feedbackKey);
     try {
       const dataUrl = record.data.startsWith('data:')
@@ -832,7 +971,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       const extension = record.mime.includes('mpeg') ? 'mp3' : record.mime.includes('mp4') ? 'm4a' : 'webm';
       const uploadedUrl = await uploadMediaFile(
         dataUrl,
-        `giao_vien_chua_${selectedSub.id}_${audioIndex + 1}.${extension}`,
+        `giao_vien_chua_${selectedSub.id}_${questionId || audioIndex + 1}.${extension}`,
         record.mime || 'audio/webm',
         'correction'
       );
@@ -840,8 +979,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       if (!uploadedUrl) throw new Error('Không nhận được liên kết file chữa');
 
       const currentAudios = getAudioRecordsForFeedback(selectedSub);
+      const hasTargetAudio = currentAudios.some((audio, index) => (
+        questionId ? audio.questionId === questionId || index === audioIndex : index === audioIndex
+      ));
       const updatedAudios = currentAudios.map((audio, index) =>
-        index === audioIndex
+        (questionId ? audio.questionId === questionId || index === audioIndex : index === audioIndex)
           ? {
               ...audio,
               teacherFeedbackUrl: uploadedUrl,
@@ -849,6 +991,16 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             }
           : audio
       );
+      if (questionId && !hasTargetAudio) {
+        updatedAudios.push({
+          questionId,
+          label: `Ghi âm chữa cho ${questionId}`,
+          data: '',
+          mime: record.mime || 'audio/webm',
+          teacherFeedbackUrl: uploadedUrl,
+          teacherFeedbackLabel: 'Ghi âm chữa phát âm của giáo viên'
+        });
+      }
       const updatedSub: SubmissionData = { ...selectedSub, audios: updatedAudios };
 
       setSelectedSub(updatedSub);
@@ -884,7 +1036,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
     const finalComment = [
       ...itemFeedbackParts,
-      commentInput.trim()
+      ...Object.entries(itemReviewStatus)
+        .map(([key, status]) => `[Đánh giá ${key}: ${status}]`),
+      stripTeacherReviewMetadata(commentInput)
     ].filter(Boolean).join(' | ');
 
     const res = await gradeSubmissionInGas(
@@ -1100,17 +1254,22 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
   const fillWordBankGroups = useMemo(() => {
     const groups = new Map<string, string[]>();
+    const showAnswerOnlyWordBank = /^hsk1-bai(?:6|7|8|9|10|11|12|13|14|15)(?:-|$)/i.test(editingExam.id);
     (editingExam.fillQuestions || []).forEach((question) => {
       const tier = question.tier || 'tier1';
       const words = groups.get(tier) || [];
-      (question.wordBank || []).forEach((word) => {
+      const sourceWords = showAnswerOnlyWordBank
+        ? [typeof question.answer === 'string' ? question.answer : question.acceptableAnswers?.split('|')[0]]
+        : (question.wordBank || []);
+      sourceWords.forEach((word) => {
+        if (typeof word !== 'string') return;
         const normalizedWord = word.trim();
         if (normalizedWord && !words.includes(normalizedWord)) words.push(normalizedWord);
       });
       groups.set(tier, words);
     });
     return Array.from(groups.entries()).map(([tier, wordBank]) => ({ tier, wordBank }));
-  }, [editingExam.fillQuestions]);
+  }, [editingExam.id, editingExam.fillQuestions]);
 
   const handleUpdateFillWordBank = (tier: string, rawWordBank: string) => {
     const wordBank = rawWordBank
@@ -1435,26 +1594,454 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     ? selectedWrongDetails.filter((detail) => !isAcceptedArrangeAnswer(detail, selectedSubmissionExam))
     : selectedWrongDetails;
   const selectedSubmissionMetrics = selectedSub ? getRegradedSubmissionMetrics(selectedSub, allExams) : null;
+  const orderedTeacherQuestions = buildOrderedQuestionList(selectedSubmissionExam);
+  const orderedQuestionById = new Map(orderedTeacherQuestions.map((item) => [item.questionId, item.question]));
 
-  const getAudioQuestionPrompt = (label: string | undefined, audioIndex: number): string => {
-    const audioLabel = String(label || '');
-    const speakingMatch = audioLabel.match(/Phần nói\s+C(\d+)/i);
-    const translationMatch = audioLabel.match(/Dịch\s*(?:&|và)\s*Ghi âm\s+C(\d+)/i);
-    const questionIndex = speakingMatch || translationMatch
-      ? Number((speakingMatch || translationMatch)?.[1]) - 1
-      : -1;
+  const getReviewQuestion = (questionId?: string, label?: string): Question | undefined => {
+    const questions = selectedSubmissionExam
+      ? [
+          ...(selectedSubmissionExam.speakingQuestions || []),
+          ...(selectedSubmissionExam.translationQuestions || []),
+          ...(selectedSubmissionExam.essayQuestions || [])
+        ]
+      : [];
+    if (questionId) {
+      const byId = questions.find((question) => question.id === questionId);
+      if (byId) return byId;
+    }
+    const labelText = String(label || '');
+    return questions.find((question) => labelText.includes(question.prompt));
+  };
 
-    const question = speakingMatch
-      ? selectedSubmissionExam?.speakingQuestions?.[questionIndex]
-      : translationMatch
-        ? selectedSubmissionExam?.translationQuestions?.[questionIndex]
-        : undefined;
+  const renderReviewDetails = (question: Question | undefined, showImage = true) => {
+    if (!question) return null;
+    const reviewKey = question.id;
+    return (
+      <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs">
+        {showImage && question.imageUrl && (
+          <img
+            src={getDriveMediaPlayerUrl(question.imageUrl)}
+            alt={`Hình minh họa câu hỏi ${question.id}`}
+            className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
+          />
+        )}
+        <p className="font-bold text-amber-950">Hướng dẫn chấm · {question.id}</p>
+        {question.referenceAnswers && (
+          <p><span className="font-semibold">Đáp án tham khảo:</span> {question.referenceAnswers.join(' / ')}</p>
+        )}
+        {question.requiredElements && (
+          <p><span className="font-semibold">Ý bắt buộc:</span> {question.requiredElements.join(' · ')}</p>
+        )}
+        {question.grammarTargets && (
+          <p><span className="font-semibold">Ngữ pháp mục tiêu:</span> {question.grammarTargets.join(' · ')}</p>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_140px] gap-2 items-center pt-1 border-t border-amber-200">
+          <label className="font-semibold text-amber-950">Đánh giá câu</label>
+          <select
+            value={itemReviewStatus[reviewKey] || 'Chưa chấm'}
+            onChange={(event) => setItemReviewStatus((prev) => ({ ...prev, [reviewKey]: event.target.value as 'Chưa chấm' | 'Đúng' | 'Sai' | 'Cần sửa' }))}
+            className="rounded border border-amber-300 bg-white px-2 py-1 text-xs"
+          >
+            <option>Chưa chấm</option>
+            <option>Đúng</option>
+            <option>Sai</option>
+            <option>Cần sửa</option>
+          </select>
+        </div>
+      </div>
+    );
+  };
 
+  const audioReviewQuestions = getExamAudioQuestions(selectedSubmissionExam);
+  const getAudioQuestionForRecord = (record: AudioRecordItem | string | undefined, audioIndex: number): Question | undefined => {
+    const audioLabel = typeof record === 'string' ? record : String(record?.label || '');
+    const taskGroup = typeof record === 'string' ? '' : String(record?.taskGroup || '');
+    const questionId = typeof record === 'string' ? undefined : record?.questionId;
+    // Stable questionId is authoritative. Labels/prompts and numeric positions
+    // are only compatibility fallbacks for submissions created before IDs were
+    // persisted with each recording.
+    const labeledQuestion = getReviewQuestion(undefined, audioLabel);
+    const orderedQuestion = questionId ? orderedQuestionById.get(questionId) : undefined;
+    if (orderedQuestion) {
+      // Repair old records whose persisted ID was shifted, when the full label
+      // still contains an unambiguous prompt for the actual question.
+      return labeledQuestion && labeledQuestion.id !== orderedQuestion.id ? labeledQuestion : orderedQuestion;
+    }
+
+    const directQuestion = getReviewQuestion(questionId);
+    if (directQuestion) {
+      return labeledQuestion && labeledQuestion.id !== directQuestion.id ? labeledQuestion : directQuestion;
+    }
+
+    if (labeledQuestion) return labeledQuestion;
+
+    const numberMatch = audioLabel.match(/(?:phần\s+nói|dịch\s*(?:nói|&|và)?\s*ghi\s*âm|câu|ghi\s*âm)\s*(?:c)?\s*(\d+)/i);
+    const questionNumber = numberMatch ? Number(numberMatch[1]) - 1 : -1;
+    if (questionNumber >= 0) {
+      const numberedQuestion = audioReviewQuestions.find((question) => {
+        const promptNumber = question.prompt.match(/(?:^|\s)Câu\s*(\d+)\s*[.:：-]?/i)?.[1];
+        return promptNumber && Number(promptNumber) === questionNumber + 1;
+      });
+      if (numberedQuestion) return numberedQuestion;
+
+      const isTranslationAudio = /dịch|口译|oral[_\s-]*translation/i.test(`${audioLabel} ${taskGroup}`);
+      const candidates = isTranslationAudio
+        ? (selectedSubmissionExam?.translationQuestions || []).filter((question) => question.translationType === 'vi_to_zh_audio')
+        : (selectedSubmissionExam?.speakingQuestions || []);
+      if (candidates[questionNumber]) return candidates[questionNumber];
+    }
+
+    return audioReviewQuestions[audioIndex];
+  };
+
+  const getAudioQuestionPrompt = (record: AudioRecordItem | string | undefined, audioIndex: number): string => {
+    const audioLabel = typeof record === 'string' ? record : String(record?.label || '');
+    const question = getAudioQuestionForRecord(record, audioIndex);
     if (question?.prompt) return question.prompt;
 
     const labelPrompt = audioLabel.match(/:\s*(.+)$/)?.[1]?.trim();
-    return labelPrompt || (questionIndex < 0 ? '' : `Câu ${audioIndex + 1}`);
+    return labelPrompt || `Câu ${audioIndex + 1}`;
   };
+
+  const getAudioRecordMatch = (question: Question): { audio?: AudioRecordItem; index: number } => {
+    const audios = selectedSub ? getAudioRecordsForFeedback(selectedSub) : [];
+    const index = audios.findIndex((audio, audioIndex) => (
+      audio.questionId === question.id ||
+      Boolean(audio.label && question.prompt && audio.label.includes(question.prompt)) ||
+      getAudioQuestionForRecord(audio, audioIndex)?.id === question.id
+    ));
+    return { audio: index >= 0 ? audios[index] : undefined, index };
+  };
+  const audioRecordsForDisplay = selectedSub ? getAudioRecordsForFeedback(selectedSub) : [];
+  const dedupedAudioRecords = (() => {
+    const records = new Map<string, { audio: AudioRecordItem; index: number; question?: Question }>();
+    audioRecordsForDisplay.forEach((audio, index) => {
+      const question = getAudioQuestionForRecord(audio, index);
+      const labelKey = String(audio.label || '').trim().toLocaleLowerCase();
+      const key = question ? `question:${question.id}` : `label:${labelKey || index}`;
+      const existing = records.get(key);
+      if (!existing) {
+        records.set(key, { audio, index, question });
+        return;
+      }
+
+      // A submission can contain the same recording twice after student and
+      // teacher media were merged. Keep one row and retain whichever fields
+      // are present in either record.
+      const merged = { ...existing.audio, ...audio };
+      if (!audio.data && !audio.url) {
+        merged.data = existing.audio.data || '';
+        merged.url = existing.audio.url;
+      }
+      if (!existing.audio.data && !existing.audio.url) {
+        merged.data = audio.data || '';
+        merged.url = audio.url;
+      }
+      if (!merged.teacherFeedbackUrl) {
+        merged.teacherFeedbackUrl = existing.audio.teacherFeedbackUrl || audio.teacherFeedbackUrl;
+      }
+      if (!merged.teacherFeedbackLabel) {
+        merged.teacherFeedbackLabel = existing.audio.teacherFeedbackLabel || audio.teacherFeedbackLabel;
+      }
+      const existingHasMedia = Boolean(existing.audio.data || existing.audio.url);
+      const currentHasMedia = Boolean(audio.data || audio.url);
+      records.set(key, {
+        audio: merged,
+        index: existingHasMedia || !currentHasMedia ? existing.index : index,
+        question: existing.question || question
+      });
+    });
+    return Array.from(records.values());
+  })();
+
+  const orderedAudioRecords = dedupedAudioRecords
+    .sort((left, right) => {
+      const leftOrder = left.question
+        ? orderedTeacherQuestions.findIndex((item) => item.questionId === left.question?.id)
+        : Number.MAX_SAFE_INTEGER;
+      const rightOrder = right.question
+        ? orderedTeacherQuestions.findIndex((item) => item.questionId === right.question?.id)
+        : Number.MAX_SAFE_INTEGER;
+      return (leftOrder < 0 ? Number.MAX_SAFE_INTEGER : leftOrder) - (rightOrder < 0 ? Number.MAX_SAFE_INTEGER : rightOrder)
+        || left.index - right.index;
+    });
+
+  const snapshotItems = parseAnswerSnapshot(selectedSub?.answerSnapshot || selectedSub?.essays);
+  const snapshotById = new Map(snapshotItems.map((item) => [item.id, item]));
+  const snapshotByPrompt = new Map(snapshotItems.map((item) => [item.prompt.trim().toLocaleLowerCase(), item]));
+  const legacyEssayAnswers = parseLegacyEssayAnswers(selectedSub?.essays);
+  const legacyWrongByPrompt = visibleSelectedWrongDetails.reduce<Map<string, TeacherWrongAnswerDetail>>((map, detail) => {
+    if (detail.prompt) map.set(detail.prompt.trim().toLocaleLowerCase(), detail);
+    return map;
+  }, new Map());
+  const audioByQuestionId = new Map<string, AudioRecordItem>();
+  orderedAudioRecords.forEach(({ audio, question }) => {
+    if (question && (audio.data || audio.url || audio.teacherFeedbackUrl)) audioByQuestionId.set(question.id, audio);
+  });
+
+  const formatTeacherAnswer = (question: Question, answer: unknown): string => {
+    if (answer === undefined || answer === null || answer === '') {
+      return question.acceptableAnswers?.split('|')[0]?.trim() || question.referenceAnswers?.[0] || question.suggestedAnswer || '';
+    }
+    if (typeof answer === 'number' && question.options) {
+      return question.options[answer] || `Đáp án ${String.fromCharCode(65 + answer)}`;
+    }
+    if (question.options && typeof answer === 'string') {
+      const option = question.options.find((value) => value === answer || value.startsWith(`${answer}.`));
+      if (option) return option;
+    }
+    return String(answer);
+  };
+
+  const getTeacherOptionId = (question: Question, answer: unknown): string => {
+    const formatted = formatTeacherAnswer(question, answer).trim();
+    const match = formatted.match(/^([A-Z])(?:\s*[.)。：:]|\s*$)/i);
+    return match ? match[1].toUpperCase() : '';
+  };
+
+  const areTeacherAnswersEquivalent = (question: Question, snapshot?: AnswerSnapshotItem): boolean => {
+    const userAnswer = String(snapshot?.userAnswer ?? '').trim();
+    const correctAnswer = String(snapshot?.correctAnswer ?? question.answer ?? '').trim();
+    if (!userAnswer || !correctAnswer) return false;
+
+    const userOptionId = getTeacherOptionId(question, userAnswer);
+    const correctOptionId = getTeacherOptionId(question, correctAnswer);
+    if (userOptionId && correctOptionId) return userOptionId === correctOptionId;
+
+    return formatTeacherAnswer(question, userAnswer).replace(/\s+/g, '')
+      === formatTeacherAnswer(question, correctAnswer).replace(/\s+/g, '');
+  };
+
+  const teacherQuestionViews: TeacherQuestionView[] = orderedTeacherQuestions.map((orderedQuestion) => {
+    const question = orderedQuestion.question;
+    const normalizedPrompt = question.prompt.trim().toLocaleLowerCase();
+    const legacyWrong = legacyWrongByPrompt.get(normalizedPrompt);
+    const legacyEssay = legacyEssayAnswers.find((item) => {
+      const prompt = item.prompt.trim().toLocaleLowerCase();
+      return prompt === normalizedPrompt || prompt.includes(normalizedPrompt) || normalizedPrompt.includes(prompt);
+    });
+    const snapshot = snapshotById.get(question.id) || snapshotByPrompt.get(normalizedPrompt) || (
+      legacyWrong
+        ? {
+            id: question.id,
+            section: orderedQuestion.sectionTitle,
+            number: orderedQuestion.originalQuestionNumber,
+            prompt: question.prompt,
+            userAnswer: legacyWrong.userAnswer,
+            correctAnswer: legacyWrong.correctAnswer,
+            status: 'wrong' as const
+          }
+        : legacyEssay
+          ? {
+              id: question.id,
+              section: orderedQuestion.sectionTitle,
+              number: orderedQuestion.originalQuestionNumber,
+              prompt: question.prompt,
+              userAnswer: legacyEssay.answer === '(Chưa làm)' ? '' : legacyEssay.answer,
+              correctAnswer: question.referenceAnswers?.[0] || question.suggestedAnswer || '',
+              status: 'manual' as const
+            }
+          : undefined
+    );
+    const audio = audioByQuestionId.get(question.id);
+    const attempted = isAttempted(question, snapshot, audio, selectedSub?.submissionImages || []);
+    const reviewRequired = requiresTeacherReview(question);
+    const incorrect = isIncorrect(snapshot, Boolean(legacyWrong)) && !areTeacherAnswersEquivalent(question, snapshot);
+    return {
+      ...orderedQuestion,
+      snapshot,
+      answerText: audio
+        ? 'Đã ghi âm'
+        : formatTeacherAnswer(question, snapshot?.userAnswer),
+      correctText: formatTeacherAnswer(question, snapshot?.correctAnswer ?? question.answer),
+      audio,
+      attempted,
+      incorrect,
+      reviewRequired,
+      legacyWrong
+    };
+  });
+
+  const incorrectTeacherQuestions = teacherQuestionViews.filter((item) => (
+    item.reviewRequired ? item.attempted : item.attempted && item.incorrect
+  ));
+  // Tab 2 is the complete subjective/manual-review block. Objective wrong
+  // questions belong only in the first tab and should not be duplicated here.
+  const teacherReviewQuestions = teacherQuestionViews.filter((item) => item.reviewRequired);
+  const visibleTeacherQuestions = gradingViewMode === 'incorrect'
+    ? incorrectTeacherQuestions
+    : teacherReviewQuestions;
+
+  const renderTeacherQuestionCard = (item: TeacherQuestionView) => {
+    const question = item.question;
+    const audioIndex = orderedAudioRecords.find((entry) => entry.question?.id === item.questionId)?.index ?? -1;
+    const audioSrc = item.audio ? getAudioSrcFromObject(item.audio) : '';
+    const isAudio = item.reviewRequired && (
+      question.type === 'speaking' ||
+      question.type === 'speaking_record' ||
+      String(question.type || '') === 'pronunciation' ||
+      question.translationType === 'vi_to_zh_audio'
+    );
+    const isStudentAnswerPresent = item.attempted && item.answerText.trim() !== '';
+    const selectedOptionId = getTeacherOptionId(question, item.snapshot?.userAnswer);
+    const correctOptionId = getTeacherOptionId(question, item.snapshot?.correctAnswer ?? question.answer);
+
+    return (
+      <article key={item.questionId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-200 pb-2">
+          <div>
+            <p className="text-sm font-bold text-slate-900">Câu {item.originalQuestionNumber}: {question.prompt}</p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-500">{item.sectionTitle} · ID: {item.questionId}</p>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+            item.reviewRequired
+              ? item.attempted ? 'bg-indigo-100 text-indigo-900' : 'bg-slate-100 text-slate-600'
+              : item.incorrect ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+          }`}>
+            {item.reviewRequired ? (item.attempted ? 'Đã làm' : 'Chưa làm') : (item.incorrect ? 'Sai' : 'Đúng')}
+          </span>
+        </div>
+
+        {question.imageUrl && (
+          <img
+            src={getDriveMediaPlayerUrl(question.imageUrl)}
+            alt={`Hình minh họa câu ${item.originalQuestionNumber}`}
+            className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
+          />
+        )}
+
+        {question.optionImages && question.optionImages.length > 0 && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+            <p className="text-xs font-bold text-slate-700">Các hình lựa chọn</p>
+            <div className="grid grid-cols-3 gap-2">
+              {question.optionImages.map((option) => {
+                const selected = selectedOptionId === option.id;
+                const correct = correctOptionId === option.id;
+                return (
+                  <div
+                    key={option.id}
+                    className={`rounded-lg border-2 bg-white p-2 ${
+                      selected && correct
+                        ? 'border-emerald-500 bg-emerald-50'
+                        : selected
+                          ? 'border-rose-400 bg-rose-50'
+                          : correct
+                            ? 'border-emerald-300 bg-emerald-50/50'
+                            : 'border-slate-200'
+                    }`}
+                  >
+                    <img
+                      src={getDriveMediaPlayerUrl(option.url)}
+                      alt={option.alt || `Lựa chọn ${option.id}`}
+                      className="aspect-[4/3] w-full rounded-md object-contain"
+                    />
+                    <div className="mt-1 flex items-center justify-between gap-1 text-xs font-bold">
+                      <span className="text-slate-800">{option.id}</span>
+                      <span className="text-right text-[10px] leading-tight">
+                        {selected && <span className="block text-rose-800">HS chọn</span>}
+                        {correct && <span className="block text-emerald-800">Đáp án đúng</span>}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {isAudio ? (
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 space-y-2">
+            <p className="text-xs font-bold text-indigo-950">Bài làm của học sinh</p>
+            {audioSrc ? (
+              <audio controls src={audioSrc} className="w-full h-8" />
+            ) : (
+              <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">Chưa ghi âm</p>
+            )}
+            {item.audio?.teacherFeedbackUrl && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-1.5">
+                <p className="text-xs font-bold text-emerald-900">File chữa phát âm của giáo viên</p>
+                <audio controls src={getDriveAudioPlayerUrl(item.audio.teacherFeedbackUrl)} className="w-full h-8" />
+              </div>
+            )}
+          </div>
+        ) : item.reviewRequired ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+            <p className="text-xs font-bold text-slate-600">Bài làm của học sinh</p>
+            <p className={`whitespace-pre-wrap text-sm leading-relaxed ${isStudentAnswerPresent ? 'text-slate-900' : 'italic text-slate-500'}`}>
+              {isStudentAnswerPresent ? item.answerText : 'Chưa làm'}
+            </p>
+          </div>
+        ) : null}
+
+        {!item.reviewRequired && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+              <p className="text-xs font-bold text-rose-900">Học sinh chọn / nhập</p>
+              <p className="mt-1 text-sm text-rose-800">{item.answerText || '—'}</p>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-xs font-bold text-emerald-900">Đáp án đúng</p>
+              <p className="mt-1 text-sm text-emerald-800">{item.correctText || '—'}</p>
+            </div>
+          </div>
+        )}
+
+        {item.reviewRequired && renderReviewDetails(question, false)}
+
+        <div className="border-t border-slate-200 pt-2 space-y-1">
+          <label className="block text-xs font-semibold text-indigo-900">
+            {isAudio ? '🎙️ Nhận xét của giáo viên cho bài ghi âm này:' : '💬 Nhận xét của giáo viên cho câu này:'}
+          </label>
+          <input
+            type="text"
+            value={itemComments[item.questionId] || ''}
+            onChange={(event) => setItemComments((prev) => ({ ...prev, [item.questionId]: event.target.value }))}
+            placeholder="Nhập nhận xét riêng cho câu này..."
+            className="w-full rounded-lg border border-indigo-300 bg-indigo-50/50 px-3 py-1.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        {isAudio && (
+          <div className="border-t border-indigo-100 pt-2 space-y-2">
+            <p className="text-xs font-semibold text-emerald-900">🎙️ Ghi âm lời chữa phát âm cho học sinh:</p>
+            {uploadingFeedbackAudio === `audio_${item.questionId}` && (
+              <p className="text-[11px] font-semibold text-emerald-700">Đang lưu file chữa lên bộ nhớ dùng chung...</p>
+            )}
+            <AudioRecorder
+              label="Ghi âm mẫu để học sinh nghe lại"
+              onAudioRecorded={(record) => void handleTeacherFeedbackRecorded(audioIndex, record, item.questionId)}
+            />
+          </div>
+        )}
+      </article>
+    );
+  };
+
+  const renderUnansweredAudioQuestion = (question: Question, questionIndex: number) => (
+    <div key={`unanswered-${question.id}`} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2 shadow-2xs">
+      <div className="space-y-1">
+        <span className="text-xs font-bold text-indigo-950">Phần nói C{questionIndex + 1}</span>
+        <p className="text-sm font-semibold leading-relaxed text-slate-800">Câu hỏi: {question.prompt}</p>
+      </div>
+      {renderReviewDetails(question)}
+      <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-mono leading-relaxed text-slate-800">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Bài làm của bạn: </span>
+        (Chưa làm)
+      </div>
+      <div className="pt-2 border-t border-indigo-100 space-y-1">
+        <label className="block text-xs font-semibold text-indigo-900">
+          🎙️ Nhận xét của giáo viên cho bài ghi âm này:
+        </label>
+        <input
+          type="text"
+          value={itemComments[`audio_${questionIndex}`] || ''}
+          onChange={(event) => setItemComments((prev) => ({ ...prev, [`audio_${questionIndex}`]: event.target.value }))}
+          placeholder="Nhập nhận xét riêng cho câu chưa làm..."
+          className="w-full px-3 py-1.5 border border-indigo-300 rounded-lg text-xs bg-indigo-50/50 text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+        />
+      </div>
+    </div>
+  );
 
   if (!isAuthenticated) {
     return (
@@ -1991,6 +2578,57 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               <span>{deleteNotice}</span>
             </div>
           )}
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <Clock className="w-5 h-5 text-amber-700 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="text-sm font-bold text-amber-950">Thời gian làm bài</h4>
+                  <p className="text-xs text-amber-900 mt-0.5">
+                    Có thể bật/tắt giới hạn thời gian cho từng bài. Khi hết giờ, bài của học sinh sẽ tự động được nộp.
+                  </p>
+                </div>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm font-bold text-amber-950 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editingExam.timeLimitEnabled === true}
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    updateExamTimeLimit(
+                      enabled,
+                      enabled ? (editingExam.timeLimitMinutes || 45) : editingExam.timeLimitMinutes
+                    );
+                  }}
+                  className="w-4 h-4 accent-amber-700"
+                  aria-label="Bật giới hạn thời gian"
+                />
+                Bật giới hạn thời gian
+              </label>
+            </div>
+
+            {editingExam.timeLimitEnabled === true && (
+              <div className="flex flex-wrap items-center gap-2 pl-7">
+                <label htmlFor="exam-time-limit-minutes" className="text-xs font-bold text-amber-950">
+                  Số phút làm bài
+                </label>
+                <input
+                  id="exam-time-limit-minutes"
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={editingExam.timeLimitMinutes ?? 45}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    updateExamTimeLimit(true, Number.isFinite(value) && value > 0 ? Math.round(value) : undefined);
+                  }}
+                  className="w-24 px-2.5 py-1.5 border border-amber-300 rounded-lg bg-white text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <span className="text-xs text-amber-900">phút</span>
+              </div>
+            )}
+          </div>
 
           {!editingExam.sourceLessonData && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
@@ -3450,7 +4088,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               </div>
             </div>
 
-            {/* Wrong Answers List if any */}
+            {false && (
+              <div>
+            {/* Legacy grouped result blocks retained only for backward reference. */}
             {visibleSelectedWrongDetails.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
@@ -3504,7 +4144,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 {selectedSub.essays && selectedSub.essays !== 'Không làm phần tự luận' && (
                   <button
                     type="button"
-                    onClick={() => speakText(selectedSub.essays)}
+                    onClick={() => speakText(removeAnswerSnapshot(selectedSub.essays))}
                     className="inline-flex items-center gap-1 text-xs text-amber-800 hover:text-amber-900 font-semibold cursor-pointer"
                   >
                     <Volume2 className="w-3.5 h-3.5" /> Nghe đọc bài tự luận
@@ -3514,10 +4154,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
               {selectedSub.essays && selectedSub.essays !== 'Không làm phần tự luận' ? (
                 <div className="space-y-3">
-                  {selectedSub.essays.split(/(?=【)/g).filter(Boolean).map((chunk, idx) => {
+                  {removeAnswerSnapshot(selectedSub.essays).split(/(?=【)/g).filter(Boolean).map((chunk, idx) => {
                     const titleMatch = chunk.match(/【(.*?)】/);
                     const title = titleMatch ? titleMatch[1] : `Câu ${idx + 1}`;
                     const answer = chunk.replace(/【.*?】\n?/, '').replace(/^Bài làm:\s*/, '').trim();
+                    const essayReviewQuestion = getReviewQuestion(undefined, title);
 
                     return (
                       <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
@@ -3534,6 +4175,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                         <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono whitespace-pre-wrap leading-relaxed">
                           {answer || '(Chưa làm)'}
                         </div>
+                        {renderReviewDetails(essayReviewQuestion)}
 
                         {/* Per-question comment input for teacher */}
                         <div className="pt-2 border-t border-slate-200 space-y-1">
@@ -3565,22 +4207,32 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 <Volume2 className="w-4 h-4 text-indigo-700" /> Bản Ghi Âm Luyện Nói Của Học Sinh
               </h4>
 
+              {audioReviewQuestions.some((question) => !getAudioRecordMatch(question).audio) && (
+                <div className="space-y-3">
+                  {audioReviewQuestions.map((question, questionIndex) => {
+                    if (getAudioRecordMatch(question).audio) return null;
+                    return renderUnansweredAudioQuestion(question, questionIndex);
+                  })}
+                </div>
+              )}
+
               {/* Local audio records */}
               {selectedSub.audios && selectedSub.audios.length > 0 ? (
                 <div className="space-y-3">
-                  {selectedSub.audios.map((aud, idx) => {
+                  {orderedAudioRecords.map(({ audio: aud, index: recordIndex, question: audioReviewQuestion }) => {
                     const audioSrc = getAudioSrcFromObject(aud);
-                    const audioQuestionPrompt = getAudioQuestionPrompt(aud.label, idx);
+                    const audioQuestionPrompt = audioReviewQuestion?.prompt || getAudioQuestionPrompt(aud, recordIndex);
                     return (
-                      <div key={idx} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2 shadow-2xs">
+                      <div key={recordIndex} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2 shadow-2xs">
                         <div className="space-y-1">
-                          <span className="text-xs font-bold text-indigo-950">{aud.label || `Ghi âm câu ${idx + 1}`}</span>
+                          <span className="text-xs font-bold text-indigo-950">{aud.label || `Ghi âm câu ${recordIndex + 1}`}</span>
                           {audioQuestionPrompt && (
                             <p className="text-sm font-semibold leading-relaxed text-slate-800">
                               Câu hỏi: {audioQuestionPrompt}
                             </p>
                           )}
                         </div>
+                        {renderReviewDetails(audioReviewQuestion)}
                         {audioSrc ? (
                           <audio controls src={audioSrc} className="w-full h-8" />
                         ) : (
@@ -3605,8 +4257,8 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                           </label>
                           <input
                             type="text"
-                            value={itemComments[`audio_${idx}`] || ''}
-                            onChange={(e) => setItemComments((prev) => ({ ...prev, [`audio_${idx}`]: e.target.value }))}
+                            value={itemComments[`audio_${recordIndex}`] || ''}
+                            onChange={(e) => setItemComments((prev) => ({ ...prev, [`audio_${recordIndex}`]: e.target.value }))}
                             placeholder="Nhập nhận xét riêng cho bài ghi âm này (ví dụ: phát âm chuẩn, chú ý thanh 3/thanh 4...)..."
                             className="w-full px-3 py-1.5 border border-indigo-300 rounded-lg text-xs bg-indigo-50/50 text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
                           />
@@ -3616,12 +4268,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                           <p className="text-xs font-semibold text-emerald-900">
                             🎙️ Ghi âm lời chữa phát âm cho học sinh:
                           </p>
-                          {uploadingFeedbackAudio === `audio_${idx}` && (
+                          {uploadingFeedbackAudio === `audio_${recordIndex}` && (
                             <p className="text-[11px] text-emerald-700 font-semibold">Đang lưu file chữa lên bộ nhớ dùng chung...</p>
                           )}
                           <AudioRecorder
                             label="Ghi âm mẫu để học sinh nghe lại"
-                            onAudioRecorded={(record) => void handleTeacherFeedbackRecorded(idx, record)}
+                            onAudioRecorded={(record) => void handleTeacherFeedbackRecorded(recordIndex, record)}
                           />
                         </div>
                       </div>
@@ -3634,8 +4286,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                   {selectedSub.driveLinks.split('\n').filter(Boolean).map((link, idx) => {
                     const rawUrl = link.substring(link.indexOf('http'));
                     const playableUrl = getDriveAudioPlayerUrl(link);
-                    const audioLabel = link.split(':')[0] || `File ghi âm câu ${idx + 1}`;
+                    const audioLabel = getAudioLinkLabel(link, `File ghi âm câu ${idx + 1}`);
                     const audioQuestionPrompt = getAudioQuestionPrompt(audioLabel, idx);
+                    const audioReviewQuestion = getAudioQuestionForRecord(audioLabel, idx);
 
                     return (
                       <div key={idx} className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2">
@@ -3647,6 +4300,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                             </p>
                           )}
                         </div>
+                        {renderReviewDetails(audioReviewQuestion)}
                         <div className="flex justify-end text-xs font-bold text-indigo-900">
                           {rawUrl && (
                             <a
@@ -3707,9 +4361,65 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500 italic">Không có file ghi âm cho bài làm này.</p>
+                audioReviewQuestions.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">Không có file ghi âm cho bài làm này.</p>
+                ) : null
               )}
             </div>
+
+              </div>
+            )}
+
+            {/* ORDERED TEACHER REVIEW */}
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Câu hỏi theo đúng thứ tự đề</h4>
+                  <p className="mt-1 text-xs text-slate-500">Recording, bài làm và nhận xét được ghép bằng ID câu hỏi.</p>
+                </div>
+                <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Chế độ xem chấm bài">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={gradingViewMode === 'incorrect'}
+                    onClick={() => setGradingViewMode('incorrect')}
+                    className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${gradingViewMode === 'incorrect' ? 'bg-white text-rose-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    Câu sai + đã làm ({incorrectTeacherQuestions.length})
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={gradingViewMode === 'teacher_review'}
+                    onClick={() => setGradingViewMode('teacher_review')}
+                    className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${gradingViewMode === 'teacher_review' ? 'bg-white text-indigo-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    Tất cả câu tự luận ({teacherReviewQuestions.length})
+                  </button>
+                </div>
+              </div>
+
+              {visibleTeacherQuestions.length > 0 ? (
+                <div className="space-y-3">
+                  {visibleTeacherQuestions.map((item, index) => (
+                    <React.Fragment key={item.questionId}>
+                      {(index === 0 || visibleTeacherQuestions[index - 1].sectionTitle !== item.sectionTitle) && (
+                        <h5 className="border-b border-slate-200 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-slate-600">
+                          {item.sectionTitle}
+                        </h5>
+                      )}
+                      {renderTeacherQuestionCard(item)}
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                  {gradingViewMode === 'incorrect'
+                    ? 'Không có câu sai hoặc câu tự luận / nói đã làm.'
+                    : 'Không có câu tự luận hoặc câu cần giáo viên chấm.'}
+                </div>
+              )}
+            </section>
 
             {/* TEACHER GRADING FORM */}
             <form onSubmit={handleSaveGrade} className="space-y-4 pt-2 border-t border-slate-200">

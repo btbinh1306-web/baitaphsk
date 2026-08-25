@@ -3,6 +3,7 @@ import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { fetchServerHandwritingExercises } from '../services/apiService';
 import { getHandwritingExercises, convertHandwritingToExamLesson } from '../services/handwritingService';
 import { ExamLesson } from '../types';
+import { buildExamCatalog } from '../utils/examCatalog';
 
 export function useStudentExamCatalog(customExams: ExamLesson[], deletedExamIds: string[]) {
   const [serverHwExamLessons, setServerHwExamLessons] = useState<ExamLesson[]>([]);
@@ -31,9 +32,9 @@ export function useStudentExamCatalog(customExams: ExamLesson[], deletedExamIds:
   }, []);
 
   const allExams = useMemo(() => {
-    const list: ExamLesson[] = [...customExams];
+    const list: ExamLesson[] = buildExamCatalog(customExams, SAMPLE_EXAMS);
 
-    [...serverHwExamLessons, ...localHwExamLessons, ...SAMPLE_EXAMS].forEach((exam) => {
+    [...serverHwExamLessons, ...localHwExamLessons].forEach((exam) => {
       if (!list.some((item) => item.id === exam.id)) list.push(exam);
     });
 

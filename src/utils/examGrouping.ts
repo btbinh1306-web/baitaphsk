@@ -32,12 +32,20 @@ function isAggregateExam(exam: ExamLesson): boolean {
   return /tổng hợp/i.test(exam.title) || /tong-hop/i.test(exam.id);
 }
 
+function isNewFrameworkPracticeExam(exam: ExamLesson): boolean {
+  return /đề luyện thi.*khung mới/i.test(exam.title) || /de-luyen-thi.*khung-moi/i.test(exam.id);
+}
+
 function aggregateRange(exam: ExamLesson): [number, number] | null {
   const match = exam.title.match(/Bài\s+(\d+)\s*[–-]\s*(\d+)/iu);
   return match ? [Number(match[1]), Number(match[2])] : null;
 }
 
 function sortExams(a: ExamLesson, b: ExamLesson): number {
+  const aNewFrameworkPractice = isNewFrameworkPracticeExam(a);
+  const bNewFrameworkPractice = isNewFrameworkPracticeExam(b);
+  if (aNewFrameworkPractice !== bNewFrameworkPractice) return aNewFrameworkPractice ? 1 : -1;
+
   const aAggregate = isAggregateExam(a);
   const bAggregate = isAggregateExam(b);
 

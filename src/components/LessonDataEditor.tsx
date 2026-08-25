@@ -32,6 +32,8 @@ const FIELD_LABELS: Record<string, string> = {
   title: 'Tiêu đề',
   level: 'Trình độ',
   description: 'Mô tả',
+  timeLimitEnabled: 'Bật giới hạn thời gian',
+  timeLimitMinutes: 'Số phút làm bài',
   sections: 'Các phần bài học',
   items: 'Danh sách bài tập',
   type: 'Dạng bài tập',

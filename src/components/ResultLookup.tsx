@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { ExamLesson, SubmissionData } from '../types';
+import { AnswerSnapshotItem, ExamLesson, Question, SubmissionData } from '../types';
 import { fetchResultById, cleanImageTagsFromText, getLocalSubmissions } from '../services/gasService';
 import { getHandwritingSubmissions } from '../services/handwritingService';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
-import { getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
+import { getAudioLinkLabel, getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { ImageLightboxModal } from './ImageLightboxModal';
+import { ResultExamReadOnly } from './ResultExamReadOnly';
+import type { ReadOnlyExamSection } from './ResultExamReadOnly';
 import { normalizeImageList } from '../utils/imageUtils';
+import { getStructuredQuestionRows, isStructuredExerciseItem } from '../utils/structuredExercises';
+import { buildExamCatalog } from '../utils/examCatalog';
+import { getExamAudioQuestions } from '../utils/examAudio';
 import {
   Search,
   CheckCircle2,
@@ -28,6 +33,54 @@ interface ResultLookupProps {
   initialSubmissionId?: string;
   customExams?: ExamLesson[];
 }
+
+type TeacherReviewStatus = 'Chưa chấm' | 'Đúng' | 'Sai' | 'Cần sửa';
+
+interface PrintableItem extends AnswerSnapshotItem {
+  legacyFallback?: boolean;
+  options?: string[];
+  subjective?: boolean;
+  teacherComment?: string;
+  teacherCorrection?: boolean;
+  teacherScore?: string | number;
+  teacherReviewStatus?: TeacherReviewStatus;
+  optionImages?: string[];
+  imageUrl?: string;
+  audioUrl?: string;
+  audioText?: string;
+  subjectiveKind?: 'essay' | 'translation' | 'speaking';
+  subjectiveIndex?: number;
+  studentAudioUrl?: string;
+  teacherAudioUrl?: string;
+  studentAudioLabel?: string;
+}
+
+interface PrintableSection {
+  title: string;
+  passage?: string;
+  items: PrintableItem[];
+}
+
+const SUBJECTIVE_SECTION_PATTERN = /(tự luận|dịch|nói|ghi âm|viết|chép|朗读|口语|自我介绍|看图说话|写作|口译|笔译)/i;
+
+const isSubjectiveQuestion = (question: PrintableItem): boolean => (
+  Boolean(question.subjective) ||
+  question.status === 'manual' ||
+  SUBJECTIVE_SECTION_PATTERN.test(`${question.section} ${question.prompt}`)
+);
+
+const shouldShowInReviewMode = (question: PrintableItem, result: SubmissionData): boolean => (
+  question.status === 'wrong' ||
+  question.status === 'unanswered' ||
+  isSubjectiveQuestion(question) ||
+  Boolean(question.teacherComment) ||
+  Boolean(question.teacherCorrection) ||
+  question.teacherScore !== undefined ||
+  Boolean(question.teacherReviewStatus) ||
+  // Old submissions do not contain per-question status. Keep them visible
+  // rather than pretending that an uncertain answer was correct.
+  Boolean(question.legacyFallback && result.notDone > 0)
+);
 
 const safeText = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -60,16 +113,45 @@ const stripTeacherCommentMetadata = (value: unknown): string => {
   return cleaned
     .split(/\s*\|\s*|\r?\n/)
     .map((part) => part.trim())
-    .filter((part) => part && !/^\[(?:Tự luận|Ghi âm)\s*(?:C|câu)?\s*\d+\]:/i.test(part))
+    .filter((part) => (
+      part &&
+      !/^\[(?:Tự luận|Ghi âm)\s*(?:C|câu)?\s*\d+\]:/i.test(part) &&
+      !/^\[Đánh giá\s+[^\]]+\]$/i.test(part) &&
+      !/^\[[^\]:]+\]:\s*.+$/u.test(part)
+    ))
     .join(' | ')
     .trim();
 };
+
+const parseAnswerSnapshot = (value?: string): AnswerSnapshotItem[] => {
+  const text = safeText(value);
+  const match = text.match(/\[ANSWER_SNAPSHOT\]:\s*(\[[\s\S]*\])\s*$/);
+  if (!match) return [];
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is AnswerSnapshotItem => (
+      item && typeof item === 'object' &&
+      typeof item.id === 'string' &&
+      typeof item.prompt === 'string' &&
+      ['correct', 'wrong', 'unanswered', 'manual'].includes(item.status)
+    ));
+  } catch {
+    return [];
+  }
+};
+
+const removeAnswerSnapshot = (value: string): string =>
+  value.replace(/\n?\[ANSWER_SNAPSHOT\]:\s*\[[\s\S]*\]\s*$/, '').trim();
 
 export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId = '', customExams = [] }) => {
   const [submissionId, setSubmissionId] = useState(initialSubmissionId);
   const [result, setResult] = useState<SubmissionData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+  const [resultViewMode, setResultViewMode] = useState<'review' | 'all'>('review');
 
   // Lightbox Modal state
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
@@ -207,6 +289,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     setIsLoading(true);
     setErrorMsg(null);
     setResult(null);
+    setIsPrintPreviewOpen(false);
+    setResultViewMode('review');
 
     try {
       const res = await fetchResultById(searchId.trim());
@@ -223,6 +307,22 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     }
   };
 
+  const handleBrowserPrint = () => {
+    document.body.classList.add('hsk-printing');
+    const cleanup = () => document.body.classList.remove('hsk-printing');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 1500);
+  };
+
+  const handlePrintExam = () => {
+    if (!document.querySelector('.print-result-sheet')) return;
+    setIsPrintPreviewOpen(true);
+    // Let the preview render first. This also keeps the feature usable when the
+    // embedded browser does not show the native print dialog immediately.
+    window.setTimeout(handleBrowserPrint, 250);
+  };
+
   const onSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     handleSearch();
@@ -231,13 +331,33 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   // Helper: Parse only per-item teacher comments for the result details.
   const parseTeacherComment = (commentStr?: string) => {
     const text = safeText(commentStr);
-    if (!text) return { itemComments: {} as Record<string, string> };
+    if (!text) {
+      return {
+        itemComments: {} as Record<string, string>,
+        itemReviews: {} as Record<string, TeacherReviewStatus>
+      };
+    }
 
     const parts = text.split(' | ');
     const itemComments: Record<string, string> = {};
+    const itemReviews: Record<string, TeacherReviewStatus> = {};
+
+    const normalizeReviewStatus = (value: string): TeacherReviewStatus => {
+      const normalized = value.trim().toLocaleLowerCase('vi');
+      if (normalized === 'đúng') return 'Đúng';
+      if (normalized === 'sai') return 'Sai';
+      if (normalized === 'cần sửa') return 'Cần sửa';
+      return 'Chưa chấm';
+    };
 
     parts.forEach((part) => {
       const trimmed = part.trim();
+      const reviewMatch = trimmed.match(/^\[Đánh giá\s+([^:]+):\s*(Chưa chấm|Đúng|Sai|Cần sửa)(?:,\s*điểm\s*(.*?))?\]$/i);
+      if (reviewMatch) {
+        itemReviews[reviewMatch[1].trim()] = normalizeReviewStatus(reviewMatch[2]);
+        return;
+      }
+
       const match = trimmed.match(/^\[(Tự luận|Ghi âm)\s*(?:C|câu)?\s*(\d+)\]:\s*(.*)$/i);
       if (match) {
         const type = match[1].toLowerCase().includes('tự luận') ? 'essay' : 'audio';
@@ -246,15 +366,21 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         if (text) {
           itemComments[`${type}_${num}`] = text;
         }
+        return;
+      }
+
+      const stableMatch = trimmed.match(/^\[([^\]:]+)\]:\s*(.*)$/u);
+      if (stableMatch && stableMatch[2].trim()) {
+        itemComments[stableMatch[1].trim()] = stableMatch[2].trim();
       }
     });
 
-    return { itemComments };
+    return { itemComments, itemReviews };
   };
 
   // Helper: Parse essay string into individual questions & answers
   const parseEssays = (essaysStr?: string) => {
-    const text = safeText(essaysStr);
+    const text = removeAnswerSnapshot(safeText(essaysStr));
     if (!text || text === 'Không làm phần tự luận') return [];
     const chunks = text.split(/(?=【)/g).filter(Boolean);
     return chunks.map((chunk) => {
@@ -474,6 +600,13 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     },
     {} as Record<string, string>
   );
+  const itemReviews = teacherCommentSources.reduce(
+    (reviews, source) => {
+      const parsed = parseTeacherComment(source).itemReviews;
+      return { ...reviews, ...parsed };
+    },
+    {} as Record<string, TeacherReviewStatus>
+  );
   const essayList = parseEssays(result?.essays);
 
   // Filter essayList to remove auto-generated placeholder strings
@@ -485,11 +618,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   const validCustomExams = Array.isArray(customExams)
     ? customExams.filter((exam): exam is ExamLesson => Boolean(exam && typeof exam === 'object'))
     : [];
-  const examCatalog = [
-    ...validCustomExams,
-    ...SAMPLE_EXAMS.filter((sampleExam) => !validCustomExams.some((exam) => exam.id === sampleExam.id))
-  ];
-  const resultExam = result
+  const examCatalog = buildExamCatalog(validCustomExams, SAMPLE_EXAMS);
+  // Handwriting results use the original image-review screen below. Do not
+  // let the read-only exam builder reinterpret them as a normal exam.
+  const resultExam = result && !isHandwritingType
     ? examCatalog.find((exam) => examMatchesLesson(exam, result.lesson))
     : undefined;
 
@@ -525,6 +657,306 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         ? Math.round((displayCorrect / result.total) * 100)
         : (result.percent <= 1 && result.percent > 0 ? Math.round(result.percent * 100) : result.percent))
     : 0;
+
+  const answerSnapshot = parseAnswerSnapshot(result?.answerSnapshot || result?.essays);
+  const snapshotById = new Map(answerSnapshot.map((item) => [item.id, item]));
+  const legacyWrongItems = visibleWrongList.map(parseWrongLineItem);
+
+  const formatQuestionAnswer = (question: Question, answer: unknown): string => {
+    if (answer === undefined || answer === null || answer === '') {
+      return question.acceptableAnswers?.split('|')[0]?.trim() || '';
+    }
+    if (typeof answer === 'number' && question.options) {
+      return question.options[answer] || `Đáp án ${String.fromCharCode(65 + answer)}`;
+    }
+    return String(answer);
+  };
+
+  const findLegacyWrong = (prompt: string) => {
+    const normalizedPrompt = normalizedText(prompt);
+    return legacyWrongItems.find((item) => {
+      const normalizedWrongPrompt = normalizedText(item.prompt);
+      return normalizedPrompt && normalizedWrongPrompt && (
+        normalizedPrompt === normalizedWrongPrompt ||
+        normalizedPrompt.includes(normalizedWrongPrompt) ||
+        normalizedWrongPrompt.includes(normalizedPrompt)
+      );
+    });
+  };
+
+  const makePrintableItem = (
+    id: string,
+    section: string,
+    prompt: string,
+    correctAnswer: string,
+    number?: number,
+    options: string[] = [],
+    media: Pick<PrintableItem, 'optionImages' | 'imageUrl' | 'audioUrl' | 'audioText' | 'subjectiveKind' | 'subjectiveIndex' | 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel'> = {}
+  ): PrintableItem => {
+    const saved = snapshotById.get(id) || snapshotById.get(prompt);
+    const legacyWrong = findLegacyWrong(prompt);
+    if (saved) return { ...saved, options, ...media };
+
+    return {
+      id,
+      section,
+      number,
+      prompt,
+      userAnswer: legacyWrong?.userAns || '',
+      correctAnswer: legacyWrong?.correctAns || correctAnswer,
+      status: legacyWrong ? 'wrong' : (result?.notDone ? 'unanswered' : 'correct'),
+      legacyFallback: true,
+      options,
+      ...media
+    };
+  };
+
+  const driveAudioLinks = safeText(result?.driveLinks).split('\n').map((link) => link.trim()).filter(Boolean);
+  const getSpeakingAudio = (question: Question, index: number): Pick<PrintableItem, 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel'> => {
+    const audio = result?.audios?.find((candidate) => candidate.questionId === question.id) || result?.audios?.[index];
+    const driveAudioUrl = driveAudioLinks[index] ? getDriveAudioPlayerUrl(driveAudioLinks[index]) : '';
+    const studentAudioUrl = audio ? (getAudioSrcFromObject(audio) || driveAudioUrl) : driveAudioUrl;
+
+    return {
+      studentAudioUrl: studentAudioUrl || undefined,
+      teacherAudioUrl: audio?.teacherFeedbackUrl
+        ? getDriveAudioPlayerUrl(audio.teacherFeedbackUrl)
+        : undefined,
+      studentAudioLabel: audio?.label || `Phần nói C${index + 1}`
+    };
+  };
+
+  const printableSections: PrintableSection[] = [];
+  const addPrintableSection = (section: PrintableSection) => {
+    if (section.items.length > 0) printableSections.push(section);
+  };
+
+  if (resultExam && !isHandwritingType) {
+    addPrintableSection({
+      title: 'Trắc nghiệm',
+      items: (resultExam.mcQuestions || []).map((question, index) => makePrintableItem(
+        question.id,
+        'Trắc nghiệm',
+        question.prompt,
+        formatQuestionAnswer(question, question.answer),
+        index + 1,
+        question.options || [],
+        { imageUrl: question.imageUrl, audioUrl: question.audioUrl, audioText: question.audioText }
+      ))
+    });
+
+    addPrintableSection({
+      title: 'Điền từ',
+      items: (resultExam.fillQuestions || []).map((question, index) => makePrintableItem(
+        question.id,
+        'Điền từ',
+        question.prompt,
+        question.acceptableAnswers?.split('|')[0]?.trim() || '',
+        index + 1,
+        question.wordBank || [],
+        { imageUrl: question.imageUrl, audioUrl: question.audioUrl, audioText: question.audioText }
+      ))
+    });
+
+    addPrintableSection({
+      title: 'Sắp xếp câu',
+      items: (resultExam.arrangeQuestions || []).map((question, index) => makePrintableItem(
+        question.id,
+        'Sắp xếp câu',
+        question.prompt,
+        question.acceptableAnswers?.split('|')[0]?.trim() || '',
+        index + 1,
+        question.wordChips || [],
+        { imageUrl: question.imageUrl, audioUrl: question.audioUrl, audioText: question.audioText }
+      ))
+    });
+
+    (resultExam.readingPassages || []).forEach((passage) => {
+      addPrintableSection({
+        title: `Đọc hiểu · ${passage.title}`,
+        passage: passage.content,
+        items: passage.questions.map((question, index) => makePrintableItem(
+          question.id,
+          `Đọc hiểu · ${passage.title}`,
+          question.prompt,
+          formatQuestionAnswer(question, question.answer),
+          index + 1,
+          question.options || [],
+          { imageUrl: question.imageUrl, audioUrl: question.audioUrl, audioText: question.audioText }
+        ))
+      });
+    });
+
+    addPrintableSection({
+      title: 'Bài nghe',
+      items: resultExam.listeningQuestions.flatMap((question) => (
+        question.subQuestions?.length ? question.subQuestions : [question]
+      )).map((question, index) => makePrintableItem(
+        question.id,
+        'Bài nghe',
+        question.prompt,
+        formatQuestionAnswer(question, question.answer),
+        index + 1,
+        question.options || [],
+        {
+          imageUrl: question.imageUrl,
+          audioUrl: question.audioUrl || question.audioPromptUrl,
+          audioText: question.audioText
+        }
+      ))
+    });
+
+    (resultExam.sections || []).forEach((section) => {
+      const structuredItems: PrintableItem[] = [];
+      section.items.forEach((item) => {
+        if (isStructuredExerciseItem(item)) {
+          getStructuredQuestionRows(item).forEach((row, index) => {
+            const correctOption = row.options.find((option) => option.id === row.correctAnswer);
+            structuredItems.push(makePrintableItem(
+              row.key,
+              section.title || 'Bài tập',
+              row.prompt,
+              correctOption ? `${correctOption.id}. ${correctOption.text}` : row.correctAnswer,
+              row.number || index + 1,
+              row.options.map((option) => `${option.id}. ${option.text}`),
+              {
+                optionImages: row.options.map((option) => option.image),
+                audioUrl: row.audio || row.questionAudio,
+                audioText: row.transcript
+              }
+            ));
+          });
+          return;
+        }
+
+        const prompt = typeof item.data.prompt === 'string'
+          ? item.data.prompt
+          : (typeof item.data.title === 'string' ? item.data.title : item.id);
+        const correctAnswer = typeof item.data.correctAnswer === 'string'
+          ? item.data.correctAnswer
+          : (typeof item.data.answer === 'string' ? item.data.answer : '');
+        structuredItems.push(makePrintableItem(
+          item.id,
+          section.title || 'Bài tập',
+          prompt,
+          correctAnswer,
+          structuredItems.length + 1
+        ));
+      });
+
+      addPrintableSection({ title: section.title || 'Bài tập', items: structuredItems });
+    });
+
+    const subjectiveQuestionEntries: Array<{
+      question: Question;
+      subjectiveKind: NonNullable<PrintableItem['subjectiveKind']>;
+      subjectiveIndex: number;
+    }> = [
+      ...(resultExam.essayQuestions || []).map((question, index) => ({ question, subjectiveKind: 'essay' as const, subjectiveIndex: index })),
+      ...(resultExam.translationQuestions || []).map((question, index) => ({
+        question,
+        subjectiveKind: 'translation' as const,
+        subjectiveIndex: (resultExam.essayQuestions || []).length + index
+      })),
+      ...(resultExam.speakingQuestions || []).map((question, index) => ({ question, subjectiveKind: 'speaking' as const, subjectiveIndex: index }))
+    ];
+
+    addPrintableSection({
+      title: 'Tự luận / Dịch / Nói',
+      items: subjectiveQuestionEntries.map(({ question, subjectiveKind, subjectiveIndex }, index) => makePrintableItem(
+        question.id,
+        question.taskGroupTitle || 'Tự luận / Dịch / Nói',
+        question.prompt,
+        question.referenceAnswers?.[0] || question.suggestedAnswer || question.acceptableAnswers || '',
+        index + 1,
+        [],
+        {
+          imageUrl: question.imageUrl,
+          audioUrl: question.audioUrl || question.audioPromptUrl,
+          audioText: question.audioText,
+          subjectiveKind,
+          subjectiveIndex,
+          ...(subjectiveKind === 'speaking' ? getSpeakingAudio(question, subjectiveIndex) : {})
+        }
+      ))
+    });
+  } else if (!isHandwritingType && answerSnapshot.length > 0) {
+    const grouped = new Map<string, PrintableItem[]>();
+    answerSnapshot.forEach((item) => {
+      const items = grouped.get(item.section) || [];
+      items.push(item);
+      grouped.set(item.section, items);
+    });
+    grouped.forEach((items, title) => addPrintableSection({ title, items }));
+  }
+
+  const resultSections = printableSections.map((section) => ({
+    ...section,
+    items: section.items.map((item, index) => {
+      const zeroBasedIndex = (item.number || index + 1) - 1;
+      const sectionText = `${section.title} ${item.section}`;
+      const audioItem = item.subjectiveKind === 'speaking' || /ghi âm|口语|口译/i.test(sectionText);
+      const subjective = isSubjectiveQuestion(item) || /tự luận|dịch|viết|nói|ghi âm/i.test(sectionText);
+      const feedbackIndex = item.subjectiveIndex ?? zeroBasedIndex;
+      const teacherComment = item.teacherComment || itemComments[item.id] || itemComments[`${audioItem ? 'audio' : 'essay'}_${feedbackIndex}`];
+      const teacherReview = itemReviews[item.id];
+
+      return {
+        ...item,
+        subjective,
+        teacherComment,
+        teacherCorrection: Boolean(subjective && correctedImgs.length > 0),
+        teacherScore: subjective && resultSpeakScore !== '' ? resultSpeakScore : undefined,
+        teacherReviewStatus: teacherReview
+      };
+    })
+  }));
+
+  const reviewSections = resultSections
+    .map((section) => ({
+      ...section,
+      items: result ? section.items.filter((item) => shouldShowInReviewMode(item, result)) : []
+    }))
+    .filter((section) => section.items.length > 0);
+
+  const speakingResultItems = resultSections
+    .flatMap((section) => section.items)
+    .filter((item) => item.subjectiveKind === 'speaking');
+  const getSpeakingResultItem = (questionId: string | undefined, label: string | undefined, index: number) => (
+    speakingResultItems.find((item) => (
+      (questionId && item.id === questionId) ||
+      (label && (item.studentAudioLabel === label || label.includes(item.prompt)))
+    )) || speakingResultItems[index]
+  );
+  const resultAudioQuestionIds = new Set(getExamAudioQuestions(resultExam).map((question) => question.id));
+  const resultAudioQuestionItems = resultSections
+    .flatMap((section) => section.items)
+    .filter((item) => resultAudioQuestionIds.has(item.id));
+  const getRecordedAudioForResultItem = (item: PrintableItem) => result?.audios?.find((audio) => (
+    audio.questionId === item.id ||
+    Boolean(audio.label && item.prompt && audio.label.includes(item.prompt))
+  ));
+  const missingResultAudioItems = resultAudioQuestionItems.filter((item) => !getRecordedAudioForResultItem(item));
+  const findResultItemForPrompt = (prompt: string): PrintableItem | undefined => {
+    const normalizedPrompt = normalizedText(prompt);
+    return resultSections
+      .flatMap((section) => section.items)
+      .find((item) => {
+        const candidatePrompt = normalizedText(item.prompt);
+        return Boolean(normalizedPrompt && candidatePrompt && (
+          normalizedPrompt === candidatePrompt ||
+          normalizedPrompt.includes(candidatePrompt) ||
+          candidatePrompt.includes(normalizedPrompt)
+        ));
+      });
+  };
+  const renderTeacherReview = (item?: PrintableItem) => item?.teacherReviewStatus ? (
+    <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+      <span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}
+    </div>
+  ) : null;
+  const allQuestionCount = resultSections.reduce((count, section) => count + section.items.length, 0);
+  const reviewQuestionCount = reviewSections.reduce((count, section) => count + section.items.length, 0);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -572,7 +1004,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
       {/* Result Display Card */}
       {result && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 space-y-6 animate-in fade-in duration-200">
+        <div className="screen-result bg-white rounded-2xl border border-slate-200 shadow-md p-6 space-y-6 animate-in fade-in duration-200">
           {/* Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
@@ -590,7 +1022,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               <p className="text-xs text-slate-500 font-medium">Lớp: {result.class} | Bài: {result.lesson}</p>
             </div>
 
-            <div>
+            <div className="flex flex-col items-end gap-2">
               {result.status === 'Đã chấm' ? (
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-800 px-3.5 py-1.5 rounded-full border border-emerald-300">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Đã được giáo viên chấm
@@ -599,6 +1031,16 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-100 text-amber-800 px-3.5 py-1.5 rounded-full border border-amber-300">
                   <Clock className="w-4 h-4 text-amber-600" /> Đã nộp - Chờ giáo viên chấm
                 </span>
+              )}
+              {resultExam && !isHandwritingType && (
+                <button
+                  type="button"
+                  onClick={handlePrintExam}
+                  className="no-print inline-flex items-center gap-1.5 rounded-lg bg-indigo-700 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-800"
+                  title="Mở hộp thoại in để lưu toàn bộ đề và kết quả dưới dạng PDF"
+                >
+                  <Download className="w-3.5 h-3.5" /> Xuất PDF toàn bộ đề
+                </button>
               )}
             </div>
           </div>
@@ -613,6 +1055,45 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               </p>
             </section>
           )}
+
+          {!isHandwritingType && resultSections.length > 0 && (
+            <div className="no-print flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1" role="tablist" aria-label="Chế độ xem kết quả">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={resultViewMode === 'review'}
+                onClick={() => setResultViewMode('review')}
+                className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition ${
+                  resultViewMode === 'review'
+                    ? 'bg-indigo-700 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-white'
+                }`}
+              >
+                Bài cần xem lại ({reviewQuestionCount})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={resultViewMode === 'all'}
+                onClick={() => setResultViewMode('all')}
+                className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition ${
+                  resultViewMode === 'all'
+                    ? 'bg-indigo-700 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-white'
+                }`}
+              >
+                Xem toàn bộ đề ({allQuestionCount})
+              </button>
+            </div>
+          )}
+
+          {!isHandwritingType && resultSections.length > 0 && resultViewMode === 'all' ? (
+            <ResultExamReadOnly
+              sections={resultSections as ReadOnlyExamSection[]}
+              structuredSections={resultExam?.sections}
+            />
+          ) : (
+            <>
 
           {/* DẠNG BÀI NỘP ẢNH / BÀI VIẾT CHÉP TAY */}
           {isHandwritingType ? (
@@ -818,7 +1299,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                     </h4>
                     <div className="space-y-3">
                       {essayListFiltered.map((item, idx) => {
-                        const teacherItemComment = itemComments[`essay_${idx}`];
+                        const teacherItemComment = itemComments[findResultItemForPrompt(item.prompt)?.id || ''] || itemComments[`essay_${idx}`];
                         const cleanAnswer = cleanImageTagsFromText(item.answer);
                         return (
                           <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2">
@@ -1120,7 +1601,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
                   <div className="space-y-4">
                     {essayList.map((item, idx) => {
-                      const teacherItemComment = itemComments[`essay_${idx}`];
+                      const reviewItem = findResultItemForPrompt(item.prompt);
+                      const teacherItemComment = itemComments[reviewItem?.id || ''] || itemComments[`essay_${idx}`];
 
                       return (
                         <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
@@ -1130,6 +1612,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                               Câu {idx + 1}: {item.prompt}
                             </span>
                           </div>
+
+                          {renderTeacherReview(reviewItem)}
 
                           {/* Student Answer */}
                           <div className="space-y-1">
@@ -1170,11 +1654,47 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                   <Mic className="w-4 h-4 text-indigo-600" /> Bản Ghi Âm Luyện Nói Của Bạn:
                 </h4>
 
+                {missingResultAudioItems.length > 0 && (
+                  <div className="space-y-4">
+                    {missingResultAudioItems.map((item, idx) => (
+                      <div key={`unanswered-result-audio-${item.id}`} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                          <span className="text-xs font-bold text-indigo-950">
+                            {item.studentAudioLabel || `Phần nói C${item.number || idx + 1}`}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold leading-relaxed text-slate-800">Đề bài: {item.prompt}</p>
+                        <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-mono leading-relaxed text-slate-800">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Bài làm của bạn: </span>
+                          (Chưa làm)
+                        </div>
+                        {renderTeacherReview(item)}
+                        {item.imageUrl && (
+                          <img
+                            src={getDriveMediaPlayerUrl(item.imageUrl)}
+                            alt={`Hình minh họa câu nói ${item.number || idx + 1}`}
+                            className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
+                          />
+                        )}
+                        {item.teacherComment ? (
+                          <div className="p-3 bg-indigo-100/80 border-2 border-indigo-300 rounded-lg text-xs text-indigo-950 space-y-1">
+                            <span className="font-bold text-indigo-900">Nhận xét của Giáo viên cho bài ghi âm này:</span>
+                            <p className="font-semibold italic text-indigo-950 pl-4 border-l-2 border-indigo-400">"{item.teacherComment}"</p>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-slate-400 italic">(Chưa có nhận xét riêng cho câu này)</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {result.audios && result.audios.length > 0 ? (
                   <div className="space-y-4">
                     {result.audios.map((aud, idx) => {
                       const audioSrc = getAudioSrcFromObject(aud);
-                      const teacherItemComment = itemComments[`audio_${idx}`];
+                      const speakingItem = getSpeakingResultItem(aud.questionId, aud.label, idx);
+                      const teacherItemComment = itemComments[speakingItem?.id || ''] || itemComments[`audio_${idx}`];
 
                       return (
                         <div key={idx} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3 shadow-2xs">
@@ -1184,6 +1704,22 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                               {aud.label || `Ghi âm câu ${idx + 1}`}
                             </span>
                           </div>
+
+                          {speakingItem?.prompt && (
+                            <p className="text-sm font-semibold leading-relaxed text-slate-800">
+                              Đề bài: {speakingItem.prompt}
+                            </p>
+                          )}
+
+                          {renderTeacherReview(speakingItem)}
+
+                          {speakingItem?.imageUrl && (
+                            <img
+                              src={getDriveMediaPlayerUrl(speakingItem.imageUrl)}
+                              alt={`Hình minh họa câu nói ${idx + 1}`}
+                              className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
+                            />
+                          )}
 
                           {/* Audio Player */}
                           {audioSrc ? (
@@ -1235,15 +1771,16 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                       File ghi âm đã lưu trên Google Drive:
                     </span>
                     {result.driveLinks.split('\n').filter(Boolean).map((link, idx) => {
-                      const teacherItemComment = itemComments[`audio_${idx}`];
                       const rawUrl = link.substring(link.indexOf('http'));
                       const playableUrl = getDriveAudioPlayerUrl(link);
+                      const speakingItem = getSpeakingResultItem(undefined, getAudioLinkLabel(link), idx);
+                      const teacherItemComment = itemComments[speakingItem?.id || ''] || itemComments[`audio_${idx}`];
 
                       return (
                         <div key={idx} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-indigo-950">
-                              {link.split(':')[0] || `Ghi âm câu ${idx + 1}`}
+                              {getAudioLinkLabel(link, `Ghi âm câu ${idx + 1}`)}
                             </span>
                             {rawUrl && (
                               <a
@@ -1256,6 +1793,22 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                               </a>
                             )}
                           </div>
+
+                          {speakingItem?.prompt && (
+                            <p className="text-sm font-semibold leading-relaxed text-slate-800">
+                              Đề bài: {speakingItem.prompt}
+                            </p>
+                          )}
+
+                          {renderTeacherReview(speakingItem)}
+
+                          {speakingItem?.imageUrl && (
+                            <img
+                              src={getDriveMediaPlayerUrl(speakingItem.imageUrl)}
+                              alt={`Hình minh họa câu nói ${idx + 1}`}
+                              className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
+                            />
+                          )}
 
                           {/* HTML5 Audio Player for Drive Audio */}
                           {playableUrl && (
@@ -1288,6 +1841,79 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               </div>
             </>
           )}
+          </>
+          )}
+        </div>
+      )}
+
+      {result && resultExam && !isHandwritingType && (
+        <div className={`print-result-sheet ${isPrintPreviewOpen ? 'print-preview-visible' : ''}`}>
+          {isPrintPreviewOpen && (
+            <div className="print-preview-toolbar no-print">
+              <div>
+                <strong>Bản xem trước toàn bộ đề</strong>
+                <span> · Bấm “In / Lưu PDF”; nếu hộp thoại không hiện, dùng menu In của trình duyệt.</span>
+              </div>
+              <div className="print-preview-actions">
+                <button type="button" onClick={handleBrowserPrint}>In / Lưu PDF</button>
+                <button type="button" onClick={() => setIsPrintPreviewOpen(false)}>Quay lại</button>
+              </div>
+            </div>
+          )}
+          <header className="print-report-header">
+            <h1>Phiếu xem lại bài làm HSK</h1>
+            <p><strong>Học sinh:</strong> {result.name} · <strong>Lớp:</strong> {result.class}</p>
+            <p><strong>Đề:</strong> {result.lesson} · <strong>Mã bài:</strong> {result.id}</p>
+            <div className="print-report-score">
+              <strong>Kết quả: {displayCorrect}/{result.total} câu đúng ({displayPercent}%)</strong>
+              <span>Sai: {displayWrongCount} · Chưa làm: {result.notDone}</span>
+            </div>
+          </header>
+
+          {answerSnapshot.length === 0 && result.notDone > 0 && (
+            <p className="print-report-note">
+              Bài nộp này được tạo trước khi hệ thống lưu trạng thái từng câu. Các câu sai được đối chiếu chính xác; những câu còn lại có thể gồm câu đúng hoặc câu chưa làm.
+            </p>
+          )}
+
+          {printableSections.map((section) => (
+            <section key={section.title} className="print-report-section">
+              <h2>{section.title}</h2>
+              {section.passage && <p className="print-report-passage">{section.passage}</p>}
+              <div className="print-report-questions">
+                {section.items.map((item, index) => {
+                  const statusLabel = item.status === 'correct'
+                    ? '✓ ĐÚNG'
+                    : item.status === 'wrong'
+                      ? '✗ SAI'
+                      : item.status === 'manual'
+                        ? 'GV CHẤM'
+                        : '— CHƯA LÀM';
+                  const statusClass = item.status === 'correct'
+                    ? 'print-status-correct'
+                    : item.status === 'wrong'
+                      ? 'print-status-wrong'
+                      : item.status === 'manual'
+                        ? 'print-status-manual'
+                        : 'print-status-unanswered';
+
+                  return (
+                    <article key={`${item.id}-${index}`} className="print-report-question">
+                      <div className="print-report-question-heading">
+                        <strong>Câu {item.number || index + 1}: {item.prompt}</strong>
+                        <span className={statusClass}>{statusLabel}</span>
+                      </div>
+                      {item.options && item.options.length > 0 && (
+                        <p className="print-report-options"><strong>Lựa chọn:</strong> {item.options.join(' · ')}</p>
+                      )}
+                      <p><strong>Học sinh trả lời:</strong> {item.userAnswer || 'Chưa có câu trả lời'}</p>
+                      <p className="print-report-correct"><strong>Đáp án đúng:</strong> {item.correctAnswer || 'Giáo viên chấm / chưa có đáp án tự động'}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 

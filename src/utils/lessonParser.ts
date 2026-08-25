@@ -139,7 +139,9 @@ export function convertExamLessonToLessonData(exam: ExamLesson): LessonData {
       id: exam.id,
       title: exam.title,
       level: exam.level,
-      description: exam.description
+      description: exam.description,
+      ...(typeof exam.timeLimitEnabled === 'boolean' ? { timeLimitEnabled: exam.timeLimitEnabled } : {}),
+      ...(typeof exam.timeLimitMinutes === 'number' ? { timeLimitMinutes: exam.timeLimitMinutes } : {})
     },
     sections
   };
@@ -498,6 +500,12 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
   const level = (lessonMeta.level as ExamLesson['level']) || 'HSK 3';
   const description =
     lessonMeta.description || `Bài học nhập từ file JSON (Phiên bản: ${lessonData.version || '1.0'}).`;
+  const timeLimitEnabled = typeof lessonMeta.timeLimitEnabled === 'boolean'
+    ? lessonMeta.timeLimitEnabled
+    : undefined;
+  const timeLimitMinutes = typeof lessonMeta.timeLimitMinutes === 'number' && lessonMeta.timeLimitMinutes > 0
+    ? Math.round(lessonMeta.timeLimitMinutes)
+    : undefined;
 
   const vocabList: VocabItem[] = [];
   const mcQuestions: Question[] = [];
@@ -735,6 +743,8 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
     title,
     level,
     description,
+    timeLimitEnabled,
+    timeLimitMinutes,
     vocabList,
     mcQuestions,
     fillQuestions,
