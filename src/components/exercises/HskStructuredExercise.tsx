@@ -24,6 +24,7 @@ interface HskStructuredExerciseProps {
   audioPlayCounts?: Record<string, number>;
   audioScope?: string;
   onAudioAttempt?: (key: string) => { allowed: boolean; count: number };
+  hideBlockAudio?: boolean;
 }
 
 const getText = (value: unknown): string => typeof value === 'string' ? value : '';
@@ -154,6 +155,53 @@ function LimitedAudio({
   );
 }
 
+interface StructuredBlockAudioProps {
+  item: LessonItem;
+  studentMode?: boolean;
+  audioPlayCounts?: Record<string, number>;
+  audioScope?: string;
+  onAudioAttempt?: (key: string) => { allowed: boolean; count: number };
+  sticky?: boolean;
+}
+
+export const StructuredBlockAudio: React.FC<StructuredBlockAudioProps> = ({
+  item,
+  studentMode = false,
+  audioPlayCounts = {},
+  audioScope = '',
+  onAudioAttempt,
+  sticky = false
+}) => {
+  const data = item.data || {};
+  const src = getText(data.audio) || getText(data.audioUrl) || getText(data.audioPromptUrl);
+  if (!src) return null;
+
+  const playCount = typeof data.maxPlayCount === 'number' && data.maxPlayCount > 0
+    ? data.maxPlayCount
+    : typeof data.playCount === 'number' && data.playCount > 0
+      ? data.playCount
+      : 2;
+  const limit = studentMode && data.limitPlayCount === true;
+  const audioKey = `${audioScope}::${item.id}::block`;
+
+  return (
+    <div className={`rounded-lg border border-indigo-200 bg-indigo-50/95 p-3 space-y-1 backdrop-blur ${
+      sticky ? 'sticky top-28 sm:top-20 z-40 shadow-lg' : ''
+    }`}>
+      <p className="text-xs font-semibold text-indigo-900">File nghe dùng chung</p>
+      <LimitedAudio
+        src={src}
+        playCount={playCount}
+        limit={limit}
+        studentMode={studentMode}
+        audioKey={audioKey}
+        usedCount={audioPlayCounts[audioKey] || 0}
+        onAttempt={onAudioAttempt}
+      />
+    </div>
+  );
+};
+
 function OptionCard({
   option,
   selected,
@@ -181,8 +229,10 @@ function OptionCard({
       className={`min-w-0 text-left rounded-lg border p-3 transition focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:cursor-default ${
         selected && correct
           ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-400'
-          : selected
+          : selected && status
             ? 'border-rose-400 bg-rose-50 ring-1 ring-rose-300'
+            : selected
+              ? 'border-emerald-600 bg-emerald-600 text-white ring-1 ring-emerald-500'
             : correct
               ? 'border-emerald-300 bg-emerald-50/50'
               : 'border-slate-200 bg-white hover:border-slate-400'
@@ -199,13 +249,17 @@ function OptionCard({
       )}
       <div className="flex items-start gap-2">
         <span className={`w-6 h-6 shrink-0 rounded-full border flex items-center justify-center text-xs font-bold ${
-          selected ? 'bg-teal-700 border-teal-700 text-white' : 'border-slate-300 text-slate-700'
+          selected && !status
+            ? 'bg-white/15 border-white text-white'
+            : selected
+              ? 'bg-teal-700 border-teal-700 text-white'
+              : 'border-slate-300 text-slate-700'
         }`}>
           {option.id}
         </span>
         <span className="min-w-0">
-          {option.text && <span className="block text-sm font-semibold text-slate-900">{option.text}</span>}
-          {showPinyin && option.pinyin && <span className="block text-xs text-indigo-700 mt-0.5">{option.pinyin}</span>}
+          {option.text && <span className={`block text-sm font-semibold ${selected && !status ? 'text-white' : 'text-slate-900'}`}>{option.text}</span>}
+          {showPinyin && option.pinyin && <span className={`block text-xs mt-0.5 ${selected && !status ? 'text-emerald-50' : 'text-indigo-700'}`}>{option.pinyin}</span>}
         </span>
       </div>
       {status && (selected || correct) && (
@@ -229,7 +283,8 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
   mode = 'exam',
   audioPlayCounts = {},
   audioScope = '',
-  onAudioAttempt
+  onAudioAttempt,
+  hideBlockAudio = false
 }) => {
   const [localAnswers, setLocalAnswers] = useState<StructuredAnswerMap>({});
   const data = item.data || {};
@@ -281,11 +336,14 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
         </div>
       </header>
 
-      {blockAudio && (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 space-y-1">
-          <p className="text-xs font-semibold text-indigo-900">File nghe dùng chung</p>
-          <LimitedAudio src={blockAudio} playCount={playCount} limit={limitPlayCount} studentMode={studentMode} />
-        </div>
+      {blockAudio && !hideBlockAudio && (
+        <StructuredBlockAudio
+          item={item}
+          studentMode={studentMode}
+          audioPlayCounts={audioPlayCounts}
+          audioScope={audioScope}
+          onAudioAttempt={onAudioAttempt}
+        />
       )}
 
       {blockQuestionAudio && (
@@ -414,6 +472,16 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                 </div>
               )}
 
+              {row.image && (
+                <div className="rounded-lg border border-slate-200 bg-white p-2 sm:max-w-sm">
+                  <img
+                    src={getDriveMediaPlayerUrl(row.image)}
+                    alt={row.alt || `Hình câu ${row.number ?? index + 1}`}
+                    className="max-h-52 w-full object-contain"
+                  />
+                </div>
+              )}
+
               {type === 'fill' && options.length === 0 ? (
                 <div className="space-y-2">
                   <input
@@ -459,8 +527,10 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                           className={`min-w-11 rounded-lg border px-4 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:cursor-default ${
                             optionSelected && optionCorrect
                               ? 'border-emerald-600 bg-emerald-600 text-white'
-                              : optionSelected
+                              : optionSelected && readOnly
                                 ? 'border-rose-500 bg-rose-100 text-rose-900'
+                                : optionSelected
+                                  ? 'border-emerald-600 bg-emerald-600 text-white'
                                 : optionCorrect
                                   ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
                                   : 'border-slate-300 bg-white text-slate-800 hover:border-teal-500'

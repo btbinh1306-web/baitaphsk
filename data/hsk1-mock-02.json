@@ -36,6 +36,7 @@
               {
                 "id": "q01",
                 "number": 1,
+                "audio": "/audio/hsk1_aggregate_0115/q01.wav",
                 "audioText": "你喝牛奶吗？不喝，我喝水。男的喝什么？",
                 "options": [
                   { "id": "A", "image": "/images/hsk1-mock-01/milk.webp", "alt": "Một cốc và một hộp sữa" },
@@ -48,6 +49,7 @@
               {
                 "id": "q02",
                 "number": 2,
+                "audio": "/audio/hsk1_aggregate_0115/q02.wav",
                 "audioText": "他是老师吗？不是，他是学生。他是什么人？",
                 "options": [
                   { "id": "A", "image": "/images/hsk1-mock-01/teacher.webp", "alt": "Một giáo viên" },
@@ -60,6 +62,7 @@
               {
                 "id": "q03",
                 "number": 3,
+                "audio": "/audio/hsk1_aggregate_0115/q03.wav",
                 "audioText": "她今天在学校吗？不，她在医院。她在哪儿？",
                 "options": [
                   { "id": "A", "image": "/images/hsk1-mock-01/school.webp", "alt": "Ở trường học" },
@@ -72,6 +75,7 @@
               {
                 "id": "q04",
                 "number": 4,
+                "audio": "/audio/hsk1_aggregate_0115/q04.wav",
                 "audioText": "你怎么去商店？我不坐飞机，我坐出租车。女的怎么去商店？",
                 "options": [
                   { "id": "A", "image": "/images/hsk1-mock-01/airplane.webp", "alt": "Đi máy bay" },
@@ -118,6 +122,7 @@
               {
                 "id": "q06",
                 "number": 6,
+                "audio": "/audio/hsk1_aggregate_0115/q06.wav",
                 "audioText": "你是哪国人？我不是中国人，我是越南人。男的是哪国人？",
                 "prompt": "男的是哪国人？",
                 "options": [
@@ -131,6 +136,7 @@
               {
                 "id": "q07",
                 "number": 7,
+                "audio": "/audio/hsk1_aggregate_0115/q07.wav",
                 "audioText": "你家有五口人吗？不是，我们家有四口人。男的家有几口人？",
                 "prompt": "男的家有几口人？",
                 "options": [
@@ -144,6 +150,7 @@
               {
                 "id": "q08",
                 "number": 8,
+                "audio": "/audio/hsk1_aggregate_0115/q08.wav",
                 "audioText": "你喜欢看电影吗？不喜欢，我喜欢听歌。女的喜欢什么？",
                 "prompt": "女的喜欢什么？",
                 "options": [
@@ -157,6 +164,7 @@
               {
                 "id": "q09",
                 "number": 9,
+                "audio": "/audio/hsk1_aggregate_0115/q09.wav",
                 "audioText": "你明天上课吗？不，明天我休息，下午去超市买东西。男的明天上课吗？",
                 "prompt": "男的明天上课吗？",
                 "options": [
@@ -170,6 +178,7 @@
               {
                 "id": "q10",
                 "number": 10,
+                "audio": "/audio/hsk1_aggregate_0115/q10.wav",
                 "audioText": "现在七点吗？不是，现在七点半。八点我去上课。男的什么时候去上课？",
                 "prompt": "男的什么时候去上课？",
                 "options": [
@@ -210,11 +219,11 @@
               { "id": "F", "image": "/images/hsk1-mock-02/movie-preference.png", "alt": "Xem phim" }
             ],
             "items": [
-              { "id": "q11", "number": 11, "audioText": "你家有五口人吗？不是，我们家有四口人。女的家有几口人？", "maxPlayCount": 2, "correctAnswer": "A" },
-              { "id": "q12", "number": 12, "audioText": "你下午去哪儿？下午我去超市买苹果，晚上去学校。男的下午去哪儿？", "maxPlayCount": 2, "correctAnswer": "B" },
-              { "id": "q13", "number": 13, "audioText": "你几点上课？我两点半上课，四点下课。男的几点上课？", "maxPlayCount": 2, "correctAnswer": "C" },
-              { "id": "q14", "number": 14, "audioText": "猫在桌子上吗？不是，小猫在桌子下面。小猫在哪儿？", "maxPlayCount": 2, "correctAnswer": "D" },
-              { "id": "q15", "number": 15, "audioText": "你坐出租车去机场吗？不，我坐飞机去机场。男的怎么去机场？", "maxPlayCount": 2, "correctAnswer": "E" }
+              { "id": "q11", "number": 11, "audio": "/audio/hsk1_aggregate_0115/q11.wav", "audioText": "你家有五口人吗？不是，我们家有四口人。女的家有几口人？", "maxPlayCount": 2, "correctAnswer": "A" },
+              { "id": "q12", "number": 12, "audio": "/audio/hsk1_aggregate_0115/q12.wav", "audioText": "你下午去哪儿？下午我去超市买苹果，晚上去学校。男的下午去哪儿？", "maxPlayCount": 2, "correctAnswer": "B" },
+              { "id": "q13", "number": 13, "audio": "/audio/hsk1_aggregate_0115/q13.wav", "audioText": "你几点上课？我两点半上课，四点下课。男的几点上课？", "maxPlayCount": 2, "correctAnswer": "C" },
+              { "id": "q14", "number": 14, "audio": "/audio/hsk1_aggregate_0115/q14.wav", "audioText": "猫在桌子上吗？不是，小猫在桌子下面。小猫在哪儿？", "maxPlayCount": 2, "correctAnswer": "D" },
+              { "id": "q15", "number": 15, "audio": "/audio/hsk1_aggregate_0115/q15.wav", "audioText": "你坐出租车去机场吗？不，我坐飞机去机场。男的怎么去机场？", "maxPlayCount": 2, "correctAnswer": "E" }
             ]
           }
         }
@@ -240,6 +249,7 @@
               {
                 "id": "q16",
                 "number": 16,
+                "audio": "/audio/hsk1_aggregate_0115/q16.wav",
                 "audioText": "我姐姐喜欢看电影，我喜欢听歌。谁喜欢看电影？",
                 "question": "谁喜欢看电影？",
                 "options": [
@@ -253,6 +263,7 @@
               {
                 "id": "q17",
                 "number": 17,
+                "audio": "/audio/hsk1_aggregate_0115/q17.mp3",
                 "audioText": "下午我在学校上课，晚上我在家看电视。男的晚上在哪儿？",
                 "question": "男的晚上在哪儿？",
                 "options": [
@@ -266,6 +277,7 @@
               {
                 "id": "q18",
                 "number": 18,
+                "audio": "/audio/hsk1_aggregate_0115/q18.mp3",
                 "audioText": "我下午两点半上课，四点下课，六点半吃晚饭。男的几点下课？",
                 "question": "男的几点下课？",
                 "options": [
@@ -279,6 +291,7 @@
               {
                 "id": "q19",
                 "number": 19,
+                "audio": "/audio/hsk1_aggregate_0115/q19.wav",
                 "audioText": "苹果一斤八块吗？不是，一斤六块。我要两斤。苹果一斤多少钱？",
                 "question": "苹果一斤多少钱？",
                 "options": [
@@ -292,6 +305,7 @@
               {
                 "id": "q20",
                 "number": 20,
+                "audio": "/audio/hsk1_aggregate_0115/q20.wav",
                 "audioText": "你想去哪儿？我想去商店买东西。今天下雨，我不去商店，我在家喝牛奶。男的今天在哪儿？",
                 "question": "男的今天在哪儿？",
                 "options": [

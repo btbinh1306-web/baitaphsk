@@ -44,6 +44,7 @@ interface ExerciseRendererProps {
   audioPlayCounts?: Record<string, number>;
   audioScope?: string;
   onAudioAttempt?: (key: string) => { allowed: boolean; count: number };
+  hideBlockAudio?: boolean;
 }
 
 export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({
@@ -56,7 +57,8 @@ export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({
   mode = 'exam',
   audioPlayCounts,
   audioScope,
-  onAudioAttempt
+  onAudioAttempt,
+  hideBlockAudio
 }) => {
   if (isStructuredExerciseItem(item)) {
     return (
@@ -71,6 +73,7 @@ export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({
         audioPlayCounts={audioPlayCounts}
         audioScope={audioScope}
         onAudioAttempt={onAudioAttempt}
+        hideBlockAudio={hideBlockAudio}
       />
     );
   }

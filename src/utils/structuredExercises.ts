@@ -196,6 +196,8 @@ export interface StructuredQuestionRow {
   transcript: string;
   correctAnswer: string;
   options: StructuredOption[];
+  image: string;
+  alt: string;
 }
 
 export function normalizeStructuredOptions(value: unknown): StructuredOption[] {
@@ -250,7 +252,9 @@ export function getStructuredQuestionRows(item: LessonItem): StructuredQuestionR
       questionAudio: textValue(row.questionAudio, row.questionAudioUrl),
       transcript: textValue(row.transcript, row.audioText),
       correctAnswer: numericAnswer || matchedAnswer?.id || textAnswer,
-      options
+      options,
+      image: textValue(row.image, row.imageUrl),
+      alt: textValue(row.alt, row.altText)
     };
   });
 }

@@ -8,6 +8,7 @@ import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUt
 import { sanitizeExamSections } from '../utils/lessonParser';
 import { groupExamsForSelection } from '../utils/examGrouping';
 import { ExerciseRenderer } from './ExerciseRenderer';
+import { StructuredBlockAudio } from './exercises/HskStructuredExercise';
 import { gradeStructuredSections, StructuredAnswerMap } from '../utils/structuredExercises';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
 import { loadFormDraft, saveListeningProgress, useStudentFormDraft } from '../hooks/useStudentFormDraft';
@@ -1220,12 +1221,32 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             {/* RENDER CUSTOM / IMPORTED LESSON SECTIONS (Matching, Dictation, Paragraph Order, Picture Writing, etc.) */}
             {currentExam.sections && currentExam.sections.length > 0 && (
               <div className="space-y-6">
-                {currentExam.sections.map((sec) => (
+                {currentExam.sections.map((sec) => {
+                  const audioItems = sec.items.filter((item) => {
+                    const data = item.data || {};
+                    return [data.audio, data.audioUrl, data.audioPromptUrl]
+                      .some((value) => typeof value === 'string' && value.trim());
+                  });
+                  const sharedAudioItem = audioItems.length === 1 && sec.items.length > 1
+                    ? audioItems[0]
+                    : undefined;
+
+                  return (
                   <div key={sec.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                       <Layers className="w-5 h-5 text-indigo-600" />
                       <h3 className="font-bold text-slate-800 text-lg">{sec.title}</h3>
                     </div>
+                    {sharedAudioItem && (
+                      <StructuredBlockAudio
+                        item={sharedAudioItem}
+                        studentMode
+                        audioPlayCounts={listeningPlayCounts}
+                        audioScope={structuredAudioScope}
+                        onAudioAttempt={handleStructuredAudioAttempt}
+                        sticky
+                      />
+                    )}
                     <div className="space-y-6">
                       {sec.items.map((item) => (
                         <ExerciseRenderer
@@ -1236,6 +1257,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           audioPlayCounts={listeningPlayCounts}
                           audioScope={structuredAudioScope}
                           onAudioAttempt={handleStructuredAudioAttempt}
+                          hideBlockAudio={item.id === sharedAudioItem?.id}
                           onAnswerChange={(key, answer) => {
                             setStructuredAnswers((current) => ({ ...current, [key]: answer }));
                           }}
@@ -1243,7 +1265,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

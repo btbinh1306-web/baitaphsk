@@ -16,8 +16,8 @@ export function isHandwritingExam(exam: ExamLesson): boolean {
 }
 
 export function getExamGroupLabel(exam: ExamLesson): string {
-  if (GROUP_ORDER.includes(exam.level)) return exam.level;
   if (isHandwritingExam(exam)) return 'Nộp bài viết tay';
+  if (GROUP_ORDER.includes(exam.level)) return exam.level;
   return 'Khác';
 }
 
@@ -36,12 +36,22 @@ function isNewFrameworkPracticeExam(exam: ExamLesson): boolean {
   return /đề luyện thi.*khung mới/i.test(exam.title) || /de-luyen-thi.*khung-moi/i.test(exam.id);
 }
 
+function trialExamNumber(exam: ExamLesson): number | null {
+  const match = exam.title.match(/HSK\s*1\s*\(3\.0\)\s*-\s*Đề thi thử số\s*(\d+)/iu);
+  return match ? Number(match[1]) : null;
+}
+
 function aggregateRange(exam: ExamLesson): [number, number] | null {
   const match = exam.title.match(/Bài\s+(\d+)\s*[–-]\s*(\d+)/iu);
   return match ? [Number(match[1]), Number(match[2])] : null;
 }
 
 function sortExams(a: ExamLesson, b: ExamLesson): number {
+  const aTrialNumber = trialExamNumber(a);
+  const bTrialNumber = trialExamNumber(b);
+  if ((aTrialNumber === null) !== (bTrialNumber === null)) return aTrialNumber === null ? -1 : 1;
+  if (aTrialNumber !== null && bTrialNumber !== null) return aTrialNumber - bTrialNumber;
+
   const aNewFrameworkPractice = isNewFrameworkPracticeExam(a);
   const bNewFrameworkPractice = isNewFrameworkPracticeExam(b);
   if (aNewFrameworkPractice !== bNewFrameworkPractice) return aNewFrameworkPractice ? 1 : -1;

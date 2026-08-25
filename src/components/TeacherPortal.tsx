@@ -331,6 +331,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [isGrading, setIsGrading] = useState(false);
   const [gradeSuccess, setGradeSuccess] = useState(false);
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
+  const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
 
   // All Available Exams
   const rawExams = buildExamCatalog(customExams, SAMPLE_EXAMS);
@@ -397,7 +398,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   };
   const updateExamTimeLimit = (enabled: boolean, minutes?: number) => {
     setEditingExam((current) => {
-      const nextMinutes = minutes === undefined ? current.timeLimitMinutes : minutes;
+      const nextMinutes = enabled
+        ? (minutes === undefined ? (current.timeLimitMinutes || 45) : minutes)
+        : 0;
       const nextExam: ExamLesson = {
         ...current,
         timeLimitEnabled: enabled,
@@ -413,9 +416,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
           lesson: {
             ...current.sourceLessonData.lesson,
             timeLimitEnabled: enabled,
-            ...(typeof nextMinutes === 'number' && nextMinutes > 0
-              ? { timeLimitMinutes: nextMinutes }
-              : {})
+            timeLimitMinutes: nextMinutes
           }
         }
       };
@@ -845,25 +846,20 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     setIsLoading(false);
   };
 
-  const handleDeleteGradedSubmission = async (sub: SubmissionData) => {
-    if (sub.status !== 'Đã chấm') return;
-
+  const handleDeleteSubmission = async (sub: SubmissionData) => {
     const idsToDelete = Array.from(new Set([sub.id, ...(sub.duplicateIds || [])]));
-    const confirmed = window.confirm(
-      `Xoá bài đã chấm của ${sub.name || 'học sinh này'}?\n\nThao tác này sẽ xoá bài trên Google Sheet và không thể hoàn tác.`
-    );
-    if (!confirmed) return;
 
     setDeletingSubmissionId(sub.id);
     const result = await deleteSubmissionsInGas(idsToDelete, passwordInput || config.teacherPass);
     if (result.ok) {
       setSubmissions((current) => current.filter((item) => !idsToDelete.includes(item.id)));
       setSelectedSub((current) => (current?.id === sub.id ? null : current));
-      setDeleteNotice(`Đã xoá bài đã chấm của ${sub.name || 'học sinh'}.`);
+      setDeleteNotice(`Đã xoá bài ${sub.status === 'Đã chấm' ? 'đã chấm' : 'chưa chấm'} của ${sub.name || 'học sinh'}.`);
     } else {
       alert(result.error || 'Không thể xoá bài nộp.');
     }
     setDeletingSubmissionId(null);
+    setPendingDeleteSubmissionId(null);
   };
 
   const openGradingModal = (sub: SubmissionData) => {
@@ -1107,6 +1103,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       }
       examToSave = parseLessonToExam(validation.parsedData);
       setEditingExam(examToSave);
+    }
+
+    if (examToSave.timeLimitEnabled === false) {
+      examToSave = { ...examToSave, timeLimitMinutes: 0 };
     }
 
     if (!examToSave.title) {
@@ -2348,13 +2348,33 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                                       Chấm bài <ChevronRight className="w-3.5 h-3.5" />
                                     </button>
                                   )}
-                                  {sub.status === 'Đã chấm' && (
+                                  {pendingDeleteSubmissionId === sub.id ? (
+                                    <div className="inline-flex flex-wrap items-center justify-end gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-900">
+                                      <span className="font-semibold">Xác nhận xoá?</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleDeleteSubmission(sub)}
+                                        disabled={isDeleting}
+                                        className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 font-bold text-white hover:bg-rose-700 disabled:opacity-50 transition cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" /> Xoá
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPendingDeleteSubmissionId(null)}
+                                        disabled={isDeleting}
+                                        className="rounded-md border border-slate-300 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition cursor-pointer"
+                                      >
+                                        Huỷ
+                                      </button>
+                                    </div>
+                                  ) : (
                                     <button
                                       type="button"
-                                      onClick={() => void handleDeleteGradedSubmission(sub)}
+                                      onClick={() => setPendingDeleteSubmissionId(sub.id)}
                                       disabled={isDeleting}
-                                      title="Xoá bài đã chấm"
-                                      aria-label={`Xoá bài đã chấm của ${sub.name}`}
+                                      title={`Xoá bài ${sub.status === 'Đã chấm' ? 'đã chấm' : 'chưa chấm'}`}
+                                      aria-label={`Xoá bài ${sub.status === 'Đã chấm' ? 'đã chấm' : 'chưa chấm'} của ${sub.name}`}
                                       className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 transition cursor-pointer"
                                     >
                                       <Trash2 className={`w-4 h-4 ${isDeleting ? 'animate-pulse' : ''}`} />
