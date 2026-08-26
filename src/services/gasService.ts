@@ -154,6 +154,8 @@ export const extractTeacherFeedbackAudiosFromRawText = (text?: string): AudioRec
         label: String(record.label || `Ghi âm câu ${index + 1}`),
         data: '',
         mime: 'audio/webm',
+        questionId: record.questionId ? String(record.questionId) : undefined,
+        taskGroup: record.taskGroup ? String(record.taskGroup) : undefined,
         teacherFeedbackUrl: String(record.teacherFeedbackUrl),
         teacherFeedbackLabel: record.teacherFeedbackLabel ? String(record.teacherFeedbackLabel) : undefined
       });
@@ -186,6 +188,17 @@ export const mergeAudioRecords = (
 
   const normalizeLabel = (label?: string) => String(label || '').trim().toLocaleLowerCase();
   const findOverlayIndex = (baseRecord: AudioRecordItem, baseIndex: number) => {
+    const baseQuestionId = normalizeLabel(baseRecord.questionId);
+    if (baseQuestionId) {
+      const questionIdIndex = overlayRecords.findIndex((record, index) => (
+        !usedOverlayIndexes.has(index) && (
+          normalizeLabel(record.questionId) === baseQuestionId ||
+          normalizeLabel(record.label).includes(baseQuestionId)
+        )
+      ));
+      if (questionIdIndex >= 0) return questionIdIndex;
+    }
+
     const baseLabel = normalizeLabel(baseRecord.label);
     if (baseLabel) {
       const labelIndex = overlayRecords.findIndex(
@@ -210,6 +223,7 @@ export const mergeAudioRecords = (
     const merged = { ...(baseRecord || {}), ...(overlay || {}) } as AudioRecordItem;
 
     // Feedback-only records intentionally omit the student's media payload.
+    if (overlay && !hasStudentMedia(overlay) && baseRecord.label) merged.label = baseRecord.label;
     if (!merged.data && baseRecord.data) merged.data = baseRecord.data;
     if (!merged.url && baseRecord.url) merged.url = baseRecord.url;
     if (overlay && !hasStudentMedia(overlay) && baseRecord.mime) merged.mime = baseRecord.mime;
@@ -854,6 +868,8 @@ export const gradeSubmissionInGas = async (
     .filter((audio) => Boolean(audio.teacherFeedbackUrl))
     .map((audio) => ({
       label: audio.label,
+      questionId: audio.questionId,
+      taskGroup: audio.taskGroup,
       teacherFeedbackUrl: audio.teacherFeedbackUrl,
       teacherFeedbackLabel: audio.teacherFeedbackLabel
     }));

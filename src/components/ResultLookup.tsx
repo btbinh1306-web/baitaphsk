@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AnswerSnapshotItem, ExamLesson, Question, SubmissionData } from '../types';
+import { AnswerSnapshotItem, AudioRecordItem, ExamLesson, Question, SubmissionData } from '../types';
 import { fetchResultById, cleanImageTagsFromText, getLocalSubmissions } from '../services/gasService';
 import { getHandwritingSubmissions } from '../services/handwritingService';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
@@ -50,6 +50,7 @@ interface PrintableItem extends AnswerSnapshotItem {
   audioText?: string;
   subjectiveKind?: 'essay' | 'translation' | 'speaking';
   subjectiveIndex?: number;
+  audioResponse?: boolean;
   studentAudioUrl?: string;
   teacherAudioUrl?: string;
   studentAudioLabel?: string;
@@ -73,6 +74,7 @@ const shouldShowInReviewMode = (question: PrintableItem, result: SubmissionData)
   question.status === 'wrong' ||
   question.status === 'unanswered' ||
   isSubjectiveQuestion(question) ||
+  Boolean(question.studentAudioUrl) ||
   Boolean(question.teacherComment) ||
   Boolean(question.teacherCorrection) ||
   question.teacherScore !== undefined ||
@@ -89,6 +91,18 @@ const safeText = (value: unknown): string => {
 };
 
 const normalizedText = (value: unknown): string => safeText(value).trim().toLowerCase();
+
+const normalizeAnswerForRegrade = (value: unknown): string => safeText(value)
+  .toLowerCase()
+  .replace(/^[a-f]\s*[.)。：:]\s*/i, '')
+  .replace(/\s+/g, '')
+  .trim();
+
+const answersMatchForRegrade = (left: unknown, right: unknown): boolean => {
+  const normalizedLeft = normalizeAnswerForRegrade(left);
+  const normalizedRight = normalizeAnswerForRegrade(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+};
 
 const examMatchesLesson = (exam: Partial<ExamLesson> | undefined, lesson: unknown): boolean => {
   if (!exam) return false;
@@ -649,15 +663,6 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     return true;
   });
 
-  const displayCorrect = result ? result.correct + regradedArrangeCount : 0;
-  const displayWrongCount = result ? Math.max(0, result.wrongCount - regradedArrangeCount) : 0;
-
-  const displayPercent = result
-    ? (result.total > 0
-        ? Math.round((displayCorrect / result.total) * 100)
-        : (result.percent <= 1 && result.percent > 0 ? Math.round(result.percent * 100) : result.percent))
-    : 0;
-
   const answerSnapshot = parseAnswerSnapshot(result?.answerSnapshot || result?.essays);
   const snapshotById = new Map(answerSnapshot.map((item) => [item.id, item]));
   const legacyWrongItems = visibleWrongList.map(parseWrongLineItem);
@@ -691,20 +696,48 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     correctAnswer: string,
     number?: number,
     options: string[] = [],
-    media: Pick<PrintableItem, 'optionImages' | 'imageUrl' | 'audioUrl' | 'audioText' | 'subjectiveKind' | 'subjectiveIndex' | 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel'> = {}
+    media: Pick<PrintableItem, 'optionImages' | 'imageUrl' | 'audioUrl' | 'audioText' | 'subjectiveKind' | 'subjectiveIndex' | 'audioResponse' | 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel'> = {}
   ): PrintableItem => {
     const saved = snapshotById.get(id) || snapshotById.get(prompt);
     const legacyWrong = findLegacyWrong(prompt);
-    if (saved) return { ...saved, options, ...media };
+    if (saved) {
+      const savedItem = { ...saved, section, number, prompt, options, ...media };
+      const currentAnswerChanged = Boolean(
+        saved.correctAnswer && correctAnswer &&
+        !answersMatchForRegrade(saved.correctAnswer, correctAnswer)
+      );
+      const subjective = Boolean(media.subjectiveKind) || isSubjectiveQuestion(savedItem);
+
+      if (currentAnswerChanged && !subjective) {
+        const userAnswer = safeText(savedItem.userAnswer).trim();
+        return {
+          ...savedItem,
+          correctAnswer,
+          status: !userAnswer
+            ? 'unanswered'
+            : (answersMatchForRegrade(userAnswer, correctAnswer) ? 'correct' : 'wrong')
+        };
+      }
+
+      return { ...savedItem, correctAnswer };
+    }
+
+    const legacyAnswerChanged = Boolean(
+      legacyWrong?.correctAns && correctAnswer &&
+      !answersMatchForRegrade(legacyWrong.correctAns, correctAnswer)
+    );
+    const legacyUserAnswer = legacyWrong?.userAns || '';
 
     return {
       id,
       section,
       number,
       prompt,
-      userAnswer: legacyWrong?.userAns || '',
-      correctAnswer: legacyWrong?.correctAns || correctAnswer,
-      status: legacyWrong ? 'wrong' : (result?.notDone ? 'unanswered' : 'correct'),
+      userAnswer: legacyUserAnswer,
+      correctAnswer,
+      status: legacyWrong
+        ? (legacyAnswerChanged && answersMatchForRegrade(legacyUserAnswer, correctAnswer) ? 'correct' : 'wrong')
+        : (result?.notDone ? 'unanswered' : 'correct'),
       legacyFallback: true,
       options,
       ...media
@@ -712,17 +745,46 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   };
 
   const driveAudioLinks = safeText(result?.driveLinks).split('\n').map((link) => link.trim()).filter(Boolean);
+  const audioLabelMatchesQuestion = (label: string | undefined, question: Question): boolean => {
+    const normalizedLabel = normalizedText(label);
+    const normalizedPrompt = normalizedText(question.prompt);
+    const normalizedQuestionId = normalizedText(question.id);
+    return Boolean(normalizedLabel && (
+      (normalizedPrompt && (
+        normalizedLabel.includes(normalizedPrompt) || normalizedPrompt.includes(normalizedLabel)
+      )) ||
+      (normalizedQuestionId && normalizedLabel.includes(normalizedQuestionId))
+    ));
+  };
+
+  const findAudioRecordsByQuestion = (question: Question, index: number): AudioRecordItem[] => {
+    const audios = result?.audios || [];
+    const matchingAudios = audios.filter((candidate) => (
+      candidate.questionId === question.id || audioLabelMatchesQuestion(candidate.label, question)
+    ));
+    if (matchingAudios.length > 0) return matchingAudios;
+
+    // Keep positional matching only for legacy audio records without any
+    // identifying metadata; labelled teacher feedback must not be shifted.
+    return audios[index] && !audios[index].questionId && !audios[index].label ? [audios[index]] : [];
+  };
+
+  const findDriveAudioLink = (question: Question, index: number): string => {
+    const labelledLink = driveAudioLinks.find((link) => audioLabelMatchesQuestion(getAudioLinkLabel(link), question));
+    return labelledLink || driveAudioLinks[index] || '';
+  };
+
   const getSpeakingAudio = (question: Question, index: number): Pick<PrintableItem, 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel'> => {
-    const audio = result?.audios?.find((candidate) => candidate.questionId === question.id) || result?.audios?.[index];
-    const driveAudioUrl = driveAudioLinks[index] ? getDriveAudioPlayerUrl(driveAudioLinks[index]) : '';
-    const studentAudioUrl = audio ? (getAudioSrcFromObject(audio) || driveAudioUrl) : driveAudioUrl;
+    const audios = findAudioRecordsByQuestion(question, index);
+    const driveAudioLink = findDriveAudioLink(question, index);
+    const driveAudioUrl = driveAudioLink ? getDriveAudioPlayerUrl(driveAudioLink) : '';
+    const studentAudioUrl = audios.map((audio) => getAudioSrcFromObject(audio)).find(Boolean) || driveAudioUrl;
+    const teacherFeedbackUrl = audios.map((audio) => audio.teacherFeedbackUrl).find(Boolean);
 
     return {
       studentAudioUrl: studentAudioUrl || undefined,
-      teacherAudioUrl: audio?.teacherFeedbackUrl
-        ? getDriveAudioPlayerUrl(audio.teacherFeedbackUrl)
-        : undefined,
-      studentAudioLabel: audio?.label || `Phần nói C${index + 1}`
+      teacherAudioUrl: teacherFeedbackUrl ? getDriveAudioPlayerUrl(teacherFeedbackUrl) : undefined,
+      studentAudioLabel: audios.find((audio) => audio.label)?.label || `Phần nói C${index + 1}`
     };
   };
 
@@ -851,19 +913,21 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       question: Question;
       subjectiveKind: NonNullable<PrintableItem['subjectiveKind']>;
       subjectiveIndex: number;
+      audioResponse: boolean;
     }> = [
-      ...(resultExam.essayQuestions || []).map((question, index) => ({ question, subjectiveKind: 'essay' as const, subjectiveIndex: index })),
+      ...(resultExam.essayQuestions || []).map((question, index) => ({ question, subjectiveKind: 'essay' as const, subjectiveIndex: index, audioResponse: false })),
       ...(resultExam.translationQuestions || []).map((question, index) => ({
         question,
         subjectiveKind: 'translation' as const,
-        subjectiveIndex: (resultExam.essayQuestions || []).length + index
+        subjectiveIndex: (resultExam.essayQuestions || []).length + index,
+        audioResponse: question.translationType === 'vi_to_zh_audio'
       })),
-      ...(resultExam.speakingQuestions || []).map((question, index) => ({ question, subjectiveKind: 'speaking' as const, subjectiveIndex: index }))
+      ...(resultExam.speakingQuestions || []).map((question, index) => ({ question, subjectiveKind: 'speaking' as const, subjectiveIndex: index, audioResponse: true }))
     ];
 
     addPrintableSection({
       title: 'Tự luận / Dịch / Nói',
-      items: subjectiveQuestionEntries.map(({ question, subjectiveKind, subjectiveIndex }, index) => makePrintableItem(
+      items: subjectiveQuestionEntries.map(({ question, subjectiveKind, subjectiveIndex, audioResponse }, index) => makePrintableItem(
         question.id,
         question.taskGroupTitle || 'Tự luận / Dịch / Nói',
         question.prompt,
@@ -876,7 +940,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
           audioText: question.audioText,
           subjectiveKind,
           subjectiveIndex,
-          ...(subjectiveKind === 'speaking' ? getSpeakingAudio(question, subjectiveIndex) : {})
+          audioResponse,
+          ...(audioResponse ? getSpeakingAudio(question, subjectiveIndex) : {})
         }
       ))
     });
@@ -919,14 +984,60 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     }))
     .filter((section) => section.items.length > 0);
 
-  const speakingResultItems = resultSections
+  const currentResultItems = resultSections.flatMap((section) => section.items);
+  const regradedCorrectCount = currentResultItems.filter((item) => {
+    if (isSubjectiveQuestion(item) || item.status !== 'correct') return false;
+    const saved = snapshotById.get(item.id) || snapshotById.get(item.prompt);
+    return saved?.status === 'wrong';
+  }).length;
+  const regradedWrongCount = currentResultItems.filter((item) => {
+    if (isSubjectiveQuestion(item) || item.status !== 'wrong') return false;
+    const saved = snapshotById.get(item.id) || snapshotById.get(item.prompt);
+    return saved?.status === 'correct';
+  }).length;
+  const displayCorrect = result
+    ? result.correct + regradedArrangeCount + regradedCorrectCount - regradedWrongCount
+    : 0;
+  const displayWrongCount = result
+    ? Math.max(0, result.wrongCount - regradedArrangeCount - regradedCorrectCount + regradedWrongCount)
+    : 0;
+  const displayPercent = result
+    ? (result.total > 0
+        ? Math.round((displayCorrect / result.total) * 100)
+        : (result.percent <= 1 && result.percent > 0 ? Math.round(result.percent * 100) : result.percent))
+    : 0;
+  const displayWrongList = visibleWrongList.filter((wrongLine) => {
+    const wrongItem = parseWrongLineItem(wrongLine);
+    const wrongPrompt = normalizedText(wrongItem.prompt);
+    const currentItem = currentResultItems.find((item) => {
+      const currentPrompt = normalizedText(item.prompt);
+      return wrongPrompt && currentPrompt && (
+        wrongPrompt === currentPrompt ||
+        wrongPrompt.includes(currentPrompt) ||
+        currentPrompt.includes(wrongPrompt)
+      );
+    });
+    return !currentItem || currentItem.status !== 'correct';
+  });
+
+  const recordingResultItems = resultSections
     .flatMap((section) => section.items)
-    .filter((item) => item.subjectiveKind === 'speaking');
+    .filter((item) => item.audioResponse);
+  const getRecordedQuestionNumber = (item: PrintableItem, fallbackIndex: number): number => {
+    const labelNumber = item.studentAudioLabel?.match(/(?:câu|question)\s*(\d+)/i)?.[1];
+    return labelNumber ? Number(labelNumber) : (item.number || fallbackIndex + 1);
+  };
+  const recordedAudioItems = recordingResultItems
+    .filter((item) => (
+    Boolean(item.studentAudioUrl) || Boolean(item.teacherAudioUrl)
+    ))
+    .sort((left, right) => getRecordedQuestionNumber(left, 0) - getRecordedQuestionNumber(right, 0));
+  const recordedAudioItemIds = new Set(recordedAudioItems.map((item) => item.id));
   const getSpeakingResultItem = (questionId: string | undefined, label: string | undefined, index: number) => (
-    speakingResultItems.find((item) => (
+    recordingResultItems.find((item) => (
       (questionId && item.id === questionId) ||
       (label && (item.studentAudioLabel === label || label.includes(item.prompt)))
-    )) || speakingResultItems[index]
+    )) || recordingResultItems[index]
   );
   const resultAudioQuestionIds = new Set(getExamAudioQuestions(resultExam).map((question) => question.id));
   const resultAudioQuestionItems = resultSections
@@ -936,7 +1047,9 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     audio.questionId === item.id ||
     Boolean(audio.label && item.prompt && audio.label.includes(item.prompt))
   ));
-  const missingResultAudioItems = resultAudioQuestionItems.filter((item) => !getRecordedAudioForResultItem(item));
+  const missingResultAudioItems = resultAudioQuestionItems.filter((item) => (
+    !item.studentAudioUrl && !getRecordedAudioForResultItem(item)
+  ));
   const findResultItemForPrompt = (prompt: string): PrintableItem | undefined => {
     const normalizedPrompt = normalizedText(prompt);
     return resultSections
@@ -950,6 +1063,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         ));
       });
   };
+  const essayListForReview = essayList.filter((item) => {
+    const resultItem = findResultItemForPrompt(item.prompt);
+    return !resultItem?.audioResponse && normalizedText(item.answer) !== 'đã ghi âm';
+  });
   const renderTeacherReview = (item?: PrintableItem) => item?.teacherReviewStatus ? (
     <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
       <span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}
@@ -1540,7 +1657,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               )}
 
               {/* Detailed Wrong Questions */}
-              {visibleWrongList.length > 0 && (
+              {displayWrongList.length > 0 && (
                 <section className="space-y-3 pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
@@ -1550,7 +1667,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                   </div>
 
                   <div className="space-y-3">
-                    {visibleWrongList.map((wrongLine, idx) => {
+                    {displayWrongList.map((wrongLine, idx) => {
                       const item = parseWrongLineItem(wrongLine);
                       return (
                         <article key={idx} className="border border-slate-200 rounded-lg p-4 space-y-3">
@@ -1591,7 +1708,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               )}
 
               {/* Detailed Essay Answers with Immediate Per-Item Teacher Comments */}
-              {essayList.length > 0 && (
+              {essayListForReview.length > 0 && (
                 <div className="space-y-3 pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
@@ -1600,7 +1717,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                   </div>
 
                   <div className="space-y-4">
-                    {essayList.map((item, idx) => {
+                    {essayListForReview.map((item, idx) => {
                       const reviewItem = findResultItemForPrompt(item.prompt);
                       const teacherItemComment = itemComments[reviewItem?.id || ''] || itemComments[`essay_${idx}`];
 
@@ -1654,6 +1771,68 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                   <Mic className="w-4 h-4 text-indigo-600" /> Bản Ghi Âm Luyện Nói Của Bạn:
                 </h4>
 
+                {recordedAudioItems.length > 0 && (
+                  <div className="space-y-4">
+                    {recordedAudioItems.map((item, idx) => {
+                      const teacherItemComment = item.teacherComment || itemComments[item.id] || itemComments[`audio_${item.subjectiveIndex ?? idx}`];
+                      const questionNumber = getRecordedQuestionNumber(item, idx);
+
+                      return (
+                        <article key={`recorded-speaking-${item.id}`} className="rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-4 shadow-2xs space-y-3">
+                          <div className="border-b border-indigo-100 pb-2">
+                            <p className="text-sm font-bold leading-relaxed text-indigo-950">
+                              Câu {questionNumber}: {item.prompt}
+                            </p>
+                          </div>
+
+                          {renderTeacherReview(item)}
+
+                          {item.imageUrl && (
+                            <img
+                              src={getDriveMediaPlayerUrl(item.imageUrl)}
+                              alt={`Hình minh họa câu nói ${questionNumber}`}
+                              className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
+                            />
+                          )}
+
+                          <div className="rounded-xl border border-indigo-200 bg-white p-3 space-y-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                              Bài làm của bạn:
+                            </span>
+                            {item.studentAudioUrl ? (
+                              <audio controls preload="metadata" src={item.studentAudioUrl} className="h-9 w-full" />
+                            ) : (
+                              <p className="text-sm italic text-slate-500">(Chưa ghi âm)</p>
+                            )}
+                          </div>
+
+                          {item.teacherAudioUrl && (
+                            <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-3 space-y-1.5">
+                              <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+                                <Mic className="h-3.5 w-3.5 text-emerald-700" />
+                                File chữa phát âm của giáo viên:
+                              </span>
+                              <audio controls preload="metadata" src={item.teacherAudioUrl} className="h-9 w-full" />
+                              <p className="text-[11px] italic text-emerald-800">
+                                Hãy nghe lại giọng mẫu của giáo viên và đọc theo.
+                              </p>
+                            </div>
+                          )}
+
+                          {teacherItemComment ? (
+                            <div className="rounded-lg border-2 border-indigo-300 bg-indigo-100/80 p-3 text-xs text-indigo-950 space-y-1">
+                              <span className="font-bold text-indigo-900">Nhận xét của Giáo viên cho bài ghi âm này:</span>
+                              <p className="border-l-2 border-indigo-400 pl-4 font-semibold italic">"{teacherItemComment}"</p>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] italic text-slate-400">(Chưa có nhận xét riêng cho câu này)</div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {missingResultAudioItems.length > 0 && (
                   <div className="space-y-4">
                     {missingResultAudioItems.map((item, idx) => (
@@ -1695,6 +1874,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                       const audioSrc = getAudioSrcFromObject(aud);
                       const speakingItem = getSpeakingResultItem(aud.questionId, aud.label, idx);
                       const teacherItemComment = itemComments[speakingItem?.id || ''] || itemComments[`audio_${idx}`];
+
+                      if (speakingItem && recordedAudioItemIds.has(speakingItem.id)) return null;
 
                       return (
                         <div key={idx} className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-4 space-y-3 shadow-2xs">

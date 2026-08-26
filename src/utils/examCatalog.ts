@@ -64,13 +64,46 @@ const isStaleHsk1Mock02Snapshot = (exam: ExamLesson, bundledExam: ExamLesson | u
   )
 );
 
+/**
+ * Keep saved copies of built-in lessons compatible with answer corrections
+ * shipped in the bundled lesson data. Older copies of Bài 2 still contain
+ * only "什么" for this blank, while the current question requires
+ * "什么名字". Preserve the saved lesson and its media; migrate only that
+ * known stale answer so old submissions are regraded against the current key.
+ */
+const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson | undefined): ExamLesson => {
+  if (exam.id !== 'hsk1-bai2-5-ky-nang' || !bundledExam) return exam;
+
+  const bundledQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai2_fill_04');
+  const savedQuestion = exam.fillQuestions?.find((question) => question.id === 'hsk1_bai2_fill_04');
+  if (!bundledQuestion || !savedQuestion) return exam;
+
+  const savedAnswer = String(savedQuestion.answer ?? '').trim();
+  const savedAcceptableAnswers = String(savedQuestion.acceptableAnswers ?? '').trim();
+  const bundledAnswer = String(bundledQuestion.answer ?? '').trim();
+  const bundledAcceptableAnswers = String(bundledQuestion.acceptableAnswers ?? '').trim();
+  const isKnownStaleAnswer = savedAnswer === '什么' || savedAcceptableAnswers === '什么';
+  if (!isKnownStaleAnswer || !bundledAnswer || !bundledAcceptableAnswers) return exam;
+
+  return {
+    ...exam,
+    fillQuestions: exam.fillQuestions?.map((question) => (
+      question.id === savedQuestion.id
+        ? { ...question, answer: bundledQuestion.answer, acceptableAnswers: bundledQuestion.acceptableAnswers }
+        : question
+    ))
+  };
+};
+
 /** Prefer the bundled expanded aggregate over an older saved snapshot with the same id. */
 export const buildExamCatalog = (customExams: ExamLesson[], bundledExams: ExamLesson[]): ExamLesson[] => {
   const bundledMock02 = bundledExams.find((exam) => exam.id === 'hsk1-mock-02');
+  const bundledById = new Map(bundledExams.map((exam) => [exam.id, normalizeBundledExamIdentity(exam)]));
   const usableCustomExams = Array.from(new Map(
     customExams
       .filter((exam) => !isStaleHsk1Mock02Snapshot(exam, bundledMock02))
       .map(normalizeBundledExamIdentity)
+      .map((exam) => migrateKnownAnswerCorrections(exam, bundledById.get(exam.id)))
       .map((exam) => [exam.id, exam])
   ).values());
 

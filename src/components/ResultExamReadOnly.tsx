@@ -26,6 +26,7 @@ export interface ReadOnlyExamItem {
   audioText?: string;
   subjective?: boolean;
   subjectiveKind?: 'essay' | 'translation' | 'speaking';
+  audioResponse?: boolean;
   studentAudioUrl?: string;
   teacherAudioUrl?: string;
   studentAudioLabel?: string;
@@ -98,6 +99,11 @@ const isSubjectiveQuestion = (sectionTitle: string, item: ReadOnlyExamItem): boo
 );
 
 const displayAnswer = (value: string): string => stripOptionLabel(value.split('|')[0] || '');
+
+const getDisplayQuestionNumber = (item: ReadOnlyExamItem, fallbackNumber: number): number => {
+  const labelNumber = item.studentAudioLabel?.match(/(?:câu|question)\s*(\d+)/i)?.[1];
+  return labelNumber ? Number(labelNumber) : (item.number || fallbackNumber);
+};
 
 const renderPromptWithAnswer = (prompt: string, answer: string): React.ReactNode => {
   const answerText = displayAnswer(answer) || 'Chưa có đáp án';
@@ -236,6 +242,7 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
           {section.items.map((item, itemIndex) => {
             const userAnswer = item.userAnswer || '';
             const correctAnswer = item.correctAnswer || '';
+            const questionNumber = getDisplayQuestionNumber(item, itemIndex + 1);
             const fillQuestion = isFillQuestion(section.title, item);
             const orderingQuestion = isOrderingQuestion(section.title, item);
             const subjectiveQuestion = isSubjectiveQuestion(section.title, item);
@@ -244,7 +251,7 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
               <article key={`${item.id}-${itemIndex}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <h6 className="text-sm font-bold leading-relaxed text-slate-900">
-                    Câu {item.number || itemIndex + 1}: {fillQuestion ? renderPromptWithAnswer(item.prompt, correctAnswer) : item.prompt}
+                    Câu {questionNumber}: {fillQuestion ? renderPromptWithAnswer(item.prompt, correctAnswer) : item.prompt}
                   </h6>
                   {!subjectiveQuestion && statusLabel(item) && (
                     <span className={`self-start whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-extrabold ${statusClass(item)}`}>
@@ -253,25 +260,38 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
                   )}
                 </div>
 
+                {item.teacherReviewStatus && (
+                  <div className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                    <span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}
+                  </div>
+                )}
+
                 {orderingQuestion && (
-                  <div className="mt-3 rounded-lg border-2 border-emerald-300 bg-emerald-50 px-4 py-3">
-                    <p className="text-xs font-extrabold uppercase tracking-wide text-emerald-800">Đáp án đúng</p>
-                    <p className="mt-1 text-lg font-extrabold leading-relaxed text-emerald-950">
-                      {displayAnswer(correctAnswer) || 'Chưa có đáp án'}
-                    </p>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className={`rounded-lg border-2 px-4 py-3 ${item.status === 'wrong'
+                      ? 'border-rose-300 bg-rose-50 text-rose-900'
+                      : 'border-slate-200 bg-white text-slate-800'}`}>
+                      <p className="text-xs font-extrabold uppercase tracking-wide">Bài làm của bạn</p>
+                      <p className="mt-1 text-lg font-extrabold leading-relaxed">
+                        {displayAnswer(userAnswer) || 'Chưa trả lời'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-emerald-950">
+                      <p className="text-xs font-extrabold uppercase tracking-wide text-emerald-800">Đáp án đúng</p>
+                      <p className="mt-1 text-lg font-extrabold leading-relaxed">
+                        {displayAnswer(correctAnswer) || 'Chưa có đáp án'}
+                      </p>
+                    </div>
                   </div>
                 )}
 
                 {subjectiveQuestion && (
                   <div className="mt-3 space-y-3">
-                    {item.subjectiveKind === 'speaking' ? (
+                    {item.audioResponse || item.subjectiveKind === 'speaking' ? (
                       <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-4 space-y-3">
-                        <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-                          <span className="text-xs font-bold text-indigo-950">
-                            {item.studentAudioLabel || `Phần nói C${item.number || itemIndex + 1}`}
-                          </span>
-                        </div>
-
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                          Bài làm của bạn:
+                        </span>
                         {item.studentAudioUrl ? (
                           <audio controls preload="metadata" src={item.studentAudioUrl} className="h-9 w-full" />
                         ) : (
@@ -304,15 +324,15 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
                     )}
 
                     {item.teacherComment ? (
-                      <div className={item.subjectiveKind === 'speaking'
+                      <div className={item.audioResponse || item.subjectiveKind === 'speaking'
                         ? 'rounded-lg border-2 border-indigo-300 bg-indigo-100/80 p-3 text-xs text-indigo-950 space-y-1'
                         : 'rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 space-y-1'}>
-                        <span className={item.subjectiveKind === 'speaking' ? 'font-bold text-indigo-900' : 'font-bold text-amber-900'}>
-                          {item.subjectiveKind === 'speaking'
+                        <span className={item.audioResponse || item.subjectiveKind === 'speaking' ? 'font-bold text-indigo-900' : 'font-bold text-amber-900'}>
+                          {item.audioResponse || item.subjectiveKind === 'speaking'
                             ? 'Nhận xét của Giáo viên cho bài ghi âm này:'
                             : 'Nhận xét của Giáo viên cho câu này:'}
                         </span>
-                        <p className={item.subjectiveKind === 'speaking'
+                        <p className={item.audioResponse || item.subjectiveKind === 'speaking'
                           ? 'border-l-2 border-indigo-400 pl-4 font-semibold italic'
                           : 'border-l-2 border-amber-400 pl-4 font-semibold italic'}>
                           "{item.teacherComment}"
@@ -324,16 +344,10 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
                   </div>
                 )}
 
-                {item.teacherReviewStatus && (
-                  <div className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                    <span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}
-                  </div>
-                )}
-
                 {item.imageUrl && (
                   <img
                     src={getDriveMediaPlayerUrl(item.imageUrl)}
-                    alt={`Hình minh họa câu ${item.number || itemIndex + 1}`}
+                    alt={`Hình minh họa câu ${questionNumber}`}
                     className="mt-3 max-h-64 w-full rounded-lg border border-slate-200 bg-white object-contain"
                   />
                 )}

@@ -294,7 +294,7 @@ const bai2FillQuestions: Question[] = [
   fillQuestion('hsk1_bai2_fill_01', '________，你叫什么名字？', '请问', bai2WordBank),
   fillQuestion('hsk1_bai2_fill_02', '我________李文。', '叫', bai2WordBank),
   fillQuestion('hsk1_bai2_fill_03', '你的________是什么？', '名字', bai2WordBank),
-  fillQuestion('hsk1_bai2_fill_04', '你叫________？', '什么', bai2WordBank),
+  fillQuestion('hsk1_bai2_fill_04', '你叫________？', '什么名字', bai2WordBank),
   fillQuestion('hsk1_bai2_fill_05', 'A：________！ B：没关系。', '对不起', bai2WordBank),
   fillQuestion('hsk1_bai2_fill_06', 'A：对不起！ B：________。', '没关系', bai2WordBank),
   fillQuestion('hsk1_bai2_fill_07', '我________高兴。', '很', bai2WordBank),

@@ -112,11 +112,13 @@ const stripTeacherReviewMetadata = (value?: string): string =>
 type TeacherReviewStatus = 'Chưa chấm' | 'Đúng' | 'Sai' | 'Cần sửa';
 
 const parseAnswerSnapshot = (value?: string): AnswerSnapshotItem[] => {
-  const match = String(value || '').match(/\[ANSWER_SNAPSHOT\]:\s*(\[[\s\S]*\])\s*$/);
-  if (!match) return [];
+  const text = String(value || '').trim();
+  const match = text.match(/\[ANSWER_SNAPSHOT\]:\s*(\[[\s\S]*\])\s*$/);
+  const jsonText = match?.[1] || (text.startsWith('[') ? text : '');
+  if (!jsonText) return [];
 
   try {
-    const parsed = JSON.parse(match[1]);
+    const parsed = JSON.parse(jsonText);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((item): item is AnswerSnapshotItem => (
       item && typeof item === 'object' &&
@@ -218,6 +220,39 @@ const parseTeacherWrongDetails = (wrong?: string): TeacherWrongAnswerDetail[] =>
   });
 };
 
+const normalizeAnswerForRegrade = (value: unknown): string => String(value ?? '')
+  .trim()
+  .toLocaleLowerCase('vi')
+  .replace(/^[a-f]\s*[.)。：:]\s*/i, '')
+  .replace(/\s+/g, '');
+
+const getCurrentAnswerCandidates = (question: Question): string[] => {
+  const acceptableAnswers = String(question.acceptableAnswers || '')
+    .split('|')
+    .map((answer) => answer.trim())
+    .filter(Boolean);
+  if (acceptableAnswers.length > 0) return acceptableAnswers;
+
+  if (typeof question.answer === 'number') {
+    const option = question.options?.[question.answer];
+    return [option || `Đáp án ${String.fromCharCode(65 + question.answer)}`, String.fromCharCode(65 + question.answer)];
+  }
+
+  if (typeof question.answer === 'string' && question.answer.trim()) {
+    const answer = question.answer.trim();
+    const option = question.options?.find((value) => value === answer || value.startsWith(`${answer}.`));
+    return option ? [option, answer] : [answer];
+  }
+
+  return [question.referenceAnswers?.[0] || question.suggestedAnswer || ''].filter(Boolean);
+};
+
+const matchesCurrentAnswer = (question: Question, userAnswer: unknown): boolean => {
+  const normalizedUserAnswer = normalizeAnswerForRegrade(userAnswer);
+  return Boolean(normalizedUserAnswer) && getCurrentAnswerCandidates(question)
+    .some((answer) => normalizeAnswerForRegrade(answer) === normalizedUserAnswer);
+};
+
 const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLesson[]) => {
   const exam = exams.find(
     (candidate) => candidate.id === submission.lesson || matchesCatalogLessonTitle(submission.lesson, candidate.title)
@@ -226,14 +261,39 @@ const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLes
     ? Math.round((submission.correct / submission.total) * 100)
     : (submission.percent <= 1 && submission.percent > 0 ? Math.round(submission.percent * 100) : submission.percent);
 
-  if (!exam || !submission.wrong || submission.wrong === 'Không có câu sai') {
+  if (!exam) {
     return { correct: submission.correct, percent: storedPercent };
   }
 
-  const resolvedArrangeAnswers = parseTeacherWrongDetails(submission.wrong)
-    .filter((detail) => isAcceptedArrangeAnswer(detail, exam)).length;
+  const snapshotItems = parseAnswerSnapshot(submission.answerSnapshot || submission.essays);
+  const snapshotById = new Map(snapshotItems.map((item) => [item.id, item]));
+  const snapshotByPrompt = new Map(snapshotItems.map((item) => [item.prompt.trim().toLocaleLowerCase(), item]));
+  const legacyWrongDetails = parseTeacherWrongDetails(submission.wrong);
+  const orderedQuestions = buildOrderedQuestionList(exam);
 
-  const correct = submission.correct + resolvedArrangeAnswers;
+  const regradedDelta = orderedQuestions.reduce((delta, orderedQuestion) => {
+    const question = orderedQuestion.question;
+    if (requiresTeacherReview(question)) return delta;
+
+    const snapshot = snapshotById.get(question.id) || snapshotByPrompt.get(question.prompt.trim().toLocaleLowerCase());
+    const legacyWrong = legacyWrongDetails.find((detail) => {
+      const detailPrompt = detail.prompt.trim().toLocaleLowerCase();
+      const questionPrompt = question.prompt.trim().toLocaleLowerCase();
+      return detailPrompt && questionPrompt && (
+        detailPrompt === questionPrompt ||
+        detailPrompt.includes(questionPrompt) ||
+        questionPrompt.includes(detailPrompt)
+      );
+    });
+    if (!snapshot && !legacyWrong) return delta;
+
+    const userAnswer = snapshot?.userAnswer ?? legacyWrong?.userAnswer ?? '';
+    const wasCorrect = snapshot?.status === 'correct';
+    const isCorrectNow = matchesCurrentAnswer(question, userAnswer);
+    return delta + Number(isCorrectNow) - Number(wasCorrect);
+  }, 0);
+
+  const correct = Math.max(0, Math.min(submission.total, submission.correct + regradedDelta));
   return {
     correct,
     percent: submission.total > 0
@@ -1801,7 +1861,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
   const areTeacherAnswersEquivalent = (question: Question, snapshot?: AnswerSnapshotItem): boolean => {
     const userAnswer = String(snapshot?.userAnswer ?? '').trim();
-    const correctAnswer = String(snapshot?.correctAnswer ?? question.answer ?? '').trim();
+    const currentCorrectAnswer = getCurrentAnswerCandidates(question)[0] || '';
+    const correctAnswer = requiresTeacherReview(question)
+      ? String(snapshot?.correctAnswer ?? currentCorrectAnswer).trim()
+      : currentCorrectAnswer;
     if (!userAnswer || !correctAnswer) return false;
 
     const userOptionId = getTeacherOptionId(question, userAnswer);
@@ -1847,13 +1910,16 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     const attempted = isAttempted(question, snapshot, audio, selectedSub?.submissionImages || []);
     const reviewRequired = requiresTeacherReview(question);
     const incorrect = isIncorrect(snapshot, Boolean(legacyWrong)) && !areTeacherAnswersEquivalent(question, snapshot);
+    const referenceAnswer = requiresTeacherReview(question)
+      ? snapshot?.correctAnswer ?? getCurrentAnswerCandidates(question)[0]
+      : getCurrentAnswerCandidates(question)[0];
     return {
       ...orderedQuestion,
       snapshot,
       answerText: audio
         ? 'Đã ghi âm'
         : formatTeacherAnswer(question, snapshot?.userAnswer),
-      correctText: formatTeacherAnswer(question, snapshot?.correctAnswer ?? question.answer),
+      correctText: formatTeacherAnswer(question, referenceAnswer),
       audio,
       attempted,
       incorrect,
@@ -1884,7 +1950,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     );
     const isStudentAnswerPresent = item.attempted && item.answerText.trim() !== '';
     const selectedOptionId = getTeacherOptionId(question, item.snapshot?.userAnswer);
-    const correctOptionId = getTeacherOptionId(question, item.snapshot?.correctAnswer ?? question.answer);
+    const correctOptionId = getTeacherOptionId(
+      question,
+      requiresTeacherReview(question)
+        ? item.snapshot?.correctAnswer ?? getCurrentAnswerCandidates(question)[0]
+        : getCurrentAnswerCandidates(question)[0]
+    );
 
     return (
       <article key={item.questionId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
