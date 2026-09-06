@@ -3,6 +3,7 @@ import { HSK1_BAI1_TO_5_EXAMS } from './hsk1Bai1To5';
 import { HSK1_BAI6_TO_15_EXAMS } from './hsk1Bai6To15';
 import { HSK2_BAI1_WORD_EXAMS } from './hsk2Bai1Word';
 import { HSK2_BAI2_TO_3_EXAMS } from './hsk2Bai2To3';
+import { HSK2_FINAL_EXAM } from './hsk2Final';
 import { HSK1_MOCK_01_EXAM } from './hsk1Mock01';
 import { HSK1_MOCK_02_EXAM } from './hsk1Mock02';
 import { HSK1_TRIAL_01_EXAM, HSK1_TRIAL_02_EXAM } from './hsk1MockTrials';
@@ -105,6 +106,7 @@ const SAMPLE_EXAMS_WITH_LOCAL_AUDIO: ExamLesson[] = [
   ...HSK1_BAI6_TO_15_EXAMS,
   ...HSK2_BAI1_WORD_EXAMS,
   ...HSK2_BAI2_TO_3_EXAMS,
+  HSK2_FINAL_EXAM,
   HSK1_MOCK_01_EXAM,
   HSK1_MOCK_02_EXAM,
   HSK1_TRIAL_01_EXAM,

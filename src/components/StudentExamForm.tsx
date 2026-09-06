@@ -61,6 +61,14 @@ const formatRemainingTime = (seconds: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 };
 
+const hasPinyinContent = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.some(hasPinyinContent);
+  if (!value || typeof value !== 'object') return false;
+  return Object.entries(value).some(([key, child]) => (
+    (key === 'pinyin' && typeof child === 'string' && child.trim().length > 0) || hasPinyinContent(child)
+  ));
+};
+
 const answerTextForQuestion = (question: Question, answer: unknown): string => {
   if (answer === undefined || answer === null || answer === '') return '';
   if (typeof answer === 'number' && question.options) {
@@ -119,6 +127,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   );
   const [audioRecords, setAudioRecords] = useState<Record<string, AudioRecordItem>>({});
   const [showSpeakingPinyin, setShowSpeakingPinyin] = useState(false);
+  const [showStructuredPinyin, setShowStructuredPinyin] = useState(true);
   const [additionalAudioSlots, setAdditionalAudioSlots] = useState<
     Array<{ id: string; record?: AudioRecordItem }>
   >([]);
@@ -177,6 +186,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     }
     return exam;
   }, [rawCurrentExam]);
+
+  const hasExamPinyin = useMemo(() => hasPinyinContent(currentExam), [currentExam]);
 
   const speakingTaskGroups = useMemo(() => {
     const groups = new Map<string, { title: string; questions: Question[] }>();
@@ -989,7 +1000,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       )}
 
       {isExamContentVisible && isTimedExam && !submittedId && (
-        <div className={`sticky top-2 z-20 rounded-xl border p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 ${
+        <div className={`${hasExamPinyin ? '' : 'sticky top-2 z-20 '}rounded-xl border p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 ${
           remainingSeconds !== null && remainingSeconds <= 60
             ? 'bg-rose-50 border-rose-300 text-rose-950'
             : 'bg-amber-50 border-amber-300 text-amber-950'
@@ -1246,6 +1257,30 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-300">
+            {hasExamPinyin && (
+              <div className="sticky top-28 z-40 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/95 px-4 py-3 shadow-md backdrop-blur sm:top-20">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-indigo-900">
+                  <span>Pinyin toàn bài đang {showStructuredPinyin ? 'hiện' : 'ẩn'}</span>
+                  {isTimedExam && !submittedId && (
+                    <span className="inline-flex items-center gap-1.5 text-amber-900" aria-label={`Thời lượng ${timeLimitMinutes} phút`}>
+                      <Clock className="h-4 w-4" />
+                      <span>Thời lượng: {timeLimitMinutes} phút</span>
+                      {remainingSeconds !== null && (
+                        <span aria-live="polite">· Còn {formatRemainingTime(remainingSeconds)}</span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  aria-pressed={showStructuredPinyin}
+                  onClick={() => setShowStructuredPinyin((value) => !value)}
+                  className="rounded-lg border border-indigo-300 bg-white px-3 py-2 text-sm font-bold text-indigo-800 transition hover:bg-indigo-100"
+                >
+                  {showStructuredPinyin ? 'Ẩn Pinyin' : 'Hiện Pinyin'}
+                </button>
+              </div>
+            )}
             {/* RENDER CUSTOM / IMPORTED LESSON SECTIONS (Matching, Dictation, Paragraph Order, Picture Writing, etc.) */}
             {currentExam.sections && currentExam.sections.length > 0 && (
               <div className="space-y-6">
@@ -1268,6 +1303,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     {sharedAudioItem && (
                       <StructuredBlockAudio
                         item={sharedAudioItem}
+                        attemptId={submissionId}
                         studentMode
                         audioPlayCounts={listeningPlayCounts}
                         audioScope={structuredAudioScope}
@@ -1282,6 +1318,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           item={item}
                           answers={structuredAnswers}
                           studentMode
+                          showPinyinOverride={hasExamPinyin ? showStructuredPinyin : undefined}
                           audioPlayCounts={listeningPlayCounts}
                           audioScope={structuredAudioScope}
                           onAudioAttempt={handleStructuredAudioAttempt}
@@ -1550,7 +1587,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                             <span className="font-bold text-indigo-700 text-sm mt-0.5">{isConversation ? `Bài nghe ${idx + 1}:` : `Câu nghe ${idx + 1}:`}</span>
                             <div>
                               <p className="text-sm font-bold text-slate-900">{q.prompt}</p>
-                              {q.pinyin && <p className="text-xs text-indigo-600 font-mono mt-0.5">Pinyin / Phiên âm: {q.pinyin}</p>}
+                              {showStructuredPinyin && q.pinyin && <p className="text-xs text-indigo-600 font-mono mt-0.5">Pinyin / Phiên âm: {q.pinyin}</p>}
                             </div>
                           </div>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -1603,7 +1640,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                               {isConversation && (
                                 <div className="text-sm font-bold text-slate-900">
                                   Câu {subIdx + 1}: {subQuestion.prompt}
-                                  {subQuestion.pinyin && (
+                                  {showStructuredPinyin && subQuestion.pinyin && (
                                     <p className="text-xs text-indigo-600 font-mono mt-0.5">
                                       Pinyin / Phiên âm: {subQuestion.pinyin}
                                     </p>

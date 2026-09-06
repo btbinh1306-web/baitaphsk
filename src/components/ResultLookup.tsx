@@ -66,13 +66,13 @@ const SUBJECTIVE_SECTION_PATTERN = /(tự luận|dịch|nói|ghi âm|viết|ché
 
 const isSubjectiveQuestion = (question: PrintableItem): boolean => (
   Boolean(question.subjective) ||
-  question.status === 'manual' ||
   SUBJECTIVE_SECTION_PATTERN.test(`${question.section} ${question.prompt}`)
 );
 
 const shouldShowInReviewMode = (question: PrintableItem, result: SubmissionData): boolean => (
   question.status === 'wrong' ||
   question.status === 'unanswered' ||
+  question.status === 'manual' ||
   isSubjectiveQuestion(question) ||
   Boolean(question.studentAudioUrl) ||
   Boolean(question.teacherComment) ||
@@ -851,7 +851,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
     addPrintableSection({
       title: 'Bài nghe',
-      items: resultExam.listeningQuestions.flatMap((question) => (
+      items: (resultExam.listeningQuestions || []).flatMap((question) => (
         question.subQuestions?.length ? question.subQuestions : [question]
       )).map((question, index) => makePrintableItem(
         question.id,
@@ -985,6 +985,23 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     .filter((section) => section.items.length > 0);
 
   const currentResultItems = resultSections.flatMap((section) => section.items);
+  const hasPendingAnswerReview = Boolean(
+    resultExam &&
+    (resultExam.sections || []).some((section) => section.items.some((item) => (
+      isStructuredExerciseItem(item) && getStructuredQuestionRows(item).some((row) => !row.correctAnswer)
+    )))
+  );
+  const currentObjectiveItems = currentResultItems.filter((item) => !item.subjective);
+  const shouldRebuildStoredMetrics = Boolean(
+    resultExam &&
+    answerSnapshot.length > 0 &&
+    !hasPendingAnswerReview &&
+    currentObjectiveItems.length > (result?.total || 0)
+  );
+  const rebuiltCorrect = currentObjectiveItems.filter((item) => item.status === 'correct').length;
+  const rebuiltWrong = currentObjectiveItems.filter((item) => item.status === 'wrong').length;
+  const rebuiltNotDone = currentObjectiveItems.filter((item) => item.status === 'unanswered').length;
+  const displayTotal = shouldRebuildStoredMetrics ? currentObjectiveItems.length : (result?.total || 0);
   const regradedCorrectCount = currentResultItems.filter((item) => {
     if (isSubjectiveQuestion(item) || item.status !== 'correct') return false;
     const saved = snapshotById.get(item.id) || snapshotById.get(item.prompt);
@@ -996,16 +1013,22 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     return saved?.status === 'correct';
   }).length;
   const displayCorrect = result
-    ? result.correct + regradedArrangeCount + regradedCorrectCount - regradedWrongCount
+    ? (shouldRebuildStoredMetrics
+        ? rebuiltCorrect
+        : result.correct + regradedArrangeCount + regradedCorrectCount - regradedWrongCount)
     : 0;
   const displayWrongCount = result
-    ? Math.max(0, result.wrongCount - regradedArrangeCount - regradedCorrectCount + regradedWrongCount)
+    ? (shouldRebuildStoredMetrics
+        ? rebuiltWrong
+        : Math.max(0, result.wrongCount - regradedArrangeCount - regradedCorrectCount + regradedWrongCount))
     : 0;
+  const displayNotDone = shouldRebuildStoredMetrics ? rebuiltNotDone : (result?.notDone || 0);
   const displayPercent = result
-    ? (result.total > 0
-        ? Math.round((displayCorrect / result.total) * 100)
+    ? (displayTotal > 0
+        ? Math.round((displayCorrect / displayTotal) * 100)
         : (result.percent <= 1 && result.percent > 0 ? Math.round(result.percent * 100) : result.percent))
     : 0;
+  const displayPercentLabel = hasPendingAnswerReview ? 'Chờ duyệt' : `${displayPercent}%`;
   const displayWrongList = visibleWrongList.filter((wrongLine) => {
     const wrongItem = parseWrongLineItem(wrongLine);
     const wrongPrompt = normalizedText(wrongItem.prompt);
@@ -1456,13 +1479,13 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <span className="text-xs font-semibold text-slate-500 block">Điểm Phần Trắc Nghiệm</span>
-                    <span className="text-2xl font-bold text-slate-800">{displayPercent}%</span>
+                    <span className="text-2xl font-bold text-slate-800">{displayPercentLabel}</span>
                     <span className="text-xs text-slate-500 block">
-                      Đúng {displayCorrect}/{result.total} câu
+                      {hasPendingAnswerReview ? 'Đáp án đang chờ giáo viên duyệt' : `Đúng ${displayCorrect}/${displayTotal} câu`}
                     </span>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center text-sm shadow-2xs">
-                    {displayPercent}%
+                    {hasPendingAnswerReview ? '?' : `${displayPercent}%`}
                   </div>
                 </div>
 
@@ -2046,8 +2069,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
             <p><strong>Học sinh:</strong> {result.name} · <strong>Lớp:</strong> {result.class}</p>
             <p><strong>Đề:</strong> {result.lesson} · <strong>Mã bài:</strong> {result.id}</p>
             <div className="print-report-score">
-              <strong>Kết quả: {displayCorrect}/{result.total} câu đúng ({displayPercent}%)</strong>
-              <span>Sai: {displayWrongCount} · Chưa làm: {result.notDone}</span>
+              <strong>
+                {hasPendingAnswerReview
+                  ? 'Kết quả: Chờ giáo viên duyệt đáp án'
+                  : `Kết quả: ${displayCorrect}/${displayTotal} câu đúng (${displayPercent}%)`}
+              </strong>
+              <span>{hasPendingAnswerReview ? 'Chưa có điểm tự động' : `Sai: ${displayWrongCount} · Chưa làm: ${displayNotDone}`}</span>
             </div>
           </header>
 

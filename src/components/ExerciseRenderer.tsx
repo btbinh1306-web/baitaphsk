@@ -41,6 +41,7 @@ interface ExerciseRendererProps {
   onAnswerChange?: (key: string, answer: string) => void;
   studentMode?: boolean;
   mode?: 'exam' | 'result';
+  showPinyinOverride?: boolean;
   audioPlayCounts?: Record<string, number>;
   audioScope?: string;
   onAudioAttempt?: (key: string) => { allowed: boolean; count: number };
@@ -55,6 +56,7 @@ export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({
   onAnswerChange,
   studentMode,
   mode = 'exam',
+  showPinyinOverride,
   audioPlayCounts,
   audioScope,
   onAudioAttempt,
@@ -70,6 +72,7 @@ export const ExerciseRenderer: React.FC<ExerciseRendererProps> = ({
         onAnswerChange={onAnswerChange}
         studentMode={studentMode}
         mode={mode}
+        showPinyinOverride={showPinyinOverride}
         audioPlayCounts={audioPlayCounts}
         audioScope={audioScope}
         onAudioAttempt={onAudioAttempt}

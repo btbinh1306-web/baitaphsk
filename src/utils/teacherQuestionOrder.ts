@@ -142,7 +142,7 @@ const appendStructuredSection = (
           answer: row.correctAnswer,
           audioUrl: row.audio || row.questionAudio,
           audioText: row.transcript,
-          teacherReviewRequired: false
+          teacherReviewRequired: !row.correctAnswer
         };
         pushQuestion(
           output,

@@ -302,6 +302,16 @@ const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLes
   };
 };
 
+const hasPendingAnswerKey = (submission: SubmissionData, exams: ExamLesson[]): boolean => {
+  if (submission.status === 'Đã chấm') return false;
+  const exam = exams.find(
+    (candidate) => candidate.id === submission.lesson || matchesCatalogLessonTitle(submission.lesson, candidate.title)
+  );
+  if (!exam) return false;
+  const questions = buildOrderedQuestionList(exam);
+  return questions.length > 0 && questions.every((item) => requiresTeacherReview(item.question));
+};
+
 const isAcceptedArrangeAnswer = (detail: TeacherWrongAnswerDetail, exam: ExamLesson): boolean => {
   const match = detail.category.match(/Sắp xếp\s+Câu\s*(\d+)/i);
   const question = match ? exam.arrangeQuestions?.[Number(match[1]) - 1] : undefined;
@@ -2382,10 +2392,19 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                                   </span>
                                 ) : (
                                   <div>
-                                    <span className="font-bold text-slate-800">
-                                      {regradedMetrics?.percent ?? (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
-                                    </span>
-                                    <span className="text-xs text-slate-500 block">({regradedMetrics?.correct ?? sub.correct}/{sub.total} câu)</span>
+                                    {hasPendingAnswerKey(sub, allExams) ? (
+                                      <>
+                                        <span className="font-bold text-amber-800">Chờ duyệt đáp án</span>
+                                        <span className="text-xs text-slate-500 block">({sub.total || 'Toàn bộ'} câu)</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="font-bold text-slate-800">
+                                          {regradedMetrics?.percent ?? (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
+                                        </span>
+                                        <span className="text-xs text-slate-500 block">({regradedMetrics?.correct ?? sub.correct}/{sub.total} câu)</span>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </td>
@@ -4170,7 +4189,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               <div>
                 <span className="text-slate-500 block">Điểm trắc nghiệm</span>
                 <span className="font-bold text-red-700 text-sm">
-                  {selectedSubmissionMetrics?.percent ?? selectedSub.percent}% ({selectedSubmissionMetrics?.correct ?? selectedSub.correct}/{selectedSub.total})
+                  {hasPendingAnswerKey(selectedSub, allExams)
+                    ? 'Chờ duyệt đáp án'
+                    : `${selectedSubmissionMetrics?.percent ?? selectedSub.percent}% (${selectedSubmissionMetrics?.correct ?? selectedSub.correct}/${selectedSub.total})`}
                 </span>
               </div>
               <div>

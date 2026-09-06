@@ -239,9 +239,9 @@ export function getStructuredQuestionRows(item: LessonItem): StructuredQuestionR
     const options = ownOptions.length > 0 ? ownOptions : sharedOptions;
     const numericAnswer = typeof rawAnswer === 'number' ? options[rawAnswer]?.id : undefined;
     const textAnswer = textValue(rawAnswer);
-    const matchedAnswer = options.find((option) => (
+    const matchedAnswer = textAnswer ? options.find((option) => (
       option.id.toLowerCase() === textAnswer.toLowerCase() || option.text === textAnswer
-    ));
+    )) : undefined;
     return {
       id,
       key: `${item.id}::${id}`,
@@ -288,6 +288,13 @@ export function gradeStructuredSections(
       if (!isStructuredExerciseItem(item)) return;
       const label = STRUCTURED_EXERCISE_LABELS[type];
       getStructuredQuestionRows(item).forEach((row, index) => {
+        if (!row.correctAnswer) {
+          const userAnswer = textValue(answers[row.key]);
+          answerDetails.push({ id: row.key, section: label, number: row.number || index + 1,
+            prompt: row.prompt, userAnswer: userAnswer ? optionDisplay(row.options, userAnswer) : '',
+            correctAnswer: 'Chờ giáo viên duyệt đáp án', status: 'manual' });
+          return;
+        }
         total += 1;
         const userAnswer = textValue(answers[row.key]);
         const userAnswerText = optionDisplay(row.options, userAnswer);
