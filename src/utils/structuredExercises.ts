@@ -14,6 +14,10 @@ export const STRUCTURED_EXERCISE_TYPES = [
 export type StructuredExerciseType = (typeof STRUCTURED_EXERCISE_TYPES)[number];
 export type StructuredAnswerMap = Record<string, string>;
 
+export const getQuestionAnchor = (id: string): string => (
+  `exam-question-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+);
+
 export const STRUCTURED_EXERCISE_LABELS: Record<StructuredExerciseType, string> = {
   listening_image_choice: 'Nghe -> chọn hình',
   listening_text_choice: 'Nghe -> chọn đáp án',
@@ -259,6 +263,20 @@ export function getStructuredQuestionRows(item: LessonItem): StructuredQuestionR
   });
 }
 
+export function getStructuredExerciseLabel(item: LessonItem): string {
+  const type = String(item.type || '').toLowerCase().trim();
+  if (type === 'listening_image_choice') {
+    const rows = getStructuredQuestionRows(item);
+    const isImageTrueFalse = rows.length > 0 && rows.some((row) => row.image) && rows.every((row) => (
+      row.options.length === 2 && row.options.every((option) => !option.image)
+    ));
+    if (isImageTrueFalse) return 'Nghe -> phán đoán đúng sai';
+  }
+  return type === 'fill' || type === 'fill_in_blank'
+    ? 'Điền từ vào chỗ trống'
+    : STRUCTURED_EXERCISE_LABELS[type as keyof typeof STRUCTURED_EXERCISE_LABELS] || type;
+}
+
 export function getStructuredQuestionCount(sections?: LessonSection[]): number {
   return (sections || []).reduce((total, section) => total + section.items.reduce((itemTotal, item) => (
     itemTotal + (isStructuredExerciseItem(item) ? getStructuredQuestionRows(item).length : 0)
@@ -286,7 +304,7 @@ export function gradeStructuredSections(
     section.items.forEach((item) => {
       const type = String(item.type || '').toLowerCase().trim();
       if (!isStructuredExerciseItem(item)) return;
-      const label = STRUCTURED_EXERCISE_LABELS[type];
+      const label = getStructuredExerciseLabel(item);
       getStructuredQuestionRows(item).forEach((row, index) => {
         if (!row.correctAnswer) {
           const userAnswer = textValue(answers[row.key]);

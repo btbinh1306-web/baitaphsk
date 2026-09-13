@@ -64,15 +64,44 @@ const isStaleHsk1Mock02Snapshot = (exam: ExamLesson, bundledExam: ExamLesson | u
   )
 );
 
-/**
- * Keep saved copies of built-in lessons compatible with answer corrections
- * shipped in the bundled lesson data. Older copies of Bài 2 still contain
- * only "什么" for this blank, while the current question requires
- * "什么名字". Preserve the saved lesson and its media; migrate only that
- * known stale answer so old submissions are regraded against the current key.
- */
+/** Keep saved copies of built-in lessons compatible with bundled answer corrections. */
 const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson | undefined): ExamLesson => {
-  if (exam.id !== 'hsk1-bai2-5-ky-nang' || !bundledExam) return exam;
+  if (!bundledExam) return exam;
+
+  if (exam.id === 'hsk1-bai4-5-ky-nang') {
+    const bundledFillQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai4_fill_02');
+    const savedFillQuestion = exam.fillQuestions?.find((question) => question.id === 'hsk1_bai4_fill_02');
+    const bundledQuestion = bundledExam.listeningQuestions?.find((question) => question.id === 'hsk1_bai4_listen_02');
+    const savedQuestion = exam.listeningQuestions?.find((question) => question.id === 'hsk1_bai4_listen_02');
+    const shouldMigrateFillAnswers = bundledFillQuestion && savedFillQuestion && (
+      String(savedFillQuestion.acceptableAnswers ?? '').trim() !== String(bundledFillQuestion.acceptableAnswers ?? '').trim()
+    );
+    const shouldMigrateListeningAnswer = bundledQuestion && savedQuestion && String(savedQuestion.answer) !== String(bundledQuestion.answer);
+    if (!shouldMigrateFillAnswers && !shouldMigrateListeningAnswer) return exam;
+
+    return {
+      ...exam,
+      fillQuestions: shouldMigrateFillAnswers
+        ? exam.fillQuestions?.map((question) => (
+          question.id === savedFillQuestion.id
+            ? { ...question, answer: bundledFillQuestion.answer, acceptableAnswers: bundledFillQuestion.acceptableAnswers }
+            : question
+        ))
+        : exam.fillQuestions,
+      listeningQuestions: exam.listeningQuestions?.map((question) => (
+        shouldMigrateListeningAnswer && question.id === savedQuestion.id
+          ? {
+              ...question,
+              answer: bundledQuestion.answer,
+              audioText: bundledQuestion.audioText,
+              explanation: bundledQuestion.explanation
+            }
+          : question
+      ))
+    };
+  }
+
+  if (exam.id !== 'hsk1-bai2-5-ky-nang') return exam;
 
   const bundledQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai2_fill_04');
   const savedQuestion = exam.fillQuestions?.find((question) => question.id === 'hsk1_bai2_fill_04');

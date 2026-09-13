@@ -11,6 +11,7 @@ import { normalizeImageList } from '../utils/imageUtils';
 import { getStructuredQuestionRows, isStructuredExerciseItem } from '../utils/structuredExercises';
 import { buildExamCatalog } from '../utils/examCatalog';
 import { getExamAudioQuestions } from '../utils/examAudio';
+import { calculateHsk1TrialScore, formatScore, getHsk1TrialPart, getQuestionMaxScore, isExcludedFromOverallScore, isHsk1TrialExam, parseTeacherItemScores, TeacherItemScore } from '../utils/teacherScoring';
 import {
   Search,
   CheckCircle2,
@@ -43,6 +44,8 @@ interface PrintableItem extends AnswerSnapshotItem {
   teacherComment?: string;
   teacherCorrection?: boolean;
   teacherScore?: string | number;
+  teacherItemScore?: number;
+  teacherMaxScore?: number;
   teacherReviewStatus?: TeacherReviewStatus;
   optionImages?: string[];
   imageUrl?: string;
@@ -66,7 +69,10 @@ const SUBJECTIVE_SECTION_PATTERN = /(tự luận|dịch|nói|ghi âm|viết|ché
 
 const isSubjectiveQuestion = (question: PrintableItem): boolean => (
   Boolean(question.subjective) ||
-  SUBJECTIVE_SECTION_PATTERN.test(`${question.section} ${question.prompt}`)
+  Boolean(question.subjectiveKind) ||
+  // Do not inspect the prompt here: a fill-in question can legitimately
+  // contain notes such as "gần người nói" / "xa người nói".
+  SUBJECTIVE_SECTION_PATTERN.test(question.section)
 );
 
 const shouldShowInReviewMode = (question: PrintableItem, result: SubmissionData): boolean => (
@@ -104,6 +110,16 @@ const answersMatchForRegrade = (left: unknown, right: unknown): boolean => {
   return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
 };
 
+const answerMatchesAccepted = (answer: unknown, acceptedAnswers: unknown): boolean => {
+  const normalizedAnswer = normalizeAnswerForRegrade(answer);
+  if (!normalizedAnswer) return false;
+  return safeText(acceptedAnswers)
+    .split('|')
+    .map(normalizeAnswerForRegrade)
+    .filter(Boolean)
+    .includes(normalizedAnswer);
+};
+
 const examMatchesLesson = (exam: Partial<ExamLesson> | undefined, lesson: unknown): boolean => {
   if (!exam) return false;
 
@@ -138,12 +154,13 @@ const stripTeacherCommentMetadata = (value: unknown): string => {
 };
 
 const parseAnswerSnapshot = (value?: string): AnswerSnapshotItem[] => {
-  const text = safeText(value);
+  const text = safeText(value).trim();
   const match = text.match(/\[ANSWER_SNAPSHOT\]:\s*(\[[\s\S]*\])\s*$/);
-  if (!match) return [];
+  const jsonText = match?.[1] || (text.startsWith('[') ? text : '');
+  if (!jsonText) return [];
 
   try {
-    const parsed = JSON.parse(match[1]);
+    const parsed = JSON.parse(jsonText);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((item): item is AnswerSnapshotItem => (
       item && typeof item === 'object' &&
@@ -621,6 +638,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     },
     {} as Record<string, TeacherReviewStatus>
   );
+  const teacherItemScores = teacherCommentSources.reduce(
+    (scores, source) => ({ ...scores, ...parseTeacherItemScores(source) }),
+    {} as Record<string, TeacherItemScore>
+  );
   const essayList = parseEssays(result?.essays);
 
   // Filter essayList to remove auto-generated placeholder strings
@@ -696,26 +717,25 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     correctAnswer: string,
     number?: number,
     options: string[] = [],
-    media: Pick<PrintableItem, 'optionImages' | 'imageUrl' | 'audioUrl' | 'audioText' | 'subjectiveKind' | 'subjectiveIndex' | 'audioResponse' | 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel'> = {}
+    media: Pick<PrintableItem, 'optionImages' | 'imageUrl' | 'audioUrl' | 'audioText' | 'subjectiveKind' | 'subjectiveIndex' | 'audioResponse' | 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel' | 'teacherMaxScore'> = {}
   ): PrintableItem => {
     const saved = snapshotById.get(id) || snapshotById.get(prompt);
     const legacyWrong = findLegacyWrong(prompt);
     if (saved) {
       const savedItem = { ...saved, section, number, prompt, options, ...media };
-      const currentAnswerChanged = Boolean(
-        saved.correctAnswer && correctAnswer &&
-        !answersMatchForRegrade(saved.correctAnswer, correctAnswer)
-      );
       const subjective = Boolean(media.subjectiveKind) || isSubjectiveQuestion(savedItem);
 
-      if (currentAnswerChanged && !subjective) {
+      // Recompute every objective item from the saved response and the
+      // current answer key. Older submissions can contain a stale status even
+      // when the answer key itself did not change.
+      if (!subjective && correctAnswer) {
         const userAnswer = safeText(savedItem.userAnswer).trim();
         return {
           ...savedItem,
           correctAnswer,
           status: !userAnswer
             ? 'unanswered'
-            : (answersMatchForRegrade(userAnswer, correctAnswer) ? 'correct' : 'wrong')
+            : (answerMatchesAccepted(userAnswer, correctAnswer) ? 'correct' : 'wrong')
         };
       }
 
@@ -736,8 +756,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       userAnswer: legacyUserAnswer,
       correctAnswer,
       status: legacyWrong
-        ? (legacyAnswerChanged && answersMatchForRegrade(legacyUserAnswer, correctAnswer) ? 'correct' : 'wrong')
-        : (result?.notDone ? 'unanswered' : 'correct'),
+        ? (legacyAnswerChanged && answerMatchesAccepted(legacyUserAnswer, correctAnswer) ? 'correct' : 'wrong')
+        : (media.subjectiveKind
+          ? 'manual'
+          : !resultExam
+            ? (result?.notDone ? 'unanswered' : 'correct')
+            : 'unanswered'),
       legacyFallback: true,
       options,
       ...media
@@ -813,7 +837,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         question.id,
         'Điền từ',
         question.prompt,
-        question.acceptableAnswers?.split('|')[0]?.trim() || '',
+        question.acceptableAnswers || formatQuestionAnswer(question, question.answer),
         index + 1,
         question.wordBank || [],
         { imageUrl: question.imageUrl, audioUrl: question.audioUrl, audioText: question.audioText }
@@ -844,7 +868,15 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
           formatQuestionAnswer(question, question.answer),
           index + 1,
           question.options || [],
-          { imageUrl: question.imageUrl, audioUrl: question.audioUrl, audioText: question.audioText }
+          {
+            imageUrl: question.imageUrl,
+            audioUrl: question.audioUrl,
+            audioText: question.audioText,
+            subjectiveKind: question.options && question.options.length > 0 ? undefined : 'essay',
+            teacherMaxScore: question.options && question.options.length > 0 || isExcludedFromOverallScore(question)
+              ? undefined
+              : getQuestionMaxScore(question)
+          }
         ))
       });
     });
@@ -941,6 +973,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
           subjectiveKind,
           subjectiveIndex,
           audioResponse,
+          teacherMaxScore: isExcludedFromOverallScore(question) ? undefined : getQuestionMaxScore(question),
           ...(audioResponse ? getSpeakingAudio(question, subjectiveIndex) : {})
         }
       ))
@@ -965,6 +998,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       const feedbackIndex = item.subjectiveIndex ?? zeroBasedIndex;
       const teacherComment = item.teacherComment || itemComments[item.id] || itemComments[`${audioItem ? 'audio' : 'essay'}_${feedbackIndex}`];
       const teacherReview = itemReviews[item.id];
+      const teacherItemScore = teacherItemScores[item.id];
 
       return {
         ...item,
@@ -972,6 +1006,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         teacherComment,
         teacherCorrection: Boolean(subjective && correctedImgs.length > 0),
         teacherScore: subjective && resultSpeakScore !== '' ? resultSpeakScore : undefined,
+        teacherItemScore: teacherItemScore?.score,
+        teacherMaxScore: item.teacherMaxScore || item.maxScore || teacherItemScore?.maxScore,
         teacherReviewStatus: teacherReview
       };
     })
@@ -985,6 +1021,30 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     .filter((section) => section.items.length > 0);
 
   const currentResultItems = resultSections.flatMap((section) => section.items);
+  const trialScore = resultExam && isHsk1TrialExam(resultExam)
+    ? (() => {
+        const counts = currentResultItems.reduce((total, item) => {
+          if (item.subjective) return total;
+          const part = getHsk1TrialPart(`${item.section} ${item.id}`);
+          if (!part) return total;
+          total[part].total += 1;
+          if (item.status === 'correct') total[part].correct += 1;
+          return total;
+        }, {
+          listening: { correct: 0, total: 0 },
+          reading: { correct: 0, total: 0 }
+        });
+
+        return counts.listening.total > 0 && counts.reading.total > 0
+          ? calculateHsk1TrialScore(
+              counts.listening.correct,
+              counts.listening.total,
+              counts.reading.correct,
+              counts.reading.total
+            )
+          : null;
+      })()
+    : null;
   const hasPendingAnswerReview = Boolean(
     resultExam &&
     (resultExam.sections || []).some((section) => section.items.some((item) => (
@@ -992,16 +1052,57 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     )))
   );
   const currentObjectiveItems = currentResultItems.filter((item) => !item.subjective);
-  const shouldRebuildStoredMetrics = Boolean(
-    resultExam &&
-    answerSnapshot.length > 0 &&
-    !hasPendingAnswerReview &&
-    currentObjectiveItems.length > (result?.total || 0)
+  const getSavedObjectiveSnapshot = (item: PrintableItem): AnswerSnapshotItem | undefined => (
+    snapshotById.get(item.id) || snapshotById.get(item.prompt)
   );
-  const rebuiltCorrect = currentObjectiveItems.filter((item) => item.status === 'correct').length;
-  const rebuiltWrong = currentObjectiveItems.filter((item) => item.status === 'wrong').length;
-  const rebuiltNotDone = currentObjectiveItems.filter((item) => item.status === 'unanswered').length;
-  const displayTotal = shouldRebuildStoredMetrics ? currentObjectiveItems.length : (result?.total || 0);
+  const currentObjectiveByPrompt = new Map(
+    currentObjectiveItems.map((item) => [normalizedText(item.prompt), item])
+  );
+  const getCurrentObjectiveItem = (snapshot: AnswerSnapshotItem): PrintableItem | undefined => (
+    currentObjectiveItems.find((item) => item.id === snapshot.id) ||
+    currentObjectiveByPrompt.get(normalizedText(snapshot.prompt))
+  );
+  // A submission snapshot is the source of truth for how many auto-graded
+  // questions that particular exam actually contained. This prevents an old
+  // stored total (for example 18) from replacing a 14- or 20-question paper.
+  const objectiveSnapshotItems = answerSnapshot.filter((snapshot) => {
+    const currentItem = getCurrentObjectiveItem(snapshot);
+    if (currentItem) return !currentItem.subjective;
+    return snapshot.status !== 'manual' && !SUBJECTIVE_SECTION_PATTERN.test(snapshot.section);
+  });
+  const hasObjectiveSnapshot = objectiveSnapshotItems.length > 0;
+  const getSnapshotStatus = (snapshot: AnswerSnapshotItem): AnswerSnapshotItem['status'] => (
+    getCurrentObjectiveItem(snapshot)?.status || snapshot.status
+  );
+  // Count the current printable status so known answer corrections also
+  // update the total score for older submissions with saved snapshots.
+  const snapshotCorrect = hasObjectiveSnapshot
+    ? objectiveSnapshotItems.filter((snapshot) => getSnapshotStatus(snapshot) === 'correct').length
+    : currentObjectiveItems.filter((item) => (
+      getSavedObjectiveSnapshot(item) && item.status === 'correct'
+    )).length;
+  const snapshotWrong = hasObjectiveSnapshot
+    ? objectiveSnapshotItems.filter((snapshot) => getSnapshotStatus(snapshot) === 'wrong').length
+    : currentObjectiveItems.filter((item) => (
+      getSavedObjectiveSnapshot(item) && item.status === 'wrong'
+    )).length;
+  const snapshotNotDone = Math.max(
+    0,
+    (hasObjectiveSnapshot ? objectiveSnapshotItems.length : currentObjectiveItems.length) - snapshotCorrect - snapshotWrong
+  );
+  // The submission snapshot and current answer key are authoritative. A
+  // missing answer can only be unanswered, never correct.
+  const shouldRebuildStoredMetrics = hasObjectiveSnapshot;
+  const displayTotal = hasObjectiveSnapshot
+    ? objectiveSnapshotItems.length
+    : resultExam && currentObjectiveItems.length > 0
+      ? currentObjectiveItems.length
+      : (result?.total || 0);
+  const unreliableStoredMetrics = Boolean(
+    resultExam &&
+    !hasObjectiveSnapshot &&
+    (result?.total || 0) !== displayTotal
+  );
   const regradedCorrectCount = currentResultItems.filter((item) => {
     if (isSubjectiveQuestion(item) || item.status !== 'correct') return false;
     const saved = snapshotById.get(item.id) || snapshotById.get(item.prompt);
@@ -1014,21 +1115,38 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   }).length;
   const displayCorrect = result
     ? (shouldRebuildStoredMetrics
-        ? rebuiltCorrect
+        ? snapshotCorrect
+        : unreliableStoredMetrics
+          ? 0
         : result.correct + regradedArrangeCount + regradedCorrectCount - regradedWrongCount)
     : 0;
   const displayWrongCount = result
     ? (shouldRebuildStoredMetrics
-        ? rebuiltWrong
+        ? snapshotWrong
+        : unreliableStoredMetrics
+          ? 0
         : Math.max(0, result.wrongCount - regradedArrangeCount - regradedCorrectCount + regradedWrongCount))
     : 0;
-  const displayNotDone = shouldRebuildStoredMetrics ? rebuiltNotDone : (result?.notDone || 0);
+  const displayNotDone = shouldRebuildStoredMetrics
+    ? snapshotNotDone
+    : unreliableStoredMetrics
+      ? displayTotal
+      : (result?.notDone || 0);
   const displayPercent = result
     ? (displayTotal > 0
         ? Math.round((displayCorrect / displayTotal) * 100)
         : (result.percent <= 1 && result.percent > 0 ? Math.round(result.percent * 100) : result.percent))
     : 0;
-  const displayPercentLabel = hasPendingAnswerReview ? 'Chờ duyệt' : `${displayPercent}%`;
+  const displayPercentLabel = hasPendingAnswerReview
+    ? 'Chờ duyệt'
+    : unreliableStoredMetrics
+      ? 'Cần kiểm tra'
+      : `${displayPercent}%`;
+  const useTrialScore = Boolean(trialScore);
+  const useTeacherScore = Boolean(resultExam && !isHandwritingType && !useTrialScore);
+  const overallMaxScore = trialScore?.maxScore || 0;
+  const overallScore = trialScore?.totalScore || 0;
+  const overallPercent = trialScore ? Math.round((overallScore / overallMaxScore) * 100) : 0;
   const displayWrongList = visibleWrongList.filter((wrongLine) => {
     const wrongItem = parseWrongLineItem(wrongLine);
     const wrongPrompt = normalizedText(wrongItem.prompt);
@@ -1090,9 +1208,17 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     const resultItem = findResultItemForPrompt(item.prompt);
     return !resultItem?.audioResponse && normalizedText(item.answer) !== 'đã ghi âm';
   });
-  const renderTeacherReview = (item?: PrintableItem) => item?.teacherReviewStatus ? (
-    <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
-      <span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}
+  const renderTeacherReview = (item?: PrintableItem) => item && (item.teacherReviewStatus || item.teacherMaxScore) ? (
+    <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
+      {item.teacherReviewStatus && (
+        <p><span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}</p>
+      )}
+      {item.teacherMaxScore && (
+        <p>
+          <span className="font-bold">Điểm câu: </span>
+          {item.teacherItemScore !== undefined ? `${item.teacherItemScore}/${item.teacherMaxScore}` : `Chưa chấm/${item.teacherMaxScore}`}
+        </p>
+      )}
     </div>
   ) : null;
   const allQuestionCount = resultSections.reduce((count, section) => count + section.items.length, 0);
@@ -1478,25 +1604,39 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                 {/* Multiple Choice Card */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-semibold text-slate-500 block">Điểm Phần Trắc Nghiệm</span>
-                    <span className="text-2xl font-bold text-slate-800">{displayPercentLabel}</span>
+                    <span className="text-xs font-semibold text-slate-500 block">
+                      {useTrialScore ? 'Điểm đề thi thử HSK 1 (3.0)' : 'Điểm Phần Trắc Nghiệm'}
+                    </span>
+                    <span className="text-2xl font-bold text-slate-800">
+                      {useTrialScore ? `${formatScore(overallScore)}/200` : displayPercentLabel}
+                    </span>
                     <span className="text-xs text-slate-500 block">
-                      {hasPendingAnswerReview ? 'Đáp án đang chờ giáo viên duyệt' : `Đúng ${displayCorrect}/${displayTotal} câu`}
+                      {useTrialScore
+                        ? `Nghe ${formatScore(trialScore.listeningScore)}/100 · Đọc ${formatScore(trialScore.readingScore)}/100`
+                        : hasPendingAnswerReview
+                          ? 'Đáp án đang chờ giáo viên duyệt'
+                          : `Đúng ${displayCorrect}/${displayTotal} câu`}
                     </span>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center text-sm shadow-2xs">
-                    {hasPendingAnswerReview ? '?' : `${displayPercent}%`}
+                    {useTrialScore ? `${overallPercent}%` : hasPendingAnswerReview ? '?' : `${displayPercent}%`}
                   </div>
                 </div>
 
                 {/* Overall Exercise Score Card */}
                 <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-4 flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-bold text-indigo-900 block">Điểm Bài Tập Chung (GV chấm)</span>
+                    <span className="text-xs font-bold text-indigo-900 block">Điểm tổng hợp</span>
                     <span className="text-2xl font-bold text-indigo-900">
-                      {resultSpeakScore || (result.status === 'Đã chấm' ? 'Đã duyệt' : 'Chờ chấm')}
+                      {useTrialScore
+                        ? `${formatScore(overallScore)}/200`
+                        : (resultSpeakScore || 'Chờ giáo viên chấm')}
                     </span>
-                    <span className="text-xs text-indigo-700 block font-medium">Kết quả tổng thể do giáo viên chấm</span>
+                    <span className="text-xs text-indigo-700 block font-medium">
+                      {useTrialScore
+                        ? `Nghe ${formatScore(trialScore.listeningScore)}/100 · Đọc ${formatScore(trialScore.readingScore)}/100 · Đúng ${displayCorrect}/${displayTotal} câu`
+                        : 'Điểm do giáo viên tự nhập'}
+                    </span>
                   </div>
                   <Award className="w-10 h-10 text-indigo-600 opacity-80" />
                 </div>
@@ -2072,9 +2212,23 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
               <strong>
                 {hasPendingAnswerReview
                   ? 'Kết quả: Chờ giáo viên duyệt đáp án'
-                  : `Kết quả: ${displayCorrect}/${displayTotal} câu đúng (${displayPercent}%)`}
+                  : useTrialScore
+                    ? `Kết quả: ${formatScore(overallScore)}/200 điểm (${overallPercent}%)`
+                    : useTeacherScore
+                    ? (resultSpeakScore
+                      ? `Điểm giáo viên chấm: ${resultSpeakScore}`
+                      : `Trắc nghiệm: ${displayCorrect}/${displayTotal} câu · Chờ GV nhập điểm tổng kết`)
+                    : `Kết quả: ${displayCorrect}/${displayTotal} câu đúng (${displayPercent}%)`}
               </strong>
-              <span>{hasPendingAnswerReview ? 'Chưa có điểm tự động' : `Sai: ${displayWrongCount} · Chưa làm: ${displayNotDone}`}</span>
+              <span>
+                {hasPendingAnswerReview
+                  ? 'Chưa có điểm tự động'
+                  : useTrialScore
+                    ? `Nghe: ${formatScore(trialScore.listeningScore)}/100 · Đọc: ${formatScore(trialScore.readingScore)}/100 · Sai: ${displayWrongCount} · Chưa làm: ${displayNotDone}`
+                    : useTeacherScore
+                    ? `Trắc nghiệm tự động: sai ${displayWrongCount} · chưa làm ${displayNotDone}`
+                    : `Sai: ${displayWrongCount} · Chưa làm: ${displayNotDone}`}
+              </span>
             </div>
           </header>
 

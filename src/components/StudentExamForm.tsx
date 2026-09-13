@@ -9,7 +9,15 @@ import { sanitizeExamSections } from '../utils/lessonParser';
 import { groupExamsForSelection } from '../utils/examGrouping';
 import { ExerciseRenderer } from './ExerciseRenderer';
 import { StructuredBlockAudio } from './exercises/HskStructuredExercise';
-import { gradeStructuredSections, StructuredAnswerMap } from '../utils/structuredExercises';
+import {
+  getQuestionAnchor,
+  getStructuredQuestionRows,
+  gradeStructuredSections,
+  isStructuredExerciseItem,
+  StructuredAnswerMap,
+  getStructuredExerciseLabel
+} from '../utils/structuredExercises';
+import { getQuestionMaxScore } from '../utils/teacherScoring';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
 import { loadFormDraft, saveListeningProgress, useStudentFormDraft } from '../hooks/useStudentFormDraft';
 import { useStudentExamCatalog } from '../hooks/useStudentExamCatalog';
@@ -60,6 +68,106 @@ const formatRemainingTime = (seconds: number): string => {
   const remainder = seconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 };
+
+interface ExamNavigationItem {
+  id: string;
+  label: string;
+  target: string;
+  answered: boolean;
+}
+
+interface ExamNavigationSubgroup {
+  id: string;
+  title: string;
+  items: ExamNavigationItem[];
+}
+
+interface ExamNavigationGroup {
+  id: string;
+  title: string;
+  subgroups: ExamNavigationSubgroup[];
+}
+
+const ExamBrief: React.FC<{
+  exam: ExamLesson;
+  answered: number;
+  total: number;
+}> = ({ exam, answered, total }) => (
+  <aside className="space-y-4 lg:sticky lg:top-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500">Đề bài</span>
+        <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-bold text-teal-800">{exam.level}</span>
+      </div>
+      <h3 className="mt-4 text-lg font-extrabold leading-snug text-slate-900">{exam.title}</h3>
+      {exam.description && <p className="mt-2 text-xs leading-5 text-slate-600">{exam.description}</p>}
+      {exam.instruction && (
+        <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 text-xs leading-5 text-indigo-950">
+          <p className="font-bold">Hướng dẫn</p>
+          <p className="mt-1 whitespace-pre-wrap">{exam.instruction}</p>
+        </div>
+      )}
+      <div className="mt-4 grid grid-cols-2 gap-2 text-center">
+        <div className="rounded-xl bg-slate-50 px-2 py-3">
+          <p className="text-xl font-black text-slate-900">{answered}</p>
+          <p className="text-[11px] font-semibold text-slate-500">Đã làm</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 px-2 py-3">
+          <p className="text-xl font-black text-slate-900">{total}</p>
+          <p className="text-[11px] font-semibold text-slate-500">Tổng câu</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+);
+
+const ExamQuestionNavigator: React.FC<{
+  groups: ExamNavigationGroup[];
+  answered: number;
+  total: number;
+}> = ({ groups, answered, total }) => (
+  <aside className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+        <div>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-500">Danh sách câu</p>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Đã làm {answered}/{total}</p>
+        </div>
+        <div className="h-2.5 w-2.5 rounded-full bg-teal-500" aria-hidden="true" />
+      </div>
+      <div className="mt-4 space-y-4">
+        {groups.map((group) => (
+          <section key={group.id}>
+            <p className="text-xs font-extrabold text-slate-700">{group.title}</p>
+            <div className="mt-2 space-y-3">
+              {group.subgroups.map((subgroup) => (
+                <div key={subgroup.id}>
+                  <p className="mb-1 text-[10px] font-bold leading-4 text-slate-500">{subgroup.title}</p>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {subgroup.items.map((item) => (
+                      <a
+                        key={item.id}
+                        href={`#${item.target}`}
+                        aria-label={`Đi tới câu ${item.label}`}
+                        className={`flex min-h-8 items-center justify-center rounded-lg border px-1 text-xs font-bold transition hover:border-teal-500 hover:bg-teal-50 ${
+                          item.answered
+                            ? 'border-teal-300 bg-teal-50 text-teal-900'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  </aside>
+);
 
 const hasPinyinContent = (value: unknown): boolean => {
   if (Array.isArray(value)) return value.some(hasPinyinContent);
@@ -205,6 +313,166 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     [currentExam.listeningQuestions]
   );
 
+  const navigationGroups = useMemo<ExamNavigationGroup[]>(() => {
+    const groups: ExamNavigationGroup[] = [];
+    const addGroup = (id: string, title: string, subgroups: ExamNavigationSubgroup[]) => {
+      const nonEmptySubgroups = subgroups.filter((subgroup) => subgroup.items.length > 0);
+      if (nonEmptySubgroups.length > 0) groups.push({ id, title, subgroups: nonEmptySubgroups });
+    };
+
+    currentExam.sections?.forEach((section, sectionIndex) => {
+      const subgroups: ExamNavigationSubgroup[] = [];
+      let fallbackNumber = 1;
+
+      section.items.forEach((item, itemIndex) => {
+        if (isStructuredExerciseItem(item)) {
+          const items = getStructuredQuestionRows(item).map((row) => {
+            const number = row.number || fallbackNumber;
+            fallbackNumber += 1;
+            return {
+              id: row.key,
+              label: String(number),
+              target: getQuestionAnchor(row.key),
+              answered: Boolean(structuredAnswers[row.key]?.trim())
+            };
+          });
+          const title = getStructuredExerciseLabel(item) || `Dạng ${itemIndex + 1}`;
+          subgroups.push({ id: `${section.id || sectionIndex}-${item.id}`, title, items });
+          return;
+        }
+
+        subgroups.push({
+          id: `${section.id || sectionIndex}-${item.id}`,
+          title: item.type || `Dạng ${itemIndex + 1}`,
+          items: [{
+            id: item.id,
+            label: String(fallbackNumber),
+            target: getQuestionAnchor(item.id),
+            answered: Boolean(structuredAnswers[item.id]?.trim())
+          }]
+        });
+        fallbackNumber += 1;
+      });
+
+      addGroup(`structured-${section.id || sectionIndex}`, section.title || `Phần ${sectionIndex + 1}`, subgroups);
+    });
+
+    addGroup('multiple-choice', 'Trắc nghiệm', [{
+      id: 'multiple-choice-items',
+      title: 'Câu hỏi trắc nghiệm',
+      items: currentExam.mcQuestions.map((question, index) => ({
+        id: question.id,
+        label: String(index + 1),
+        target: getQuestionAnchor(question.id),
+        answered: mcAnswers[question.id] !== undefined
+      }))
+    }]);
+
+    addGroup('fill', 'Điền từ', [{
+      id: 'fill-items',
+      title: 'Điền từ vào chỗ trống',
+      items: (currentExam.fillQuestions || []).map((question, index) => ({
+        id: question.id,
+        label: String(index + 1),
+        target: getQuestionAnchor(question.id),
+        answered: Boolean(fillAnswers[question.id]?.trim())
+      }))
+    }]);
+
+    addGroup('arrange', 'Sắp xếp câu', [{
+      id: 'arrange-items',
+      title: 'Sắp xếp câu',
+      items: (currentExam.arrangeQuestions || []).map((question, index) => ({
+        id: question.id,
+        label: String(index + 1),
+        target: getQuestionAnchor(question.id),
+        answered: (arrangeAnswers[question.id] || []).length > 0
+      }))
+    }]);
+
+    addGroup('listening', 'Luyện nghe', [{
+      id: 'listening-items',
+      title: 'Bài nghe',
+      items: listeningQuestionItems.map((question, index) => ({
+        id: question.id,
+        label: String(index + 1),
+        target: getQuestionAnchor(question.id),
+        answered: question.type === 'listening_fill' || question.type === 'listening_fill_in_blank'
+          ? Boolean(fillAnswers[question.id]?.trim())
+          : mcAnswers[question.id] !== undefined
+      }))
+    }]);
+
+    currentExam.readingPassages?.forEach((passage, passageIndex) => {
+      addGroup(`reading-${passage.id || passageIndex}`, passage.title || `Đọc ${passageIndex + 1}`, [{
+        id: `${passage.id || passageIndex}-items`,
+        title: 'Câu hỏi đọc hiểu',
+        items: passage.questions.map((question, index) => ({
+          id: question.id,
+          label: String(index + 1),
+          target: getQuestionAnchor(question.id),
+          answered: question.options ? mcAnswers[question.id] !== undefined : Boolean(essayAnswers[question.id]?.trim())
+        }))
+      }]);
+    });
+
+    addGroup('essay', 'Viết & tự luận', [{
+      id: 'essay-items',
+      title: 'Tự luận',
+      items: currentExam.essayQuestions.map((question, index) => ({
+        id: question.id,
+        label: String(index + 1),
+        target: getQuestionAnchor(question.id),
+        answered: Boolean(essayAnswers[question.id]?.trim())
+      }))
+    }]);
+
+    addGroup('speaking', 'Kỹ năng nói', [{
+      id: 'speaking-items',
+      title: 'Bài nói',
+      items: currentExam.speakingQuestions.map((question, index) => ({
+        id: question.id,
+        label: String(index + 1),
+        target: getQuestionAnchor(question.id),
+        answered: Boolean(audioRecords[question.id])
+      }))
+    }]);
+
+    addGroup('translation', 'Kỹ năng dịch', [{
+      id: 'translation-items',
+      title: 'Bài dịch',
+      items: (currentExam.translationQuestions || []).map((question, index) => ({
+        id: question.id,
+        label: String(index + 1),
+        target: getQuestionAnchor(question.id),
+        answered: Boolean(essayAnswers[question.id]?.trim() || audioRecords[question.id])
+      }))
+    }]);
+
+    return groups;
+  }, [
+    arrangeAnswers,
+    audioRecords,
+    currentExam,
+    essayAnswers,
+    fillAnswers,
+    listeningQuestionItems,
+    mcAnswers,
+    structuredAnswers
+  ]);
+
+  const navigationTotal = navigationGroups.reduce(
+    (total, group) => total + group.subgroups.reduce((subgroupTotal, subgroup) => subgroupTotal + subgroup.items.length, 0),
+    0
+  );
+  const navigationAnswered = navigationGroups.reduce(
+    (total, group) => total + group.subgroups.reduce(
+      (subgroupTotal, subgroup) => subgroupTotal + subgroup.items.filter((item) => item.answered).length,
+      0
+    ),
+    0
+  );
+
   const structuredAudioScope = useMemo(() => {
     const studentId = `${studentName.trim().toLocaleLowerCase()}::${studentClass.trim().toLocaleLowerCase()}`;
     return `${studentId || 'anonymous'}::${submissionId}::${currentExam.id}`;
@@ -348,6 +616,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const isExamContentVisible = Boolean(
     selectedExamId && (!isTimedExam || (hasRequiredStudentInfo && timeLimitStartedAt))
   );
+  const isExamLayoutVisible = isExamContentVisible && isVocabDone;
   const canStartTimedExam = Boolean(
     selectedExamId && hasRequiredStudentInfo && isVocabDone
   );
@@ -561,7 +830,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 prompt: q.prompt,
                 userAnswer: ans === '(Chưa làm)' ? '' : ans,
                 correctAnswer: q.suggestedAnswer || q.acceptableAnswers || '',
-                status: 'manual'
+                status: 'manual',
+                maxScore: getQuestionMaxScore(q)
               });
               return;
             }
@@ -764,7 +1034,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           prompt: q.prompt,
           userAnswer: ans === '(Chưa làm)' ? '' : ans,
           correctAnswer: q.suggestedAnswer || q.acceptableAnswers || '',
-          status: 'manual'
+          status: 'manual',
+          maxScore: getQuestionMaxScore(q)
         });
         return `【${q.prompt}】\nBài làm: ${ans}`;
         })
@@ -780,7 +1051,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               prompt: q.prompt,
               userAnswer: ans === '(Chưa làm)' ? '' : ans,
               correctAnswer: q.suggestedAnswer || q.acceptableAnswers || '',
-              status: 'manual'
+              status: 'manual',
+              maxScore: getQuestionMaxScore(q)
             });
             const label =
               q.translationType === 'vi_to_zh_text'
@@ -803,7 +1075,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           prompt: q.prompt,
           userAnswer: rec ? 'Đã ghi âm' : '',
           correctAnswer: q.referenceAnswers?.[0] || q.suggestedAnswer || '',
-          status: 'manual'
+          status: 'manual',
+          maxScore: getQuestionMaxScore(q)
         });
         if (rec) {
           audioList.push({
@@ -826,7 +1099,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               prompt: q.prompt,
               userAnswer: rec ? 'Đã ghi âm' : '',
               correctAnswer: q.referenceAnswers?.[0] || q.suggestedAnswer || '',
-              status: 'manual'
+              status: 'manual',
+              maxScore: getQuestionMaxScore(q)
             });
             if (rec) {
               audioList.push({
@@ -985,7 +1259,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-[1600px] space-y-6">
       {/* Banner / Header */}
       {isExamContentVisible && (
         <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-700 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
@@ -1204,6 +1478,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           </div>
         )}
 
+        <div className={`grid items-start gap-5 ${isExamLayoutVisible ? 'lg:grid-cols-[minmax(210px,0.62fr)_minmax(0,1.8fr)_250px]' : ''}`}>
+          {isExamLayoutVisible && (
+            <ExamBrief exam={currentExam} answered={navigationAnswered} total={navigationTotal} />
+          )}
+
+          <div className="min-w-0">
         {/* EXERCISES CONTAINER - LOCKED WHEN VOCAB IS NOT DONE */}
         {isTimedExam && !hasRequiredStudentInfo ? (
           <div className="p-8 text-center bg-amber-50 border border-amber-300 rounded-2xl text-amber-950 space-y-2">
@@ -1313,20 +1593,21 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     )}
                     <div className="space-y-6">
                       {sec.items.map((item) => (
-                        <ExerciseRenderer
-                          key={item.id}
-                          item={item}
-                          answers={structuredAnswers}
-                          studentMode
-                          showPinyinOverride={hasExamPinyin ? showStructuredPinyin : undefined}
-                          audioPlayCounts={listeningPlayCounts}
-                          audioScope={structuredAudioScope}
-                          onAudioAttempt={handleStructuredAudioAttempt}
-                          hideBlockAudio={item.id === sharedAudioItem?.id}
-                          onAnswerChange={(key, answer) => {
-                            setStructuredAnswers((current) => ({ ...current, [key]: answer }));
-                          }}
-                        />
+                        <div id={isStructuredExerciseItem(item) ? undefined : getQuestionAnchor(item.id)} key={item.id} className="scroll-mt-32">
+                          <ExerciseRenderer
+                            item={item}
+                            answers={structuredAnswers}
+                            studentMode
+                            showPinyinOverride={hasExamPinyin ? showStructuredPinyin : undefined}
+                            audioPlayCounts={listeningPlayCounts}
+                            audioScope={structuredAudioScope}
+                            onAudioAttempt={handleStructuredAudioAttempt}
+                            hideBlockAudio={item.id === sharedAudioItem?.id}
+                            onAnswerChange={(key, answer) => {
+                              setStructuredAnswers((current) => ({ ...current, [key]: answer }));
+                            }}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -1352,7 +1633,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                 <div className="space-y-6">
                   {currentExam.mcQuestions.map((q, idx) => (
-                    <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+                    <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
                       {q.type && !['mc', 'multiple_choice', 'flashcard', 'vocab', 'fill', 'fill_in_blank', 'arrange', 'ordering', 'matching', 'dictation', 'paragraph_order', 'picture_writing', 'speaking_record', 'listening_multiple_choice', 'listening_true_false', 'listening', 'listening_mc', 'listening_tf', 'reading', 'passage', 'essay', 'writing', 'speaking', 'pronunciation', 'translation', 'translate', 'translate_vi_zh'].includes(q.type) && (
                         <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 font-mono flex items-center justify-between">
                           <span>Unsupported Exercise Type: <strong>{q.type}</strong></span>
@@ -1443,7 +1724,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       {/* Questions list with RESET index for Tier 2 */}
                       <div className="space-y-3">
                         {group.questions.map((q, qIdx) => (
-                          <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                          <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                             <div>
                               <p className="text-sm font-semibold text-slate-800">
                                 Câu {qIdx + 1}: {q.prompt}
@@ -1495,7 +1776,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     });
 
                     return (
-                      <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div>
                           <div>
                             <p className="text-sm font-semibold text-slate-800">
@@ -1581,7 +1862,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     const isTfType = q.type === 'listening_tf' || q.type === 'listening_true_false';
 
                     return (
-                      <div key={q.id} className="p-4 rounded-xl bg-indigo-50/40 border border-indigo-100 space-y-3.5">
+                      <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-indigo-50/40 border border-indigo-100 space-y-3.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2">
                             <span className="font-bold text-indigo-700 text-sm mt-0.5">{isConversation ? `Bài nghe ${idx + 1}:` : `Câu nghe ${idx + 1}:`}</span>
@@ -1634,8 +1915,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         <div className={isConversation ? 'space-y-3 pt-1' : ''}>
                           {subQuestions.map((subQuestion, subIdx) => (
                             <div
+                              id={getQuestionAnchor(subQuestion.id)}
                               key={subQuestion.id}
-                              className={isConversation ? 'p-3 bg-white/80 rounded-xl border border-indigo-100 space-y-2' : ''}
+                              className={`scroll-mt-32 ${isConversation ? 'p-3 bg-white/80 rounded-xl border border-indigo-100 space-y-2' : ''}`}
                             >
                               {isConversation && (
                                 <div className="text-sm font-bold text-slate-900">
@@ -1692,7 +1974,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                       <div className="space-y-4 pt-1">
                         {passage.questions.map((q, qIdx) => (
-                          <div key={q.id} className="p-3.5 rounded-lg bg-white border border-slate-200 space-y-2">
+                          <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-3.5 rounded-lg bg-white border border-slate-200 space-y-2">
                             <p className="text-xs font-bold text-slate-700">
                               Câu {qIdx + 1}: {q.prompt}
                             </p>
@@ -1756,7 +2038,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 <div className="space-y-4">
                   {currentExam.essayQuestions.map((q, idx) => {
                     return (
-                      <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-slate-800">
                             Câu {idx + 1}: {q.prompt}
@@ -1836,7 +2118,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         const questionNumber = questionOffset + idx + 1;
 
                         return (
-                        <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="text-xs font-bold text-slate-500">Câu {questionNumber}</span>
                             {q.preparationSeconds && (
@@ -1913,8 +2195,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     if (q.translationType === 'vi_to_zh_audio') {
                       return (
                         <div
+                          id={getQuestionAnchor(q.id)}
                           key={q.id}
-                          className="grid gap-4 rounded-xl border border-slate-200 bg-white px-4 py-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-center"
+                          className="scroll-mt-32 grid gap-4 rounded-xl border border-slate-200 bg-white px-4 py-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-center"
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -1955,7 +2238,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     // Dạng 2: Cho câu tiếng Việt -> Viết câu tiếng Trung
                     if (q.translationType === 'vi_to_zh_text') {
                       return (
-                        <div key={q.id} className="p-5 rounded-xl bg-white border-2 border-sky-200 shadow-sm space-y-4">
+                      <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-5 rounded-xl bg-white border-2 border-sky-200 shadow-sm space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-sky-100 border border-sky-200 text-sky-900">
                               Dịch viết Việt → Trung
@@ -1985,7 +2268,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     // Dạng 3: Cho câu tiếng Trung -> Dịch thành tiếng Việt
                     if (q.translationType === 'zh_to_vi_text') {
                       return (
-                        <div key={q.id} className="p-5 rounded-xl bg-white border-2 border-sky-200 shadow-sm space-y-4">
+                      <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-5 rounded-xl bg-white border-2 border-sky-200 shadow-sm space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-sky-100 border border-sky-200 text-sky-900">
                               Dịch viết Trung → Việt
@@ -2085,6 +2368,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             </button>
           </div>
         )}
+          </div>
+
+          {isExamLayoutVisible && (
+            <ExamQuestionNavigator
+              groups={navigationGroups}
+              answered={navigationAnswered}
+              total={navigationTotal}
+            />
+          )}
+        </div>
           </>
         ) : (
           <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-slate-500 space-y-2">

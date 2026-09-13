@@ -64,6 +64,7 @@ export interface Question {
   responseSeconds?: number;
   hidePinyinByDefault?: boolean;
   rubric?: Array<{ id: string; label: string; maxScore: number }>;
+  maxScore?: number;
   uploadFormats?: string[];
 }
 
@@ -154,6 +155,8 @@ export interface AnswerSnapshotItem {
   userAnswer?: string;
   correctAnswer?: string;
   status: AnswerSnapshotStatus;
+  maxScore?: number;
+  teacherScore?: string | number;
 }
 
 export * from './types/handwriting';

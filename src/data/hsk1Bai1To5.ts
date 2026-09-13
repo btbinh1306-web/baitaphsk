@@ -445,7 +445,7 @@ const bai3SpeakingTranslations: Question[] = [
 
 const bai4FillQuestions: Question[] = [
   fillQuestion('hsk1_bai4_fill_01', '我________一个哥哥。', '有', bai4WordBank),
-  fillQuestion('hsk1_bai4_fill_02', '我________姐姐。', '没有', bai4WordBank),
+  { ...fillQuestion('hsk1_bai4_fill_02', '我________姐姐。', '没有', bai4WordBank), acceptableAnswers: '有|没有' },
   fillQuestion('hsk1_bai4_fill_03', '你家有________口人？', '几', bai4WordBank),
   fillQuestion('hsk1_bai4_fill_04', '这本书________钱？', '多少', bai4WordBank),
   fillQuestion('hsk1_bai4_fill_05', '我有________个孩子。', '两', bai4WordBank),
@@ -479,7 +479,7 @@ const bai4Reading = readingPassage(
 
 const bai4Listening: Question[] = [
   listeningQuestion('hsk1_bai4_listen_01', 'Nghe và chọn số người.', ['3口', '4口', '5口'], 2, '我家有五口人。'),
-  listeningQuestion('hsk1_bai4_listen_02', 'Nghe và chọn tuổi.', ['8岁', '18岁', '28岁'], 0, '我妹妹八岁。'),
+  listeningQuestion('hsk1_bai4_listen_02', 'Nghe và chọn tuổi.', ['8岁', '18岁', '28岁'], 1, '我妹妹十八岁。'),
   listeningQuestion('hsk1_bai4_listen_03', 'Nghe và chọn cấu trúc đúng.', ['两个人', '二个人', '两人个'], 0, '两个人。'),
   listeningQuestion('hsk1_bai4_listen_04', 'Nghe và chọn câu hỏi.', ['你家有几口人？', '你有几个家？', '你几岁家？'], 0, '你家有几口人？'),
   listeningQuestion(

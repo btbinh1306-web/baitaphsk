@@ -6,7 +6,12 @@ import { HSK2_BAI2_TO_3_EXAMS } from './hsk2Bai2To3';
 import { HSK2_FINAL_EXAM } from './hsk2Final';
 import { HSK1_MOCK_01_EXAM } from './hsk1Mock01';
 import { HSK1_MOCK_02_EXAM } from './hsk1Mock02';
-import { HSK1_TRIAL_01_EXAM, HSK1_TRIAL_02_EXAM } from './hsk1MockTrials';
+import {
+  HSK1_PDF_TRIAL_01_EXAM,
+  HSK1_PDF_TRIAL_02_EXAM,
+  HSK1_TRIAL_01_EXAM,
+  HSK1_TRIAL_02_EXAM
+} from './hsk1MockTrials';
 
 const LOCAL_AUDIO_BY_QUESTION_ID: Record<string, string> = {
   hsk1_bai1_listen_01: '/audio/HSK1_B01/HSK1_B01_01.mp3',
@@ -111,6 +116,8 @@ const SAMPLE_EXAMS_WITH_LOCAL_AUDIO: ExamLesson[] = [
   HSK1_MOCK_02_EXAM,
   HSK1_TRIAL_01_EXAM,
   HSK1_TRIAL_02_EXAM,
+  HSK1_PDF_TRIAL_01_EXAM,
+  HSK1_PDF_TRIAL_02_EXAM,
   {
     id: 'hsk1-b1-ai-xiaoyu',
     title: 'HSK 1 - Bài 1: 小语，你好！ (Đọc câu, Nối từ, Xếp câu & Dịch thuật)',

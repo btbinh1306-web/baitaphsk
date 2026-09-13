@@ -62,6 +62,35 @@ const answerMatches = (left: string, right: string): boolean => {
   ));
 };
 
+const exactAnswerMatches = (left: string, right: string): boolean => {
+  const normalizedLeft = normalizeAnswer(left);
+  const normalizedRight = normalizeAnswer(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+};
+
+const resolveStructuredAnswerId = (
+  answer: string,
+  options: Array<{ id: string; text?: string }>
+): string => {
+  const normalizedAnswer = normalizeAnswer(answer);
+  if (!normalizedAnswer) return '';
+
+  const matched = options.find((option) => {
+    const candidates = [
+      option.id,
+      option.text ? `${option.id}. ${option.text}` : '',
+      option.text || ''
+    ].filter(Boolean);
+
+    return candidates.some((candidate) => (
+      normalizeAnswer(candidate) === normalizedAnswer ||
+      answerMatches(answer, candidate)
+    ));
+  });
+
+  return matched?.id || '';
+};
+
 const statusLabel = (item: ReadOnlyExamItem): string => {
   if (item.status === 'correct') return '✓ ĐÚNG';
   if (item.status === 'wrong') return '✗ SAI';
@@ -95,7 +124,10 @@ const isOrderingQuestion = (sectionTitle: string, item: ReadOnlyExamItem): boole
 
 const isSubjectiveQuestion = (sectionTitle: string, item: ReadOnlyExamItem): boolean => (
   Boolean(item.subjective) ||
-  /tự luận|dịch|nói|ghi âm|viết|chép|口译|笔译|口语/i.test(`${sectionTitle} ${item.section} ${item.prompt}`)
+  Boolean(item.subjectiveKind) ||
+  // Prompt notes like "gần người nói" belong to a fill-in question and
+  // must not turn the item into a subjective-answer card.
+  /tự luận|dịch|nói|ghi âm|viết|chép|口译|笔译|口语/i.test(`${sectionTitle} ${item.section}`)
 );
 
 const displayAnswer = (value: string): string => stripOptionLabel(value.split('|')[0] || '');
@@ -134,10 +166,25 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
           .find((candidate) => candidate.title === section.title)
           ?.items.find((candidate) => candidate.id === row.key);
         structuredCorrectAnswers[row.key] = row.correctAnswer;
-        structuredStatuses[row.key] = resultItem?.status || 'unanswered';
-        if (!resultItem?.userAnswer) return;
-        const answer = row.options.find((option) => answerMatches(resultItem.userAnswer || '', `${option.id}. ${option.text}`));
-        if (answer) structuredAnswers[row.key] = answer.id;
+        const rawUserAnswer = resultItem?.userAnswer || '';
+        const resolvedAnswerId = resolveStructuredAnswerId(rawUserAnswer, row.options);
+        if (resolvedAnswerId) structuredAnswers[row.key] = resolvedAnswerId;
+
+        if (!rawUserAnswer.trim()) {
+          structuredStatuses[row.key] = 'unanswered';
+          return;
+        }
+
+        if (!row.correctAnswer) {
+          structuredStatuses[row.key] = resultItem?.status || 'manual';
+          return;
+        }
+
+        // Recompute from the answer ID so a stale snapshot cannot mark a
+        // correct shared-image/shared-choice answer as wrong in read-only view.
+        structuredStatuses[row.key] = resolvedAnswerId
+          ? (resolvedAnswerId === row.correctAnswer ? 'correct' : 'wrong')
+          : (resultItem?.status || 'wrong');
       });
     });
   });
@@ -372,8 +419,8 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
                 {subjectiveQuestion || fillQuestion || orderingQuestion ? null : item.options && item.options.length > 0 ? (
                   <div className={`mt-3 grid gap-2 ${item.options.length >= 3 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                     {item.options.map((option, optionIndex) => {
-                      const selected = answerMatches(userAnswer, option);
-                      const correct = answerMatches(correctAnswer, option);
+                      const selected = exactAnswerMatches(userAnswer, option);
+                      const correct = exactAnswerMatches(correctAnswer, option);
                       const explicitLabel = option.match(/^([a-f])\s*[.)。：:]\s*/i)?.[1];
                       const optionLabel = explicitLabel || String.fromCharCode(65 + optionIndex);
                       const optionText = explicitLabel

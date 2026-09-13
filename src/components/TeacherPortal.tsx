@@ -24,6 +24,13 @@ import {
   requiresTeacherReview,
   OrderedTeacherQuestion
 } from '../utils/teacherQuestionOrder';
+import {
+  calculateHsk1TrialScore,
+  formatScore,
+  getHsk1TrialPart,
+  Hsk1TrialScore,
+  isHsk1TrialExam,
+} from '../utils/teacherScoring';
 import { fileToCompressedDataUrl } from '../utils/imageUtils';
 import { ImportLesson } from './ImportLesson';
 import { EditQuestionModal } from './EditQuestionModal';
@@ -253,7 +260,17 @@ const matchesCurrentAnswer = (question: Question, userAnswer: unknown): boolean 
     .some((answer) => normalizeAnswerForRegrade(answer) === normalizedUserAnswer);
 };
 
-const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLesson[]) => {
+interface RegradedSubmissionMetrics {
+  correct: number;
+  total: number;
+  percent: number;
+  trialScore?: Hsk1TrialScore;
+}
+
+const getRegradedSubmissionMetrics = (
+  submission: SubmissionData,
+  exams: ExamLesson[]
+): RegradedSubmissionMetrics => {
   const exam = exams.find(
     (candidate) => candidate.id === submission.lesson || matchesCatalogLessonTitle(submission.lesson, candidate.title)
   );
@@ -262,7 +279,11 @@ const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLes
     : (submission.percent <= 1 && submission.percent > 0 ? Math.round(submission.percent * 100) : submission.percent);
 
   if (!exam) {
-    return { correct: submission.correct, percent: storedPercent };
+    return {
+      correct: submission.correct,
+      total: submission.total,
+      percent: storedPercent
+    };
   }
 
   const snapshotItems = parseAnswerSnapshot(submission.answerSnapshot || submission.essays);
@@ -270,6 +291,82 @@ const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLes
   const snapshotByPrompt = new Map(snapshotItems.map((item) => [item.prompt.trim().toLocaleLowerCase(), item]));
   const legacyWrongDetails = parseTeacherWrongDetails(submission.wrong);
   const orderedQuestions = buildOrderedQuestionList(exam);
+  const objectiveQuestions = orderedQuestions.filter((item) => !requiresTeacherReview(item.question));
+  const currentQuestionByPrompt = new Map(
+    orderedQuestions.map((item) => [item.question.prompt.trim().toLocaleLowerCase(), item])
+  );
+  const getCurrentQuestion = (snapshot: AnswerSnapshotItem): OrderedTeacherQuestion | undefined => (
+    orderedQuestions.find((item) => item.questionId === snapshot.id) ||
+    currentQuestionByPrompt.get(snapshot.prompt.trim().toLocaleLowerCase())
+  );
+
+  if (isHsk1TrialExam(exam) && snapshotItems.length > 0) {
+    const trialItems = snapshotItems.filter((item) => {
+      const currentQuestion = getCurrentQuestion(item);
+      const part = getHsk1TrialPart(`${currentQuestion?.sectionTitle || item.section} ${currentQuestion?.sectionId || ''} ${item.id}`);
+      return Boolean(part && (!currentQuestion || !requiresTeacherReview(currentQuestion.question)));
+    });
+    let listeningCorrect = 0;
+    let listeningTotal = 0;
+    let readingCorrect = 0;
+    let readingTotal = 0;
+
+    trialItems.forEach((item) => {
+      const currentQuestion = getCurrentQuestion(item);
+      const part = getHsk1TrialPart(`${currentQuestion?.sectionTitle || item.section} ${currentQuestion?.sectionId || ''} ${item.id}`);
+      if (part === 'listening') listeningTotal += 1;
+      if (part === 'reading') readingTotal += 1;
+
+      const currentAnswers = currentQuestion ? getCurrentAnswerCandidates(currentQuestion.question) : [];
+      const isCorrectNow = currentQuestion && currentAnswers.length > 0
+        ? matchesCurrentAnswer(currentQuestion.question, item.userAnswer)
+        : item.status === 'correct';
+      if (!isCorrectNow) return;
+      if (part === 'listening') listeningCorrect += 1;
+      if (part === 'reading') readingCorrect += 1;
+    });
+
+    if (listeningTotal > 0 && readingTotal > 0) {
+      const trialScore = calculateHsk1TrialScore(
+        listeningCorrect,
+        listeningTotal,
+        readingCorrect,
+        readingTotal
+      );
+      return {
+        correct: listeningCorrect + readingCorrect,
+        total: listeningTotal + readingTotal,
+        percent: Math.round((trialScore.totalScore / trialScore.maxScore) * 100),
+        trialScore
+      };
+    }
+  }
+
+  // Use only the auto-graded questions present in this submission. The
+  // catalog can change after submission, and stored totals may belong to an
+  // older version of the paper.
+  const objectiveSnapshotItems = snapshotItems.filter((snapshot) => {
+    const currentQuestion = getCurrentQuestion(snapshot);
+    if (currentQuestion) return !requiresTeacherReview(currentQuestion.question);
+    return snapshot.status !== 'manual' && !/tự luận|dịch|nói|ghi âm|viết|chép|朗读|口语|口译|笔译/i.test(snapshot.section);
+  });
+  if (objectiveSnapshotItems.length > 0) {
+    // Recompute from each saved response and the current answer key. The
+    // stored status can be stale after a teacher fixes an answer or after an
+    // older submission was graded with a different rule.
+    const correct = objectiveSnapshotItems.filter((item) => {
+      const currentQuestion = getCurrentQuestion(item);
+      const currentAnswers = currentQuestion ? getCurrentAnswerCandidates(currentQuestion.question) : [];
+      return currentQuestion && currentAnswers.length > 0
+        ? matchesCurrentAnswer(currentQuestion.question, item.userAnswer)
+        : item.status === 'correct';
+    }).length;
+    return {
+      correct,
+      total: objectiveSnapshotItems.length,
+      percent: Math.round((correct / objectiveSnapshotItems.length) * 100)
+    };
+  }
 
   const regradedDelta = orderedQuestions.reduce((delta, orderedQuestion) => {
     const question = orderedQuestion.question;
@@ -293,11 +390,13 @@ const getRegradedSubmissionMetrics = (submission: SubmissionData, exams: ExamLes
     return delta + Number(isCorrectNow) - Number(wasCorrect);
   }, 0);
 
-  const correct = Math.max(0, Math.min(submission.total, submission.correct + regradedDelta));
+  const objectiveTotal = objectiveQuestions.length > 0 ? objectiveQuestions.length : submission.total;
+  const correct = Math.max(0, Math.min(objectiveTotal, submission.correct + regradedDelta));
   return {
     correct,
-    percent: submission.total > 0
-      ? Math.round((correct / submission.total) * 100)
+    total: objectiveTotal,
+    percent: objectiveTotal > 0
+      ? Math.round((correct / objectiveTotal) * 100)
       : (submission.percent <= 1 && submission.percent > 0 ? Math.round(submission.percent * 100) : submission.percent)
   };
 };
@@ -969,7 +1068,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       return;
     }
     setSelectedSub(sub);
-    setSpeakScoreInput(String(sub.speakScore || ''));
+    setSpeakScoreInput(
+      sub.speakScore === undefined || sub.speakScore === null
+        ? ''
+        : String(sub.speakScore)
+    );
     const storedReviewMetadata = parseTeacherItemMetadata(sub.comment || sub.teacherComment || '');
     const submissionExam = allExams.find((exam) => exam.id === sub.lesson || matchesCatalogLessonTitle(sub.lesson, exam.title));
     const legacyCommentKeyMap = new Map<string, string>();
@@ -1100,6 +1203,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         return `[${label}]: ${valStr}`;
       });
 
+    const finalSpeakScore = selectedSubmissionMetrics?.trialScore
+      ? `${formatScore(selectedSubmissionMetrics.trialScore.totalScore)}/200`
+      : String(speakScoreInput || '').trim();
+
     const finalComment = [
       ...itemFeedbackParts,
       ...Object.entries(itemReviewStatus)
@@ -1109,7 +1216,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
     const res = await gradeSubmissionInGas(
       selectedSub.id,
-      speakScoreInput,
+      finalSpeakScore,
       finalComment,
       passwordInput || config.teacherPass,
       modalCorrectedImages,
@@ -1123,7 +1230,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
           item.id === selectedSub.id
             ? {
                 ...item,
-                speakScore: speakScoreInput,
+                speakScore: finalSpeakScore,
                 comment: finalComment,
                 teacherComment: finalComment,
                 correctedImages: modalCorrectedImages,
@@ -1136,7 +1243,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         prev
           ? {
               ...prev,
-              speakScore: speakScoreInput,
+              speakScore: finalSpeakScore,
               comment: finalComment,
               teacherComment: finalComment,
               correctedImages: modalCorrectedImages,
@@ -1664,8 +1771,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     ? selectedWrongDetails.filter((detail) => !isAcceptedArrangeAnswer(detail, selectedSubmissionExam))
     : selectedWrongDetails;
   const selectedSubmissionMetrics = selectedSub ? getRegradedSubmissionMetrics(selectedSub, allExams) : null;
+  const selectedTrialScore = selectedSubmissionMetrics?.trialScore;
   const orderedTeacherQuestions = buildOrderedQuestionList(selectedSubmissionExam);
   const orderedQuestionById = new Map(orderedTeacherQuestions.map((item) => [item.questionId, item.question]));
+  const manualReviewQuestions = orderedTeacherQuestions
+    .filter((item) => requiresTeacherReview(item.question))
+    .map((item) => item.question);
 
   const getReviewQuestion = (questionId?: string, label?: string): Question | undefined => {
     const questions = selectedSubmissionExam
@@ -2397,12 +2508,27 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                                         <span className="font-bold text-amber-800">Chờ duyệt đáp án</span>
                                         <span className="text-xs text-slate-500 block">({sub.total || 'Toàn bộ'} câu)</span>
                                       </>
-                                    ) : (
-                                      <>
-                                        <span className="font-bold text-slate-800">
-                                          {regradedMetrics?.percent ?? (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
+                                  ) : (
+                                    <>
+                                        {regradedMetrics?.trialScore && (
+                                          <>
+                                            <span className="font-bold text-indigo-800 block">
+                                              Điểm: {formatScore(regradedMetrics.trialScore.totalScore)}/200
+                                            </span>
+                                            <span className="text-xs text-slate-500 block">
+                                              Nghe {formatScore(regradedMetrics.trialScore.listeningScore)}/100 · Đọc {formatScore(regradedMetrics.trialScore.readingScore)}/100
+                                            </span>
+                                          </>
+                                        )}
+                                        {!regradedMetrics?.trialScore && sub.speakScore && (
+                                          <span className="font-bold text-indigo-800 block">
+                                            Điểm GV: {sub.speakScore}
+                                          </span>
+                                        )}
+                                        <span className="text-xs text-slate-500 block">
+                                          Trắc nghiệm: {regradedMetrics?.percent ?? (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
+                                          {' '}({regradedMetrics?.correct ?? sub.correct}/{regradedMetrics?.total ?? sub.total} câu)
                                         </span>
-                                        <span className="text-xs text-slate-500 block">({regradedMetrics?.correct ?? sub.correct}/{sub.total} câu)</span>
                                       </>
                                     )}
                                   </div>
@@ -4177,7 +4303,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             </div>
 
             {/* Overview info */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
               <div>
                 <span className="text-slate-500 block">Thời gian nộp</span>
                 <span className="font-semibold text-slate-800">{selectedSub.time}</span>
@@ -4187,11 +4313,21 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                 <span className="font-semibold text-slate-800 truncate block">{selectedSub.lesson}</span>
               </div>
               <div>
-                <span className="text-slate-500 block">Điểm trắc nghiệm</span>
+                <span className="text-slate-500 block">{selectedTrialScore ? 'Điểm đề thi thử' : 'Điểm trắc nghiệm'}</span>
                 <span className="font-bold text-red-700 text-sm">
-                  {hasPendingAnswerKey(selectedSub, allExams)
+                  {selectedTrialScore
+                    ? `${formatScore(selectedTrialScore.totalScore)}/200 (Nghe ${formatScore(selectedTrialScore.listeningScore)}/100 · Đọc ${formatScore(selectedTrialScore.readingScore)}/100)`
+                    : hasPendingAnswerKey(selectedSub, allExams)
                     ? 'Chờ duyệt đáp án'
-                    : `${selectedSubmissionMetrics?.percent ?? selectedSub.percent}% (${selectedSubmissionMetrics?.correct ?? selectedSub.correct}/${selectedSub.total})`}
+                    : `${selectedSubmissionMetrics?.percent ?? selectedSub.percent}% (${selectedSubmissionMetrics?.correct ?? selectedSub.correct}/${selectedSubmissionMetrics?.total ?? selectedSub.total})`}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">{selectedTrialScore ? 'Thang điểm' : 'Điểm tổng hợp thang 10'}</span>
+                <span className="font-bold text-indigo-800 text-sm">
+                  {selectedTrialScore
+                    ? '200 điểm · không cần chấm tay'
+                    : (selectedSub.speakScore || 'Chưa nhập')}
                 </span>
               </div>
               <div>
@@ -4537,17 +4673,26 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
             <form onSubmit={handleSaveGrade} className="space-y-4 pt-2 border-t border-slate-200">
               <h4 className="font-bold text-slate-800 text-sm">Nhập Kết Quả Chấm Điểm & Nhận Xét (GV)</h4>
 
+              {manualReviewQuestions.length > 0 && !selectedTrialScore && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 px-3.5 py-3 text-xs text-indigo-950">
+                  <p className="font-bold">Giáo viên tự nhập điểm tổng kết</p>
+                  <p className="mt-1 text-[11px] text-indigo-700">Hệ thống không tự quy đổi điểm tự luận/nói. Hãy nhập điểm cuối cùng vào ô bên dưới rồi lưu.</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Điểm bài tập chung
+                    {selectedTrialScore ? 'Điểm đề thi thử thang 200 (tự động)' : 'Điểm tổng kết (GV tự nhập)'}
                   </label>
                   <input
                     type="text"
-                    value={speakScoreInput}
+                    value={selectedTrialScore
+                      ? `${formatScore(selectedTrialScore.totalScore)}/200`
+                      : speakScoreInput}
                     onChange={(e) => setSpeakScoreInput(e.target.value)}
-                    placeholder="Ví dụ: 9/10, 8.5 hoặc Đạt"
-                    required
+                    placeholder={selectedTrialScore ? 'Tự động tính theo Nghe + Đọc' : 'Ví dụ: 8.5/10 hoặc 85/100'}
+                    readOnly={Boolean(selectedTrialScore)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   />
                 </div>

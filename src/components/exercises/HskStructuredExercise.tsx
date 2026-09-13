@@ -4,9 +4,10 @@ import { LessonItem } from '../../types/lesson';
 import {
   getStructuredQuestionRows,
   getStructuredSharedOptions,
+  getQuestionAnchor,
   StructuredAnswerMap,
   StructuredOption,
-  STRUCTURED_EXERCISE_LABELS,
+  getStructuredExerciseLabel,
   StructuredExerciseType
 } from '../../utils/structuredExercises';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../../utils/audioUtils';
@@ -459,7 +460,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
         </span>
         <div className="min-w-0">
           <h4 className="font-bold text-slate-900 text-base">
-            {type === 'fill' ? 'Điền từ vào chỗ trống' : STRUCTURED_EXERCISE_LABELS[type]}
+            {getStructuredExerciseLabel(item)}
           </h4>
           {getText(data.instruction) && <p className="text-sm text-slate-600 mt-0.5">{getText(data.instruction)}</p>}
         </div>
@@ -575,7 +576,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
           const pinyinLines = row.pinyin.split('\n').map((line) => line.trim()).filter(Boolean);
           const pairPromptPinyin = showPinyin && promptLines.length > 1 && promptLines.length === pinyinLines.length;
           return (
-            <article key={row.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4 space-y-3">
+            <article id={getQuestionAnchor(row.key)} key={row.key} className="scroll-mt-32 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4 space-y-3">
               <div className={`flex ${inlineSelectLayout ? 'flex-row items-start justify-between gap-3' : 'flex-col sm:flex-row sm:items-start justify-between gap-3'}`}>
                 <div className="min-w-0 flex-1">
                   {pairPromptPinyin ? (
