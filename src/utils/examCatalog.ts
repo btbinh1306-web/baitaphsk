@@ -64,6 +64,32 @@ const isStaleHsk1Mock02Snapshot = (exam: ExamLesson, bundledExam: ExamLesson | u
   )
 );
 
+const isLocalUploadAudioUrl = (value: unknown): boolean => (
+  typeof value === 'string' && /^\/api\/media\/file_[^/]+\.(?:mp3|wav|ogg|m4a|webm)$/iu.test(value.trim())
+);
+
+/** Restore bundled listening audio when an old local upload no longer exists. */
+const migrateMissingBundledAudio = (exam: ExamLesson, bundledExam: ExamLesson | undefined): ExamLesson => {
+  if (!bundledExam || !exam.listeningQuestions?.length || !bundledExam.listeningQuestions?.length) return exam;
+
+  const bundledAudioByQuestionId = new Map(
+    bundledExam.listeningQuestions
+      .map((question) => [question.id, question.audioUrl || question.audioPromptUrl])
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim().length > 0)
+  );
+  let changed = false;
+  const listeningQuestions = exam.listeningQuestions.map((question) => {
+    const bundledAudio = bundledAudioByQuestionId.get(question.id);
+    const hasMissingLocalUpload = [question.audioUrl, question.audioPromptUrl].some(isLocalUploadAudioUrl);
+    if (!bundledAudio || !hasMissingLocalUpload) return question;
+
+    changed = true;
+    return { ...question, audioUrl: bundledAudio, audioPromptUrl: bundledAudio };
+  });
+
+  return changed ? { ...exam, listeningQuestions } : exam;
+};
+
 /** Keep saved copies of built-in lessons compatible with bundled answer corrections. */
 const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson | undefined): ExamLesson => {
   if (!bundledExam) return exam;
@@ -133,6 +159,7 @@ export const buildExamCatalog = (customExams: ExamLesson[], bundledExams: ExamLe
       .filter((exam) => !isStaleHsk1Mock02Snapshot(exam, bundledMock02))
       .map(normalizeBundledExamIdentity)
       .map((exam) => migrateKnownAnswerCorrections(exam, bundledById.get(exam.id)))
+      .map((exam) => migrateMissingBundledAudio(exam, bundledById.get(exam.id)))
       .map((exam) => [exam.id, exam])
   ).values());
 
