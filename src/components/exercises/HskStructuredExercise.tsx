@@ -435,8 +435,9 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
   const blockQuestionAudio = getText(data.questionAudio) || getText(data.questionAudioUrl);
   const compactListeningImageChoice = type === 'listening_image_choice' && Array.isArray(data.exampleImages);
   const hasSharedOptions = sharedOptions.length > 0;
-  const sharedChoiceSelectLayout = type === 'reading_shared_image_match' || (type === 'fill' && hasSharedOptions);
   const sharedOptionsHaveImages = sharedOptions.some((option) => option.image);
+  const sharedImageBankLayout = hasSharedOptions && sharedOptionsHaveImages;
+  const sharedChoiceSelectLayout = (type === 'reading_shared_image_match' && !sharedOptionsHaveImages) || (type === 'fill' && hasSharedOptions);
   const displayedSharedOptions = shouldShuffleImages && sharedOptionsHaveImages
     ? shuffleAndRelabelOptions(sharedOptions, `${item.id}:images`)
     : shouldShuffleOptions && !sharedOptionsHaveImages
@@ -492,29 +493,31 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
         </div>
       )}
 
-      {hasSharedOptions && (
-        <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-3 space-y-2">
-          <p className="text-xs font-bold uppercase text-teal-800 tracking-wide">Bảng lựa chọn dùng chung</p>
-          <div className="grid grid-cols-3 gap-2">
-            {displayedSharedOptions.map((option) => (
-              <div key={option.id} className="rounded-lg border border-teal-200 bg-white p-2">
-                {option.image && (
-                  <div className="aspect-[4/3] bg-slate-50 rounded mb-2 overflow-hidden">
-                    <img
-                      src={getDriveMediaPlayerUrl(option.image)}
-                      alt={option.alt || `Lựa chọn ${option.id}`}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                )}
-                <p className="text-sm font-bold text-slate-900">{option.id}. {option.text}</p>
-                {showPinyin && option.pinyin && <p className="text-xs leading-5 font-medium text-indigo-600/90">{option.pinyin}</p>}
-              </div>
-            ))}
+      <div className={sharedImageBankLayout ? 'grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]' : 'space-y-4'}>
+        {hasSharedOptions && (
+          <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-3 space-y-2">
+            <p className="text-xs font-bold uppercase text-teal-800 tracking-wide">Bảng lựa chọn dùng chung</p>
+            <div className={`grid gap-2 ${sharedImageBankLayout ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {displayedSharedOptions.map((option) => (
+                <div key={option.id} className="rounded-lg border border-teal-200 bg-white p-2">
+                  {option.image && (
+                    <div className="aspect-[4/3] bg-slate-50 rounded mb-2 overflow-hidden">
+                      <img
+                        src={getDriveMediaPlayerUrl(option.image)}
+                        alt={option.alt || `Lựa chọn ${option.id}`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  )}
+                  <p className="text-sm font-bold text-slate-900">{option.id}. {option.text}</p>
+                  {showPinyin && option.pinyin && <p className="text-xs leading-5 font-medium text-indigo-600/90">{option.pinyin}</p>}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
+        <div className="space-y-4">
       {Array.isArray(data.exampleImages) && <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {data.exampleImages.map((value, index) => {
           const example = value as { image: string; text: string };
@@ -568,9 +571,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
             type === 'listening_text_choice' ||
             type === 'listening_comprehension_choice'
           );
-          const usesSharedChoiceBank = hasSharedOptions && (
-            type === 'listening_shared_image_match'
-          );
+          const usesSharedChoiceBank = sharedImageBankLayout;
           const prompt = hideListeningPrompt || row.prompt === `Câu ${index + 1}` ? '' : row.prompt;
           const promptLines = prompt.split('\n').map((line) => line.trim()).filter(Boolean);
           const pinyinLines = row.pinyin.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -807,6 +808,8 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
             </article>
           );
         })}
+      </div>
+        </div>
       </div>
     </section>
   );

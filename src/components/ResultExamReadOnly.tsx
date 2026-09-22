@@ -293,16 +293,23 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
             const fillQuestion = isFillQuestion(section.title, item);
             const orderingQuestion = isOrderingQuestion(section.title, item);
             const subjectiveQuestion = isSubjectiveQuestion(section.title, item);
+            const fillAnswerIsCorrect = fillQuestion && !subjectiveQuestion && Boolean(userAnswer.trim())
+              ? answerMatches(userAnswer, correctAnswer)
+              : undefined;
+            const displayedStatus = fillAnswerIsCorrect === undefined
+              ? item.status
+              : fillAnswerIsCorrect ? 'correct' : 'wrong';
+            const displayedItem = displayedStatus === item.status ? item : { ...item, status: displayedStatus };
 
             return (
               <article key={`${item.id}-${itemIndex}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <h6 className="text-sm font-bold leading-relaxed text-slate-900">
-                    Câu {questionNumber}: {fillQuestion ? renderPromptWithAnswer(item.prompt, correctAnswer) : item.prompt}
+                    Câu {questionNumber}: {fillQuestion ? renderPromptWithAnswer(item.prompt, userAnswer || correctAnswer) : item.prompt}
                   </h6>
-                  {!subjectiveQuestion && statusLabel(item) && (
-                    <span className={`self-start whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-extrabold ${statusClass(item)}`}>
-                      {statusLabel(item)}
+                  {!subjectiveQuestion && statusLabel(displayedItem) && (
+                    <span className={`self-start whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-extrabold ${statusClass(displayedItem)}`}>
+                      {statusLabel(displayedItem)}
                     </span>
                   )}
                 </div>
@@ -458,7 +465,9 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800">
                       <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Bài làm của bạn</p>
-                      <p className="whitespace-pre-wrap font-semibold">{userAnswer || 'Chưa có câu trả lời'}</p>
+                      <p className={`whitespace-pre-wrap font-semibold ${displayedStatus === 'wrong' ? 'text-rose-700' : 'text-emerald-800'}`}>
+                        {userAnswer || 'Chưa có câu trả lời'}
+                      </p>
                     </div>
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
                       <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">Đáp án / đáp án tham khảo</p>

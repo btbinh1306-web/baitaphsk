@@ -21,6 +21,7 @@ import {
   buildOrderedQuestionList,
   isAttempted,
   isIncorrect,
+  isObjectiveSnapshotItem,
   requiresTeacherReview,
   OrderedTeacherQuestion
 } from '../utils/teacherQuestionOrder';
@@ -264,6 +265,8 @@ interface RegradedSubmissionMetrics {
   correct: number;
   total: number;
   percent: number;
+  attempted?: number;
+  notDone?: number;
   trialScore?: Hsk1TrialScore;
 }
 
@@ -282,7 +285,9 @@ const getRegradedSubmissionMetrics = (
     return {
       correct: submission.correct,
       total: submission.total,
-      percent: storedPercent
+      percent: storedPercent,
+      attempted: submission.done,
+      notDone: submission.notDone
     };
   }
 
@@ -299,12 +304,21 @@ const getRegradedSubmissionMetrics = (
     orderedQuestions.find((item) => item.questionId === snapshot.id) ||
     currentQuestionByPrompt.get(snapshot.prompt.trim().toLocaleLowerCase())
   );
+  const getCompletionCounts = (items: AnswerSnapshotItem[]) => {
+    const attempted = items.filter((item) => {
+      const currentQuestion = getCurrentQuestion(item);
+      return currentQuestion
+        ? isAttempted(currentQuestion.question, item)
+        : Boolean(item.userAnswer?.trim() && !/^(?:\(chưa làm\)|chưa làm|để trống)$/i.test(item.userAnswer.trim()));
+    }).length;
+    return { attempted, notDone: items.length - attempted };
+  };
 
   if (isHsk1TrialExam(exam) && snapshotItems.length > 0) {
     const trialItems = snapshotItems.filter((item) => {
       const currentQuestion = getCurrentQuestion(item);
       const part = getHsk1TrialPart(`${currentQuestion?.sectionTitle || item.section} ${currentQuestion?.sectionId || ''} ${item.id}`);
-      return Boolean(part && (!currentQuestion || !requiresTeacherReview(currentQuestion.question)));
+      return Boolean(part && isObjectiveSnapshotItem(item, orderedQuestions));
     });
     let listeningCorrect = 0;
     let listeningTotal = 0;
@@ -337,6 +351,7 @@ const getRegradedSubmissionMetrics = (
         correct: listeningCorrect + readingCorrect,
         total: listeningTotal + readingTotal,
         percent: Math.round((trialScore.totalScore / trialScore.maxScore) * 100),
+        ...getCompletionCounts(trialItems),
         trialScore
       };
     }
@@ -345,11 +360,9 @@ const getRegradedSubmissionMetrics = (
   // Use only the auto-graded questions present in this submission. The
   // catalog can change after submission, and stored totals may belong to an
   // older version of the paper.
-  const objectiveSnapshotItems = snapshotItems.filter((snapshot) => {
-    const currentQuestion = getCurrentQuestion(snapshot);
-    if (currentQuestion) return !requiresTeacherReview(currentQuestion.question);
-    return snapshot.status !== 'manual' && !/tự luận|dịch|nói|ghi âm|viết|chép|朗读|口语|口译|笔译/i.test(snapshot.section);
-  });
+  const objectiveSnapshotItems = snapshotItems.filter((snapshot) => (
+    isObjectiveSnapshotItem(snapshot, orderedQuestions)
+  ));
   if (objectiveSnapshotItems.length > 0) {
     // Recompute from each saved response and the current answer key. The
     // stored status can be stale after a teacher fixes an answer or after an
@@ -364,7 +377,8 @@ const getRegradedSubmissionMetrics = (
     return {
       correct,
       total: objectiveSnapshotItems.length,
-      percent: Math.round((correct / objectiveSnapshotItems.length) * 100)
+      percent: Math.round((correct / objectiveSnapshotItems.length) * 100),
+      ...getCompletionCounts(objectiveSnapshotItems)
     };
   }
 
@@ -391,13 +405,17 @@ const getRegradedSubmissionMetrics = (
   }, 0);
 
   const objectiveTotal = objectiveQuestions.length > 0 ? objectiveQuestions.length : submission.total;
+  const hasReliableStoredCompletion = submission.total === objectiveTotal &&
+    submission.done + submission.notDone === submission.total;
   const correct = Math.max(0, Math.min(objectiveTotal, submission.correct + regradedDelta));
   return {
     correct,
     total: objectiveTotal,
     percent: objectiveTotal > 0
       ? Math.round((correct / objectiveTotal) * 100)
-      : (submission.percent <= 1 && submission.percent > 0 ? Math.round(submission.percent * 100) : submission.percent)
+      : (submission.percent <= 1 && submission.percent > 0 ? Math.round(submission.percent * 100) : submission.percent),
+    attempted: hasReliableStoredCompletion ? submission.done : undefined,
+    notDone: hasReliableStoredCompletion ? submission.notDone : undefined
   };
 };
 
@@ -2529,6 +2547,11 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                                           Trắc nghiệm: {regradedMetrics?.percent ?? (sub.percent <= 1 && sub.percent > 0 ? Math.round(sub.percent * 100) : sub.percent)}%
                                           {' '}({regradedMetrics?.correct ?? sub.correct}/{regradedMetrics?.total ?? sub.total} câu)
                                         </span>
+                                        {regradedMetrics?.attempted !== undefined && regradedMetrics.notDone !== undefined && (
+                                          <span className="text-xs text-slate-500 block">
+                                            Đã làm {regradedMetrics.attempted} · Bỏ trống {regradedMetrics.notDone}
+                                          </span>
+                                        )}
                                       </>
                                     )}
                                   </div>

@@ -54,6 +54,19 @@ export const requiresTeacherReview = (question: Question): boolean => (
   isHandwritingQuestion(question)
 );
 
+export const isObjectiveSnapshotItem = (
+  snapshot: AnswerSnapshotItem,
+  orderedQuestions: OrderedTeacherQuestion[]
+): boolean => {
+  const normalizedPrompt = snapshot.prompt.trim().toLocaleLowerCase();
+  const currentQuestion = orderedQuestions.find((item) => item.questionId === snapshot.id) ||
+    orderedQuestions.find((item) => item.question.prompt.trim().toLocaleLowerCase() === normalizedPrompt);
+
+  if (currentQuestion) return !requiresTeacherReview(currentQuestion.question);
+  return snapshot.status !== 'manual' &&
+    !/(tự luận|dịch|nói|ghi âm|viết|chép|朗读|口语|自我介绍|看图说话|写作|口译|笔译|handwriting)/i.test(snapshot.section);
+};
+
 export const isAttempted = (
   question: Question,
   snapshot?: AnswerSnapshotItem,

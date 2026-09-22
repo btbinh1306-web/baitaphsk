@@ -12,6 +12,7 @@ import { getStructuredQuestionRows, isStructuredExerciseItem } from '../utils/st
 import { buildExamCatalog } from '../utils/examCatalog';
 import { getExamAudioQuestions } from '../utils/examAudio';
 import { calculateHsk1TrialScore, formatScore, getHsk1TrialPart, getQuestionMaxScore, isExcludedFromOverallScore, isHsk1TrialExam, parseTeacherItemScores, TeacherItemScore } from '../utils/teacherScoring';
+import { buildOrderedQuestionList, isObjectiveSnapshotItem, requiresTeacherReview } from '../utils/teacherQuestionOrder';
 import {
   Search,
   CheckCircle2,
@@ -41,6 +42,7 @@ interface PrintableItem extends AnswerSnapshotItem {
   legacyFallback?: boolean;
   options?: string[];
   subjective?: boolean;
+  teacherReviewRequired?: boolean;
   teacherComment?: string;
   teacherCorrection?: boolean;
   teacherScore?: string | number;
@@ -70,6 +72,7 @@ const SUBJECTIVE_SECTION_PATTERN = /(tự luận|dịch|nói|ghi âm|viết|ché
 const isSubjectiveQuestion = (question: PrintableItem): boolean => (
   Boolean(question.subjective) ||
   Boolean(question.subjectiveKind) ||
+  Boolean(question.teacherReviewRequired) ||
   // Do not inspect the prompt here: a fill-in question can legitimately
   // contain notes such as "gần người nói" / "xa người nói".
   SUBJECTIVE_SECTION_PATTERN.test(question.section)
@@ -686,6 +689,9 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
 
   const answerSnapshot = parseAnswerSnapshot(result?.answerSnapshot || result?.essays);
   const snapshotById = new Map(answerSnapshot.map((item) => [item.id, item]));
+  const resultOrderedQuestions = buildOrderedQuestionList(resultExam);
+  const resultQuestionById = new Map(resultOrderedQuestions.map((item) => [item.questionId, item]));
+  const resultQuestionByPrompt = new Map(resultOrderedQuestions.map((item) => [normalizedText(item.question.prompt), item]));
   const legacyWrongItems = visibleWrongList.map(parseWrongLineItem);
 
   const formatQuestionAnswer = (question: Question, answer: unknown): string => {
@@ -719,11 +725,23 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     options: string[] = [],
     media: Pick<PrintableItem, 'optionImages' | 'imageUrl' | 'audioUrl' | 'audioText' | 'subjectiveKind' | 'subjectiveIndex' | 'audioResponse' | 'studentAudioUrl' | 'teacherAudioUrl' | 'studentAudioLabel' | 'teacherMaxScore'> = {}
   ): PrintableItem => {
+    const sourceQuestion = resultQuestionById.get(id) || resultQuestionByPrompt.get(normalizedText(prompt));
+    const teacherReviewRequired = sourceQuestion
+      ? requiresTeacherReview(sourceQuestion.question)
+      : undefined;
     const saved = snapshotById.get(id) || snapshotById.get(prompt);
     const legacyWrong = findLegacyWrong(prompt);
     if (saved) {
-      const savedItem = { ...saved, section, number, prompt, options, ...media };
-      const subjective = Boolean(media.subjectiveKind) || isSubjectiveQuestion(savedItem);
+      const savedItem = {
+        ...saved,
+        section,
+        number,
+        prompt,
+        options,
+        ...media,
+        teacherReviewRequired: teacherReviewRequired ?? (saved as PrintableItem).teacherReviewRequired
+      };
+      const subjective = Boolean(teacherReviewRequired) || Boolean(media.subjectiveKind) || isSubjectiveQuestion(savedItem);
 
       // Recompute every objective item from the saved response and the
       // current answer key. Older submissions can contain a stale status even
@@ -755,9 +773,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       prompt,
       userAnswer: legacyUserAnswer,
       correctAnswer,
+      teacherReviewRequired,
       status: legacyWrong
         ? (legacyAnswerChanged && answerMatchesAccepted(legacyUserAnswer, correctAnswer) ? 'correct' : 'wrong')
-        : (media.subjectiveKind
+        : (media.subjectiveKind || teacherReviewRequired
           ? 'manual'
           : !resultExam
             ? (result?.notDone ? 'unanswered' : 'correct')
@@ -1055,6 +1074,10 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   const getSavedObjectiveSnapshot = (item: PrintableItem): AnswerSnapshotItem | undefined => (
     snapshotById.get(item.id) || snapshotById.get(item.prompt)
   );
+  const getCurrentResultItem = (snapshot: AnswerSnapshotItem): PrintableItem | undefined => (
+    currentResultItems.find((item) => item.id === snapshot.id) ||
+    currentResultItems.find((item) => normalizedText(item.prompt) === normalizedText(snapshot.prompt))
+  );
   const currentObjectiveByPrompt = new Map(
     currentObjectiveItems.map((item) => [normalizedText(item.prompt), item])
   );
@@ -1065,11 +1088,13 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
   // A submission snapshot is the source of truth for how many auto-graded
   // questions that particular exam actually contained. This prevents an old
   // stored total (for example 18) from replacing a 14- or 20-question paper.
-  const objectiveSnapshotItems = answerSnapshot.filter((snapshot) => {
-    const currentItem = getCurrentObjectiveItem(snapshot);
-    if (currentItem) return !currentItem.subjective;
-    return snapshot.status !== 'manual' && !SUBJECTIVE_SECTION_PATTERN.test(snapshot.section);
-  });
+  const objectiveSnapshotItems = answerSnapshot.filter((snapshot) => (
+    getCurrentResultItem(snapshot)?.subjective
+      ? false
+      : resultExam
+        ? isObjectiveSnapshotItem(snapshot, resultOrderedQuestions)
+        : snapshot.status !== 'manual' && !SUBJECTIVE_SECTION_PATTERN.test(snapshot.section)
+  ));
   const hasObjectiveSnapshot = objectiveSnapshotItems.length > 0;
   const getSnapshotStatus = (snapshot: AnswerSnapshotItem): AnswerSnapshotItem['status'] => (
     getCurrentObjectiveItem(snapshot)?.status || snapshot.status
@@ -1616,6 +1641,11 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
                         : hasPendingAnswerReview
                           ? 'Đáp án đang chờ giáo viên duyệt'
                           : `Đúng ${displayCorrect}/${displayTotal} câu`}
+                    </span>
+                    <span className="text-xs text-slate-500 block">
+                      {unreliableStoredMetrics
+                        ? 'Không đủ dữ liệu cũ để xác định số câu đã làm/bỏ trống'
+                        : `Đã làm ${Math.max(0, displayTotal - displayNotDone)}/${displayTotal} · Bỏ trống ${displayNotDone}`}
                     </span>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center text-sm shadow-2xs">

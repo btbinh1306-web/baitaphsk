@@ -88,86 +88,97 @@ interface ExamNavigationGroup {
   subgroups: ExamNavigationSubgroup[];
 }
 
-const ExamBrief: React.FC<{
-  exam: ExamLesson;
-  answered: number;
-  total: number;
-}> = ({ exam, answered, total }) => (
-  <aside className="space-y-4 lg:sticky lg:top-4">
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-        <span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500">Đề bài</span>
-        <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-bold text-teal-800">{exam.level}</span>
-      </div>
-      <h3 className="mt-4 text-lg font-extrabold leading-snug text-slate-900">{exam.title}</h3>
-      {exam.description && <p className="mt-2 text-xs leading-5 text-slate-600">{exam.description}</p>}
-      {exam.instruction && (
-        <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 text-xs leading-5 text-indigo-950">
-          <p className="font-bold">Hướng dẫn</p>
-          <p className="mt-1 whitespace-pre-wrap">{exam.instruction}</p>
-        </div>
-      )}
-      <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-        <div className="rounded-xl bg-slate-50 px-2 py-3">
-          <p className="text-xl font-black text-slate-900">{answered}</p>
-          <p className="text-[11px] font-semibold text-slate-500">Đã làm</p>
-        </div>
-        <div className="rounded-xl bg-slate-50 px-2 py-3">
-          <p className="text-xl font-black text-slate-900">{total}</p>
-          <p className="text-[11px] font-semibold text-slate-500">Tổng câu</p>
-        </div>
-      </div>
-    </div>
-  </aside>
-);
-
 const ExamQuestionNavigator: React.FC<{
   groups: ExamNavigationGroup[];
   answered: number;
   total: number;
-}> = ({ groups, answered, total }) => (
-  <aside className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
-        <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-500">Danh sách câu</p>
-          <p className="mt-1 text-xs font-semibold text-slate-600">Đã làm {answered}/{total}</p>
-        </div>
-        <div className="h-2.5 w-2.5 rounded-full bg-teal-500" aria-hidden="true" />
-      </div>
-      <div className="mt-4 space-y-4">
-        {groups.map((group) => (
-          <section key={group.id}>
-            <p className="text-xs font-extrabold text-slate-700">{group.title}</p>
-            <div className="mt-2 space-y-3">
-              {group.subgroups.map((subgroup) => (
-                <div key={subgroup.id}>
-                  <p className="mb-1 text-[10px] font-bold leading-4 text-slate-500">{subgroup.title}</p>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {subgroup.items.map((item) => (
-                      <a
-                        key={item.id}
-                        href={`#${item.target}`}
-                        aria-label={`Đi tới câu ${item.label}`}
-                        className={`flex min-h-8 items-center justify-center rounded-lg border px-1 text-xs font-bold transition hover:border-teal-500 hover:bg-teal-50 ${
-                          item.answered
-                            ? 'border-teal-300 bg-teal-50 text-teal-900'
-                            : 'border-slate-200 bg-white text-slate-700'
-                        }`}
-                      >
-                        {item.label}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ))}
+}> = ({ groups, answered, total }) => {
+  const progressRatio = total > 0 ? Math.min(answered / total, 1) : 0;
+  const circumference = 2 * Math.PI * 50;
+
+  return (
+    <aside className="lg:sticky lg:top-36 lg:z-10 lg:self-start">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex lg:max-h-[calc(100vh-9rem)] lg:flex-col">
+        <div className="shrink-0">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-600">Bảng câu hỏi</p>
+            <p className="text-xs font-semibold text-slate-500">Tổng {total} câu</p>
+          </div>
+          <div className="border-b border-slate-100 py-5 text-center">
+            <div
+              className="relative mx-auto h-32 w-32"
+              role="progressbar"
+              aria-label="Tiến độ làm bài"
+              aria-valuemin={0}
+              aria-valuemax={Math.max(total, 1)}
+              aria-valuenow={answered}
+            >
+              <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden="true">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" strokeWidth="8" className="text-slate-200" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="50"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference * (1 - progressRatio)}
+                  className="text-emerald-500 transition-[stroke-dashoffset] duration-300"
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-3xl font-black text-slate-800">
+                {answered}/{total}
+              </span>
             </div>
-          </section>
-        ))}
+            <p className="mt-2 text-xs font-semibold text-slate-500">Tiến độ làm bài</p>
+            <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-600">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded bg-emerald-500" aria-hidden="true" />
+                Đã làm {answered}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded bg-slate-200" aria-hidden="true" />
+                Chưa làm {Math.max(total - answered, 0)}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          {groups.map((group) => (
+            <section key={group.id}>
+              <p className="truncate text-[10px] font-extrabold leading-3 text-slate-700" title={group.title}>{group.title}</p>
+              <div className="mt-1 space-y-1.5">
+                {group.subgroups.map((subgroup) => (
+                  <div key={subgroup.id}>
+                    <p className="mb-1 truncate text-[9px] font-bold leading-3 text-slate-500" title={subgroup.title}>{subgroup.title}</p>
+                    <div className="grid grid-cols-5 gap-1">
+                      {subgroup.items.map((item) => (
+                        <a
+                          key={item.id}
+                          href={`#${item.target}`}
+                          aria-label={`Đi tới câu ${item.label}`}
+                          className={`flex min-h-6 items-center justify-center rounded-md border px-0.5 text-[10px] font-bold transition hover:border-teal-500 hover:bg-teal-50 ${
+                            item.answered
+                              ? 'border-teal-300 bg-teal-50 text-teal-900'
+                              : 'border-slate-200 bg-white text-slate-700'
+                          }`}
+                        >
+                          {item.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
-    </div>
   </aside>
-);
+  );
+};
 
 const hasPinyinContent = (value: unknown): boolean => {
   if (Array.isArray(value)) return value.some(hasPinyinContent);
@@ -1478,10 +1489,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           </div>
         )}
 
-        <div className={`grid items-start gap-5 ${isExamLayoutVisible ? 'lg:grid-cols-[minmax(210px,0.62fr)_minmax(0,1.8fr)_250px]' : ''}`}>
-          {isExamLayoutVisible && (
-            <ExamBrief exam={currentExam} answered={navigationAnswered} total={navigationTotal} />
-          )}
+        <div className={`grid items-start gap-5 ${isExamLayoutVisible ? 'lg:grid-cols-[minmax(0,1fr)_280px]' : ''}`}>
 
           <div className="min-w-0">
         {/* EXERCISES CONTAINER - LOCKED WHEN VOCAB IS NOT DONE */}

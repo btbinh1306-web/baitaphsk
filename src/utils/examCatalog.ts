@@ -127,6 +127,30 @@ const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson
     };
   }
 
+  if (exam.id === 'hsk1-bai5-5-ky-nang') {
+    const bundledFillById = new Map(
+      (bundledExam.fillQuestions || []).map((question) => [question.id, question])
+    );
+    let changed = false;
+    const fillQuestions = (exam.fillQuestions || []).map((question) => {
+      const bundledQuestion = bundledFillById.get(question.id);
+      if (!bundledQuestion) return question;
+
+      const answerChanged = String(question.answer ?? '').trim() !== String(bundledQuestion.answer ?? '').trim();
+      const acceptableAnswersChanged = String(question.acceptableAnswers ?? '').trim() !== String(bundledQuestion.acceptableAnswers ?? '').trim();
+      if (!answerChanged && !acceptableAnswersChanged) return question;
+
+      changed = true;
+      return {
+        ...question,
+        answer: bundledQuestion.answer,
+        acceptableAnswers: bundledQuestion.acceptableAnswers
+      };
+    });
+
+    return changed ? { ...exam, fillQuestions } : exam;
+  }
+
   if (exam.id !== 'hsk1-bai2-5-ky-nang') return exam;
 
   const bundledQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai2_fill_04');
