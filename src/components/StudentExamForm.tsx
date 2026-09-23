@@ -95,6 +95,36 @@ interface ExamNavigationGroup {
   subgroups: ExamNavigationSubgroup[];
 }
 
+interface EssayQuestionGroup {
+  key: 'error-correction' | 'writing';
+  title: string;
+  questions: Question[];
+}
+
+const getEssayQuestionGroups = (questions: Question[]): EssayQuestionGroup[] => {
+  const errorCorrectionQuestions = questions.filter((question) => question.type === 'error_correction');
+  const writingQuestions = questions.filter((question) => question.type !== 'error_correction');
+  const groups: EssayQuestionGroup[] = [];
+
+  if (errorCorrectionQuestions.length > 0) {
+    groups.push({
+      key: 'error-correction',
+      title: `Bài 1: Phán đoán đúng sai, sửa câu sai (1-${errorCorrectionQuestions.length})`,
+      questions: errorCorrectionQuestions
+    });
+  }
+
+  if (writingQuestions.length > 0) {
+    groups.push({
+      key: 'writing',
+      title: `Bài 2: ${writingQuestions[0].prompt || 'Viết đoạn văn'}`,
+      questions: writingQuestions
+    });
+  }
+
+  return groups;
+};
+
 const ExamQuestionNavigator: React.FC<{
   groups: ExamNavigationGroup[];
   answered: number;
@@ -442,10 +472,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }]);
     });
 
-    addGroup('essay', 'Viết & tự luận', [{
-      id: 'essay-items',
-      title: 'Tự luận',
-      items: currentExam.essayQuestions.map((question, index) => ({
+    addGroup('essay', 'Viết & tự luận', getEssayQuestionGroups(currentExam.essayQuestions).map((group) => ({
+      id: `essay-${group.key}`,
+      title: group.title,
+      items: group.questions.map((question, index) => ({
         id: question.id,
         label: String(index + 1),
         target: getQuestionAnchor(question.id),
@@ -453,7 +483,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           ? isErrorCorrectionAnswered(essayAnswers[question.id])
           : Boolean(essayAnswers[question.id]?.trim())
       }))
-    }]);
+    })));
 
     addGroup('speaking', 'Kỹ năng nói', [{
       id: 'speaking-items',
@@ -633,6 +663,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       };
     });
   }, [currentExam.id, currentExam.fillQuestions]);
+
+  const essayQuestionGroups = useMemo(
+    () => getEssayQuestionGroups(currentExam.essayQuestions),
+    [currentExam.essayQuestions]
+  );
 
   const isAggregateExam = /tổng hợp|tong-hop/i.test(`${currentExam.id} ${currentExam.title}`);
   const hasVocabList = !isAggregateExam && !!(currentExam.vocabList && currentExam.vocabList.length > 0);
@@ -2078,8 +2113,18 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {currentExam.essayQuestions.map((q, idx) => {
+                <div className="space-y-6">
+                  {essayQuestionGroups.map((group) => (
+                    <section key={group.key} className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/20 p-4">
+                      <div className="flex items-start justify-between gap-3 border-b border-amber-100 pb-3">
+                        <h4 className="text-sm font-extrabold leading-relaxed text-amber-950">{group.title}</h4>
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+                          {group.questions.length} câu
+                        </span>
+                      </div>
+
+                      <div className="space-y-4">
+                        {group.questions.map((q, idx) => {
                     if (q.type === 'error_correction') {
                       const answer = parseErrorCorrectionAnswer(essayAnswers[q.id]);
                       const updateAnswer = (patch: Partial<ErrorCorrectionAnswer>) => {
@@ -2131,7 +2176,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       );
                     }
 
-                    return (
+                          return (
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-slate-800">
@@ -2157,8 +2202,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition"
                         />
                       </div>
-                    );
-                  })}
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               </div>
             )}
