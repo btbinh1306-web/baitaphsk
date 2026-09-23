@@ -76,6 +76,11 @@ const formatRemainingTime = (seconds: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 };
 
+const getFillGroupDisplayTitle = (title?: string): string | undefined => {
+  const displayTitle = title?.replace(/^Nhóm\s+\d+\s*·?\s*/u, '').trim();
+  return displayTitle || undefined;
+};
+
 interface ExamNavigationItem {
   id: string;
   label: string;
@@ -419,8 +424,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     const fillNavigationGroups = new Map<string, { key: string; title?: string; questions: Question[] }>();
     (currentExam.fillQuestions || []).forEach((question) => {
       const key = question.fillGroup || `tier:${question.tier || 'tier1'}`;
-      const group = fillNavigationGroups.get(key) || { key, title: question.fillGroupTitle, questions: [] };
-      if (!group.title && question.fillGroupTitle) group.title = question.fillGroupTitle;
+      const displayTitle = getFillGroupDisplayTitle(question.fillGroupTitle);
+      const group = fillNavigationGroups.get(key) || { key, title: displayTitle, questions: [] };
+      if (!group.title && displayTitle) group.title = displayTitle;
       group.questions.push(question);
       fillNavigationGroups.set(key, group);
     });
@@ -630,10 +636,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       const groupKey = q.fillGroup || `tier:${tierKey}`;
       let g = groups.find((item) => item.key === groupKey);
       if (!g) {
-        g = { key: groupKey, tier: tierKey, title: q.fillGroupTitle, wordBank: [], questions: [] };
+        g = { key: groupKey, tier: tierKey, title: getFillGroupDisplayTitle(q.fillGroupTitle), wordBank: [], questions: [] };
         groups.push(g);
       }
-      if (!g.title && q.fillGroupTitle) g.title = q.fillGroupTitle;
+      const displayTitle = getFillGroupDisplayTitle(q.fillGroupTitle);
+      if (!g.title && displayTitle) g.title = displayTitle;
       if (q.wordBank?.length) {
         const existingWords = g.wordBank || [];
         g.wordBank = q.wordBank.reduce<string[]>((words, word) => {
