@@ -341,6 +341,24 @@ export const HSK2_BAI5_EXAM: ExamLesson = {
   ]
 };
 
+const hsk2Bai6FillGroup1: FillMeta = {
+  fillGroup: 'hsk2-b6-fill-group-1',
+  fillGroupTitle: 'Nhóm 1',
+  wordBank: ['忘', '画笔', '蛋糕', '打开', '床']
+};
+
+const hsk2Bai6FillGroup2: FillMeta = {
+  fillGroup: 'hsk2-b6-fill-group-2',
+  fillGroupTitle: 'Nhóm 2 · Dùng trùng điệp tính từ AA / AABB',
+  wordBank: ['长', '快乐', '舒服', '地']
+};
+
+const hsk2Bai6FillGroup3: FillMeta = {
+  fillGroup: 'hsk2-b6-fill-group-3',
+  fillGroupTitle: 'Nhóm 3 · Cụm từ “什么的”',
+  wordBank: ['什么的']
+};
+
 export const HSK2_BAI6_EXAM: ExamLesson = {
   id: 'hsk2-bai6-xiaoxue-shengri-kuaile',
   title: 'HSK 2 - Bài 6: 小雪，生日快乐！',
@@ -356,16 +374,16 @@ export const HSK2_BAI6_EXAM: ExamLesson = {
     vocab('地', 'de', 'trợ từ kết cấu trạng ngữ', 'Trợ từ'), vocab('什么的', 'shénme de', 'vân vân, các thứ', 'Cụm từ')
   ],
   fillQuestions: [
-    fill('hsk2_b6_fill_01', '明天是朋友的生日，你别____。', '忘'),
-    fill('hsk2_b6_fill_02', '妹妹喜欢画画，我送她一支____。', '画笔'),
-    fill('hsk2_b6_fill_03', '过生日我们要买一个大大的____。', '蛋糕'),
-    fill('hsk2_b6_fill_04', '这是你的礼物，请你____看看。', '打开'),
-    fill('hsk2_b6_fill_05', '很累的时候，我想在____上休息。', '床'),
-    fill('hsk2_b6_fill_06', '中国人过生日要吃____的面条儿。', '长长'),
-    fill('hsk2_b6_fill_07', '生日那天，大家____地唱歌。', '快快乐乐'),
-    fill('hsk2_b6_fill_08', '下班以后，我想____地睡一觉。', '舒舒服服'),
-    fill('hsk2_b6_fill_09', '桌子上有苹果、香蕉____。', '什么的'),
-    fill('hsk2_b6_fill_10', '我喜欢吃鱼、肉____。', '什么的')
+    fill('hsk2_b6_fill_01', '明天是朋友的生日，你别____。', '忘', hsk2Bai6FillGroup1),
+    fill('hsk2_b6_fill_02', '妹妹喜欢画画，我送她一支____。', '画笔', hsk2Bai6FillGroup1),
+    fill('hsk2_b6_fill_03', '过生日我们要买一个大大的____。', '蛋糕', hsk2Bai6FillGroup1),
+    fill('hsk2_b6_fill_04', '这是你的礼物，请你____看看。', '打开', hsk2Bai6FillGroup1),
+    fill('hsk2_b6_fill_05', '很累的时候，我想在____上休息。', '床', hsk2Bai6FillGroup1),
+    fill('hsk2_b6_fill_06', '中国人过生日要吃____的面条儿。', '长长', hsk2Bai6FillGroup2),
+    fill('hsk2_b6_fill_07', '生日那天，大家____地唱歌。', '快快乐乐', hsk2Bai6FillGroup2),
+    fill('hsk2_b6_fill_08', '下班以后，我想____地睡一觉。', '舒舒服服', hsk2Bai6FillGroup2),
+    fill('hsk2_b6_fill_09', '桌子上有苹果、香蕉____。', '什么的', hsk2Bai6FillGroup3),
+    fill('hsk2_b6_fill_10', '我喜欢吃鱼、肉____。', '什么的', hsk2Bai6FillGroup3)
   ],
   arrangeQuestions: [
     arrange('hsk2_b6_arr_01', '生日快乐 / 小雪', ['生日快乐', '小雪', '！'], '小雪，生日快乐！'),
