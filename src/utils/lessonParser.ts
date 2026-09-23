@@ -687,6 +687,8 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
           tier: itemTier,
           prompt: itemPrompt || 'Điền từ vào chỗ trống:',
           pinyin: itemPinyin,
+          fillGroup: typeof itemData.fillGroup === 'string' ? itemData.fillGroup : undefined,
+          fillGroupTitle: typeof itemData.fillGroupTitle === 'string' ? itemData.fillGroupTitle : undefined,
           wordBank: itemWordBank,
           acceptableAnswers:
             itemAcceptableAnswers || (typeof itemAnswer === 'string' ? itemAnswer : undefined),

@@ -38,6 +38,8 @@ export interface Question {
   wordChips?: string[]; // array of word chips for sentence arrangement
   acceptableAnswers?: string; // pipe-separated options, e.g. "6月13号|6月13日|六月十三号|六月十三日"
   wordBank?: string[]; // word bank choices for fill in blanks section
+  fillGroup?: string; // shared word-bank group within a fill section
+  fillGroupTitle?: string; // optional display title for a shared word-bank group
   suggestedAnswer?: string; // model answer unlocked when student inputs answer
   errorCorrection?: {
     sentenceIsCorrect: boolean;

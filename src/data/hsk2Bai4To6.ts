@@ -7,13 +7,16 @@ const vocab = (hanzi: string, pinyin: string, meaning: string, type = 'Từ vự
   type
 });
 
-const fill = (id: string, prompt: string, answer: string): Question => ({
+type FillMeta = Pick<Question, 'wordBank' | 'fillGroup' | 'fillGroupTitle'>;
+
+const fill = (id: string, prompt: string, answer: string, meta: FillMeta = {}): Question => ({
   id,
   type: 'fill',
   tier: 'tier1',
   prompt,
   acceptableAnswers: answer,
-  suggestedAnswer: answer
+  suggestedAnswer: answer,
+  ...meta
 });
 
 const arrange = (id: string, prompt: string, chips: string[], answer: string): Question => ({
@@ -100,17 +103,61 @@ export const HSK2_BAI4_EXAM: ExamLesson = {
     vocab('过去', 'guòqù', 'qua đó', 'Động từ'), vocab('更', 'gèng', 'càng, hơn', 'Phó từ')
   ],
   fillQuestions: [
-    fill('hsk2_b4_fill_01', '我看见老师在里面，我们____找她吧。', '进去'),
-    fill('hsk2_b4_fill_02', '我想买一____新裤子。', '条'),
-    fill('hsk2_b4_fill_03', '这家____是新开的，东西很便宜。', '商场'),
-    fill('hsk2_b4_fill_04', '我的____不见了，我需要买一个新的。', '书包'),
-    fill('hsk2_b4_fill_05', '这件衣服什么____？我喜欢绿色。', '颜色'),
-    fill('hsk2_b4_fill_06a', '我没吃____这种水果。', '过'),
-    fill('hsk2_b4_fill_06b', '我想____一下。', '试'),
-    fill('hsk2_b4_fill_07a', '____今天天气不好。', '因为'),
-    fill('hsk2_b4_fill_07b', '____我们不去商场了。', '所以'),
-    fill('hsk2_b4_fill_08', '那边卖裤子，我们____看看吧。', '过去'),
-    fill('hsk2_b4_fill_09', '绿色的很好看，我觉得黑色的____好看。', '更')
+    fill('hsk2_b4_fill_01', '我看见老师在里面，我们____找她吧。', '进去', {
+      fillGroup: 'hsk2-b4-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['进去', '条', '商场', '书包', '颜色']
+    }),
+    fill('hsk2_b4_fill_02', '我想买一____新裤子。', '条', {
+      fillGroup: 'hsk2-b4-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['进去', '条', '商场', '书包', '颜色']
+    }),
+    fill('hsk2_b4_fill_03', '这家____是新开的，东西很便宜。', '商场', {
+      fillGroup: 'hsk2-b4-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['进去', '条', '商场', '书包', '颜色']
+    }),
+    fill('hsk2_b4_fill_04', '我的____不见了，我需要买一个新的。', '书包', {
+      fillGroup: 'hsk2-b4-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['进去', '条', '商场', '书包', '颜色']
+    }),
+    fill('hsk2_b4_fill_05', '这件衣服什么____？我喜欢绿色。', '颜色', {
+      fillGroup: 'hsk2-b4-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['进去', '条', '商场', '书包', '颜色']
+    }),
+    fill('hsk2_b4_fill_06a', '我没吃____这种水果。', '过', {
+      fillGroup: 'hsk2-b4-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['过', '因为', '所以', '试', '过去', '更']
+    }),
+    fill('hsk2_b4_fill_06b', '我想____一下。', '试', {
+      fillGroup: 'hsk2-b4-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['过', '因为', '所以', '试', '过去', '更']
+    }),
+    fill('hsk2_b4_fill_07a', '____今天天气不好。', '因为', {
+      fillGroup: 'hsk2-b4-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['过', '因为', '所以', '试', '过去', '更']
+    }),
+    fill('hsk2_b4_fill_07b', '____我们不去商场了。', '所以', {
+      fillGroup: 'hsk2-b4-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['过', '因为', '所以', '试', '过去', '更']
+    }),
+    fill('hsk2_b4_fill_08', '那边卖裤子，我们____看看吧。', '过去', {
+      fillGroup: 'hsk2-b4-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['过', '因为', '所以', '试', '过去', '更']
+    }),
+    fill('hsk2_b4_fill_09', '绿色的很好看，我觉得黑色的____好看。', '更', {
+      fillGroup: 'hsk2-b4-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['过', '因为', '所以', '试', '过去', '更']
+    })
   ],
   arrangeQuestions: [
     arrange('hsk2_b4_arr_01', '来过 / 这家 / 我们 / 商场', ['来过', '这家', '我们', '商场', '。'], '我们来过这家商场。'),

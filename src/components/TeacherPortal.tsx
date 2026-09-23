@@ -1448,32 +1448,34 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   };
 
   const fillWordBankGroups = useMemo(() => {
-    const groups = new Map<string, string[]>();
+    const groups = new Map<string, { tier: string; title?: string; wordBank: string[] }>();
     const showAnswerOnlyWordBank = /^hsk1-bai(?:6|7|8|9|10|11|12|13|14|15)(?:-|$)/i.test(editingExam.id);
     (editingExam.fillQuestions || []).forEach((question) => {
       const tier = question.tier || 'tier1';
-      const words = groups.get(tier) || [];
+      const groupKey = question.fillGroup || `tier:${tier}`;
+      const group = groups.get(groupKey) || { tier, title: question.fillGroupTitle, wordBank: [] };
+      if (!group.title && question.fillGroupTitle) group.title = question.fillGroupTitle;
       const sourceWords = showAnswerOnlyWordBank
         ? [typeof question.answer === 'string' ? question.answer : question.acceptableAnswers?.split('|')[0]]
         : (question.wordBank || []);
       sourceWords.forEach((word) => {
         if (typeof word !== 'string') return;
         const normalizedWord = word.trim();
-        if (normalizedWord && !words.includes(normalizedWord)) words.push(normalizedWord);
+        if (normalizedWord && !group.wordBank.includes(normalizedWord)) group.wordBank.push(normalizedWord);
       });
-      groups.set(tier, words);
+      groups.set(groupKey, group);
     });
-    return Array.from(groups.entries()).map(([tier, wordBank]) => ({ tier, wordBank }));
+    return Array.from(groups.entries()).map(([groupKey, group]) => ({ groupKey, ...group }));
   }, [editingExam.id, editingExam.fillQuestions]);
 
-  const handleUpdateFillWordBank = (tier: string, rawWordBank: string) => {
+  const handleUpdateFillWordBank = (groupKey: string, rawWordBank: string) => {
     const wordBank = rawWordBank
       .split(',')
       .map((word) => word.trim())
       .filter(Boolean)
       .filter((word, index, words) => words.indexOf(word) === index);
     const updatedFill = (editingExam.fillQuestions || []).map((question) =>
-      (question.tier || 'tier1') === tier ? { ...question, wordBank } : question
+      (question.fillGroup || `tier:${question.tier || 'tier1'}`) === groupKey ? { ...question, wordBank } : question
     );
     setEditingExam({ ...editingExam, fillQuestions: updatedFill });
   };
@@ -3184,14 +3186,14 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
               </div>
 
               {fillWordBankGroups.length > 0 ? (
-                fillWordBankGroups.map(({ tier, wordBank }) => (
-                  <label key={tier} className="block space-y-1.5">
+                fillWordBankGroups.map(({ groupKey, tier, title, wordBank }) => (
+                  <label key={groupKey} className="block space-y-1.5">
                     <span className="text-xs font-semibold text-emerald-900">
-                      {tier === 'tier1' ? 'Cấp 1: Tri thức' : tier === 'tier2' ? 'Cấp 2: Bán giao tiếp' : 'Cấp 3: Giao tiếp tự do'}
+                      {title || (tier === 'tier1' ? 'Cấp 1: Tri thức' : tier === 'tier2' ? 'Cấp 2: Bán giao tiếp' : 'Cấp 3: Giao tiếp tự do')}
                     </span>
                     <textarea
                       value={wordBank.join(', ')}
-                      onChange={(event) => handleUpdateFillWordBank(tier, event.target.value)}
+                      onChange={(event) => handleUpdateFillWordBank(groupKey, event.target.value)}
                       onBlur={handleFillWordBankBlur}
                       placeholder="老师, 学生, 谢谢... (cách nhau bằng dấu phẩy)"
                       rows={2}

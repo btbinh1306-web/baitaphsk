@@ -568,7 +568,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
   const groupedFillQuestions = useMemo(() => {
     if (!currentExam.fillQuestions) return [];
-    const groups: { tier: string; wordBank?: string[]; questions: typeof currentExam.fillQuestions }[] = [];
+    const groups: { key: string; tier: string; title?: string; wordBank?: string[]; questions: typeof currentExam.fillQuestions }[] = [];
     const shuffleWordBank = (words: string[]) => {
       const shuffled = [...words];
       for (let index = shuffled.length - 1; index > 0; index -= 1) {
@@ -589,11 +589,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
     currentExam.fillQuestions.forEach((q) => {
       const tierKey = q.tier || 'tier1';
-      let g = groups.find((item) => item.tier === tierKey);
+      const groupKey = q.fillGroup || `tier:${tierKey}`;
+      let g = groups.find((item) => item.key === groupKey);
       if (!g) {
-        g = { tier: tierKey, wordBank: [], questions: [] };
+        g = { key: groupKey, tier: tierKey, title: q.fillGroupTitle, wordBank: [], questions: [] };
         groups.push(g);
       }
+      if (!g.title && q.fillGroupTitle) g.title = q.fillGroupTitle;
       if (q.wordBank?.length) {
         const existingWords = g.wordBank || [];
         g.wordBank = q.wordBank.reduce<string[]>((words, word) => {
@@ -1730,7 +1732,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2">
                           <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs uppercase tracking-wider">
                             <Sparkles className="w-4 h-4 text-emerald-600" />
-                            <span>Bảng từ cho sẵn (Chọn từ thích hợp để điền vào câu):</span>
+                            <span>{group.title ? `${group.title} · ` : ''}Bảng từ cho sẵn (Chọn từ thích hợp để điền vào câu):</span>
                           </div>
                           <div className="flex flex-wrap gap-2.5 pt-1">
                             {group.wordBank.map((word, wIdx) => (
