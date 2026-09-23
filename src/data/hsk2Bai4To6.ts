@@ -349,14 +349,12 @@ const hsk2Bai6FillGroup1: FillMeta = {
 
 const hsk2Bai6FillGroup2: FillMeta = {
   fillGroup: 'hsk2-b6-fill-group-2',
-  fillGroupTitle: 'Nhóm 2 · Dùng trùng điệp tính từ AA / AABB',
+  fillGroupTitle: 'Nhóm 2 · Điền từ, dùng dạng trùng điệp tính từ AA / AABB',
   wordBank: ['长', '快乐', '舒服', '地']
 };
 
 const hsk2Bai6FillGroup3: FillMeta = {
-  fillGroup: 'hsk2-b6-fill-group-3',
-  fillGroupTitle: 'Nhóm 3 · Cụm từ “什么的”',
-  wordBank: ['什么的']
+  fillGroup: 'hsk2-b6-fill-group-3'
 };
 
 export const HSK2_BAI6_EXAM: ExamLesson = {
