@@ -386,16 +386,24 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     }]);
 
-    addGroup('fill', 'Điền từ', [{
-      id: 'fill-items',
-      title: 'Điền từ vào chỗ trống',
-      items: (currentExam.fillQuestions || []).map((question, index) => ({
+    const fillNavigationGroups = new Map<string, { key: string; title?: string; questions: Question[] }>();
+    (currentExam.fillQuestions || []).forEach((question) => {
+      const key = question.fillGroup || `tier:${question.tier || 'tier1'}`;
+      const group = fillNavigationGroups.get(key) || { key, title: question.fillGroupTitle, questions: [] };
+      if (!group.title && question.fillGroupTitle) group.title = question.fillGroupTitle;
+      group.questions.push(question);
+      fillNavigationGroups.set(key, group);
+    });
+    addGroup('fill', 'Điền từ', Array.from(fillNavigationGroups.values()).map((group, groupIndex) => ({
+      id: `fill-${group.key}`,
+      title: `Bài ${groupIndex + 1}${group.title ? ` · ${group.title}` : ''}`,
+      items: group.questions.map((question, index) => ({
         id: question.id,
         label: String(index + 1),
         target: getQuestionAnchor(question.id),
         answered: Boolean(fillAnswers[question.id]?.trim())
       }))
-    }]);
+    })));
 
     addGroup('arrange', 'Sắp xếp câu', [{
       id: 'arrange-items',
@@ -1726,7 +1734,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                 <div className="space-y-6">
                   {groupedFillQuestions.map((group, groupIdx) => (
-                    <div key={groupIdx} className="space-y-4">
+                    <div key={group.key} className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4">
+                      <div className="flex items-center justify-between gap-3 border-b border-emerald-200 pb-3">
+                        <h4 className="text-base font-extrabold text-emerald-950">
+                          Bài {groupIdx + 1}{group.title ? ` · ${group.title}` : ''}
+                        </h4>
+                        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-emerald-800">
+                          {group.questions.length} câu
+                        </span>
+                      </div>
+
                       {/* Prominent Word Bank Display */}
                       {group.wordBank && group.wordBank.length > 0 && (
                         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2">
