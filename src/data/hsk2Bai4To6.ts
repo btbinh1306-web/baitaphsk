@@ -220,21 +220,81 @@ export const HSK2_BAI5_EXAM: ExamLesson = {
     vocab('酒店', 'jiǔdiàn', 'khách sạn', 'Danh từ')
   ],
   fillQuestions: [
-    fill('hsk2_b5_fill_01', '你____一点儿，我们要迟到了。', '快'),
-    fill('hsk2_b5_fill_02a', '我不上去，我在____。', '下面'),
-    fill('hsk2_b5_fill_02b', '我在下面____你。', '等'),
-    fill('hsk2_b5_fill_03', '请你坐____，他马上就到。', '一会儿'),
-    fill('hsk2_b5_fill_04', '这是我给朋友准备的____。', '礼物'),
-    fill('hsk2_b5_fill_05', '外边很冷，你们快____吧。', '进来'),
-    fill('hsk2_b5_fill_06', '我在楼上，你____找我吧。', '上来'),
-    fill('hsk2_b5_fill_07a', '我在楼下，你____吧。', '下来'),
-    fill('hsk2_b5_fill_07b', '我不____了。', '上去'),
-    fill('hsk2_b5_fill_08a', '吃完饭，我____朋友回酒店。', '跟'),
-    fill('hsk2_b5_fill_08b', '吃完饭，我跟朋友回____。', '酒店'),
-    fill('hsk2_b5_fill_09a', '____九点了，我们快走吧。', '都'),
-    fill('hsk2_b5_fill_09b', '都九点____，我们快走吧。', '了'),
-    fill('hsk2_b5_fill_10a', '我____去过中国了，我不想再去。', '都'),
-    fill('hsk2_b5_fill_10b', '我都去过中国____，我不想再去。', '了')
+    fill('hsk2_b5_fill_01', '你____一点儿，我们要迟到了。', '快', {
+      fillGroup: 'hsk2-b5-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['快', '下面', '等', '一会儿', '礼物']
+    }),
+    fill('hsk2_b5_fill_02a', '我不上去，我在____。', '下面', {
+      fillGroup: 'hsk2-b5-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['快', '下面', '等', '一会儿', '礼物']
+    }),
+    fill('hsk2_b5_fill_02b', '我在下面____你。', '等', {
+      fillGroup: 'hsk2-b5-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['快', '下面', '等', '一会儿', '礼物']
+    }),
+    fill('hsk2_b5_fill_03', '请你坐____，他马上就到。', '一会儿', {
+      fillGroup: 'hsk2-b5-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['快', '下面', '等', '一会儿', '礼物']
+    }),
+    fill('hsk2_b5_fill_04', '这是我给朋友准备的____。', '礼物', {
+      fillGroup: 'hsk2-b5-fill-group-1',
+      fillGroupTitle: 'Nhóm 1',
+      wordBank: ['快', '下面', '等', '一会儿', '礼物']
+    }),
+    fill('hsk2_b5_fill_05', '外边很冷，你们快____吧。', '进来', {
+      fillGroup: 'hsk2-b5-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
+    }),
+    fill('hsk2_b5_fill_06', '我在楼上，你____找我吧。', '上来', {
+      fillGroup: 'hsk2-b5-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
+    }),
+    fill('hsk2_b5_fill_07a', '我在楼下，你____吧。', '下来', {
+      fillGroup: 'hsk2-b5-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
+    }),
+    fill('hsk2_b5_fill_07b', '我不____了。', '上去', {
+      fillGroup: 'hsk2-b5-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
+    }),
+    fill('hsk2_b5_fill_08a', '吃完饭，我____朋友回酒店。', '跟', {
+      fillGroup: 'hsk2-b5-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
+    }),
+    fill('hsk2_b5_fill_08b', '吃完饭，我跟朋友回____。', '酒店', {
+      fillGroup: 'hsk2-b5-fill-group-2',
+      fillGroupTitle: 'Nhóm 2',
+      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
+    }),
+    fill('hsk2_b5_fill_09a', '____九点了，我们快走吧。', '都', {
+      fillGroup: 'hsk2-b5-fill-group-3',
+      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
+      wordBank: ['都', '了']
+    }),
+    fill('hsk2_b5_fill_09b', '都九点____，我们快走吧。', '了', {
+      fillGroup: 'hsk2-b5-fill-group-3',
+      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
+      wordBank: ['都', '了']
+    }),
+    fill('hsk2_b5_fill_10a', '我____去过中国了，我不想再去。', '都', {
+      fillGroup: 'hsk2-b5-fill-group-3',
+      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
+      wordBank: ['都', '了']
+    }),
+    fill('hsk2_b5_fill_10b', '我都去过中国____，我不想再去。', '了', {
+      fillGroup: 'hsk2-b5-fill-group-3',
+      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
+      wordBank: ['都', '了']
+    })
   ],
   arrangeQuestions: [
     arrange('hsk2_b5_arr_01', '快 / 吧 / 下来', ['快', '吧', '下来', '。'], '快下来吧。'),
