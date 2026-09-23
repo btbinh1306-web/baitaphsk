@@ -109,7 +109,7 @@ const getEssayQuestionGroups = (questions: Question[]): EssayQuestionGroup[] => 
   if (errorCorrectionQuestions.length > 0) {
     groups.push({
       key: 'error-correction',
-      title: `Bài 1: Phán đoán đúng sai, sửa câu sai (1-${errorCorrectionQuestions.length})`,
+      title: 'Bài 1: Phán đoán đúng sai, sửa câu sai',
       questions: errorCorrectionQuestions
     });
   }
@@ -2180,7 +2180,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-slate-800">
-                            Câu {idx + 1}: {q.prompt}
+                            {group.questions.length === 1 ? 'Bài làm:' : `Câu ${idx + 1}: ${q.prompt}`}
                           </p>
                         </div>
 
