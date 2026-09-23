@@ -704,6 +704,17 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     return String(answer);
   };
 
+  const formatSubjectiveCorrectAnswer = (question: Question): string => {
+    if (question.type === 'error_correction') {
+      if (question.errorCorrection?.sentenceIsCorrect === true) return 'Đúng';
+      if (question.errorCorrection?.sentenceIsCorrect === false) {
+        return `Sai — Sửa: ${question.suggestedAnswer || ''}`;
+      }
+    }
+
+    return question.referenceAnswers?.[0] || question.suggestedAnswer || question.acceptableAnswers || '';
+  };
+
   const findLegacyWrong = (prompt: string) => {
     const normalizedPrompt = normalizedText(prompt);
     return legacyWrongItems.find((item) => {
@@ -982,7 +993,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
         question.id,
         question.taskGroupTitle || 'Tự luận / Dịch / Nói',
         question.prompt,
-        question.referenceAnswers?.[0] || question.suggestedAnswer || question.acceptableAnswers || '',
+        formatSubjectiveCorrectAnswer(question),
         index + 1,
         [],
         {

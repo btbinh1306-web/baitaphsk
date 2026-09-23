@@ -814,7 +814,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       type === 'listening_true_false'
     ) {
       updatedExam.listeningQuestions = [...(updatedExam.listeningQuestions || []), questionToSave];
-    } else if (type === 'essay') {
+    } else if (type === 'essay' || type === 'error_correction') {
       updatedExam.essayQuestions = [...updatedExam.essayQuestions, questionToSave];
     } else if (type === 'speaking' || type === 'speaking_record') {
       updatedExam.speakingQuestions = [...updatedExam.speakingQuestions, questionToSave];

@@ -25,6 +25,8 @@ export const STANDARD_CONVERTED_TYPES = new Set([
   'passage',
   'essay',
   'writing',
+  'error_correction',
+  'error_correction_tf',
   'speaking',
   'speaking_record',
   'pronunciation',
@@ -126,7 +128,10 @@ export function convertExamLessonToLessonData(exam: ExamLesson): LessonData {
     'imported-writing-speaking',
     'Viết, nói & dịch',
     [
-      ...(exam.essayQuestions || []).map((question) => questionToLessonItem(question, 'essay')),
+      ...(exam.essayQuestions || []).map((question) => questionToLessonItem(
+        question,
+        question.type === 'error_correction' ? 'error_correction' : 'essay'
+      )),
       ...(exam.speakingQuestions || []).map((question) => questionToLessonItem(question, 'speaking')),
       ...(exam.translationQuestions || []).map((question) => questionToLessonItem(question, 'translation')),
       ...(exam.handwritingQuestions || []).map((question) => questionToLessonItem(question, 'handwriting_submission'))
@@ -207,6 +212,20 @@ function normalizeTranslationQuestions(questions: Question[]): Question[] {
       ? { ...question, pinyin: undefined }
       : question
   ));
+}
+
+function readErrorCorrectionMetadata(data: Record<string, unknown>): { sentenceIsCorrect: boolean } | undefined {
+  const nested = data.errorCorrection && typeof data.errorCorrection === 'object' && !Array.isArray(data.errorCorrection)
+    ? data.errorCorrection as Record<string, unknown>
+    : data;
+  const value = nested.sentenceIsCorrect ?? nested.isCorrect;
+  if (typeof value === 'boolean') return { sentenceIsCorrect: value };
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', 'correct', 'đúng', 'dung'].includes(normalized)) return { sentenceIsCorrect: true };
+    if (['false', 'incorrect', 'sai'].includes(normalized)) return { sentenceIsCorrect: false };
+  }
+  return undefined;
 }
 
 function isVietnameseToChineseAudioPrompt(prompt: string): boolean {
@@ -460,6 +479,29 @@ export function sanitizeExamSections(exam: ExamLesson): ExamLesson {
         return false;
       }
 
+      // Error correction is subjective: the student first judges true/false,
+      // then writes a correction only when the sentence is false.
+      if (type === 'error_correction' || type === 'error_correction_tf') {
+        const metadata = readErrorCorrectionMetadata(itemData);
+        const itemPrompt = stripLeadingQuestionNumber(
+          typeof itemData.prompt === 'string' ? itemData.prompt : 'Phán đoán đúng sai và sửa câu nếu sai:'
+        ) || 'Phán đoán đúng sai và sửa câu nếu sai:';
+        if (!essayQuestions.some((question) => question.id === qId || question.prompt === itemPrompt)) {
+          essayQuestions.push({
+            id: qId,
+            type: 'error_correction',
+            tier: 'tier3',
+            prompt: itemPrompt,
+            suggestedAnswer: typeof itemData.suggestedAnswer === 'string'
+              ? itemData.suggestedAnswer
+              : (typeof itemData.answer === 'string' ? itemData.answer : undefined),
+            explanation: typeof itemData.explanation === 'string' ? itemData.explanation : undefined,
+            errorCorrection: metadata
+          });
+        }
+        return false;
+      }
+
       // Filter out standard types that belong in specific question arrays
       // Keep the HSK structured fill block in sections so its shared word bank
       // and choice renderer are not split into the legacy fill form.
@@ -670,6 +712,19 @@ export function parseLessonToExam(lessonData: LessonData): ExamLesson {
       }
 
       // Essay or Writing
+      if (type === 'error_correction' || type === 'error_correction_tf') {
+        essayQuestions.push({
+          id: qId,
+          type: 'error_correction',
+          tier: 'tier3',
+          prompt: itemPrompt || 'Phán đoán đúng sai và sửa câu nếu sai:',
+          suggestedAnswer: itemSuggestedAnswer || (typeof itemAnswer === 'string' ? itemAnswer : undefined),
+          explanation: itemExplanation,
+          errorCorrection: readErrorCorrectionMetadata(itemData)
+        });
+        return;
+      }
+
       if (type === 'essay' || type === 'writing') {
         const itemImg = typeof itemData.imageUrl === 'string' ? itemData.imageUrl : (typeof itemData.image === 'string' ? itemData.image : undefined);
         essayQuestions.push({

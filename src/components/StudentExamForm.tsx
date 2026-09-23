@@ -18,6 +18,13 @@ import {
   getStructuredExerciseLabel
 } from '../utils/structuredExercises';
 import { getQuestionMaxScore } from '../utils/teacherScoring';
+import {
+  ErrorCorrectionAnswer,
+  formatErrorCorrectionAnswer,
+  isErrorCorrectionAnswered,
+  parseErrorCorrectionAnswer,
+  serializeErrorCorrectionAnswer
+} from '../utils/errorCorrection';
 import { HandwritingExerciseView, HandwritingExerciseViewHandle } from './exercises/HandwritingExerciseView';
 import { loadFormDraft, saveListeningProgress, useStudentFormDraft } from '../hooks/useStudentFormDraft';
 import { useStudentExamCatalog } from '../hooks/useStudentExamCatalog';
@@ -434,7 +441,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         id: question.id,
         label: String(index + 1),
         target: getQuestionAnchor(question.id),
-        answered: Boolean(essayAnswers[question.id]?.trim())
+        answered: question.type === 'error_correction'
+          ? isErrorCorrectionAnswered(essayAnswers[question.id])
+          : Boolean(essayAnswers[question.id]?.trim())
       }))
     }]);
 
@@ -1038,17 +1047,24 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       const essayParts = [
         ...readingEssayParts,
         ...currentExam.essayQuestions.map((q) => {
-        const ans = essayAnswers[q.id] || '(Chưa làm)';
-        answerSnapshot.push({
-          id: q.id,
-          section: 'Tự luận',
-          prompt: q.prompt,
-          userAnswer: ans === '(Chưa làm)' ? '' : ans,
-          correctAnswer: q.suggestedAnswer || q.acceptableAnswers || '',
-          status: 'manual',
-          maxScore: getQuestionMaxScore(q)
-        });
-        return `【${q.prompt}】\nBài làm: ${ans}`;
+          const ans = essayAnswers[q.id] || '(Chưa làm)';
+          const isErrorCorrection = q.type === 'error_correction';
+          const answerText = isErrorCorrection ? formatErrorCorrectionAnswer(essayAnswers[q.id]) : ans;
+          const expectedErrorCorrection = q.errorCorrection?.sentenceIsCorrect === true
+            ? 'Đúng'
+            : q.errorCorrection?.sentenceIsCorrect === false
+              ? `Sai — Sửa: ${q.suggestedAnswer || ''}`
+              : q.suggestedAnswer || '';
+          answerSnapshot.push({
+            id: q.id,
+            section: 'Tự luận',
+            prompt: q.prompt,
+            userAnswer: answerText,
+            correctAnswer: isErrorCorrection ? expectedErrorCorrection : q.suggestedAnswer || q.acceptableAnswers || '',
+            status: 'manual',
+            maxScore: getQuestionMaxScore(q)
+          });
+          return `【${q.prompt}】\nBài làm: ${answerText || '(Chưa làm)'}`;
         })
       ];
 
@@ -2045,6 +2061,57 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                 <div className="space-y-4">
                   {currentExam.essayQuestions.map((q, idx) => {
+                    if (q.type === 'error_correction') {
+                      const answer = parseErrorCorrectionAnswer(essayAnswers[q.id]);
+                      const updateAnswer = (patch: Partial<ErrorCorrectionAnswer>) => {
+                        const next: ErrorCorrectionAnswer = {
+                          judgement: patch.judgement || answer.judgement || 'correct',
+                          correction: patch.correction ?? (answer.correction || '')
+                        };
+                        handleEssayChange(q.id, serializeErrorCorrectionAnswer(next));
+                      };
+
+                      return (
+                        <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-amber-200 space-y-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">Câu {idx + 1}: {q.prompt}</p>
+                              <p className="mt-1 text-xs text-slate-500">Phán đoán trước. Nếu chọn Sai, hãy nhập câu đã sửa.</p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">Tự luận</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label={`Phán đoán câu ${idx + 1}`}>
+                            {([
+                              ['correct', 'Đúng', 'border-emerald-200 bg-emerald-50 text-emerald-900'],
+                              ['incorrect', 'Sai', 'border-rose-200 bg-rose-50 text-rose-900']
+                            ] as const).map(([value, label, classes]) => (
+                              <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-bold ${classes}`}>
+                                <input
+                                  type="radio"
+                                  name={`error-correction-${q.id}`}
+                                  checked={answer.judgement === value}
+                                  onChange={() => updateAnswer({ judgement: value })}
+                                  className="h-4 w-4"
+                                />
+                                {label}
+                              </label>
+                            ))}
+                          </div>
+
+                          {answer.judgement === 'incorrect' && (
+                            <textarea
+                              rows={2}
+                              value={answer.correction || ''}
+                              onChange={(event) => updateAnswer({ judgement: 'incorrect', correction: event.target.value })}
+                              placeholder="Nhập câu đúng đã sửa..."
+                              className="w-full rounded-lg border border-rose-200 bg-white p-3 text-sm outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500"
+                            />
+                          )}
+                        </div>
+                      );
+                    }
+
                     return (
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">

@@ -37,6 +37,9 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
   // Fill / Arrange / Essay / Translation
   const [acceptableAnswers, setAcceptableAnswers] = useState<string>(question.acceptableAnswers || '');
   const [suggestedAnswer, setSuggestedAnswer] = useState<string>(question.suggestedAnswer || '');
+  const [sentenceIsCorrect, setSentenceIsCorrect] = useState(
+    question.errorCorrection?.sentenceIsCorrect ?? true
+  );
   const [wordChips, setWordChips] = useState<string>(
     Array.isArray(question.wordChips) ? question.wordChips.join(', ') : ''
   );
@@ -65,6 +68,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
       setCorrectAnswer(typeof question.answer === 'number' ? question.answer : 0);
       setAcceptableAnswers(question.acceptableAnswers || '');
       setSuggestedAnswer(question.suggestedAnswer || '');
+      setSentenceIsCorrect(question.errorCorrection?.sentenceIsCorrect ?? true);
       setWordChips(Array.isArray(question.wordChips) ? question.wordChips.join(', ') : '');
       setItems(Array.isArray(question.items) ? question.items.map(String).join(', ') : '');
       setAudioUrl(question.audioUrl || question.audioPromptUrl || '');
@@ -160,6 +164,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
         : undefined,
       acceptableAnswers: acceptableAnswers.trim() || undefined,
       suggestedAnswer: suggestedAnswer.trim() || undefined,
+      errorCorrection: type === 'error_correction' ? { sentenceIsCorrect } : undefined,
       wordChips: finalChips,
       items: finalItems,
       audioUrl: audioUrl.trim() || undefined,
@@ -216,6 +221,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
                 <option value="fill">✍️ Điền từ vào chỗ trống (fill)</option>
                 <option value="arrange">🧩 Sắp xếp từ thành câu (arrange)</option>
                 <option value="essay">📄 Bài tập tự luận (essay)</option>
+                <option value="error_correction">🛠️ Sửa lỗi sai (Đúng/Sai → sửa câu)</option>
                 <option value="handwriting_submission">📝 Bài chép từ mới / Nộp ảnh bài viết (handwriting_submission)</option>
               </select>
             </div>
@@ -398,16 +404,33 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
           )}
 
           {/* Suggested answers for Essay / Translation */}
-          {(type === 'essay' || type === 'translation') && (
+          {(type === 'essay' || type === 'translation' || type === 'error_correction') && (
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Gợi ý / Đáp án mẫu chuẩn:</label>
               <input
                 type="text"
                 value={suggestedAnswer}
                 onChange={(e) => setSuggestedAnswer(e.target.value)}
-                placeholder="Ví dụ: 你的打算是什么？"
+                placeholder={type === 'error_correction' ? 'Câu đúng sau khi sửa (nếu câu gốc sai)' : 'Ví dụ: 你的打算是什么？'}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
               />
+            </div>
+          )}
+
+          {type === 'error_correction' && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 space-y-2">
+              <label className="block text-xs font-bold text-amber-950">Đáp án phán đoán của câu gốc:</label>
+              <div className="flex flex-wrap gap-4 text-sm font-semibold text-slate-800">
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" checked={sentenceIsCorrect} onChange={() => setSentenceIsCorrect(true)} />
+                  Đúng
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" checked={!sentenceIsCorrect} onChange={() => setSentenceIsCorrect(false)} />
+                  Sai
+                </label>
+              </div>
+              <p className="text-[11px] text-amber-900">Học sinh chọn Sai mới phải nhập câu sửa. Câu này được lưu trong phần tự luận.</p>
             </div>
           )}
 

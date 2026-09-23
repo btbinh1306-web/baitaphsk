@@ -15,6 +15,7 @@ export interface Question {
     | 'fill'
     | 'arrange'
     | 'essay'
+    | 'error_correction'
     | 'speaking'
     | 'speaking_record'
     | 'translation'
@@ -38,6 +39,9 @@ export interface Question {
   acceptableAnswers?: string; // pipe-separated options, e.g. "6月13号|6月13日|六月十三号|六月十三日"
   wordBank?: string[]; // word bank choices for fill in blanks section
   suggestedAnswer?: string; // model answer unlocked when student inputs answer
+  errorCorrection?: {
+    sentenceIsCorrect: boolean;
+  };
   explanation?: string;
   audioText?: string; // Hidden TTS script used when a listening audio file is not attached
   audioPromptUrl?: string;

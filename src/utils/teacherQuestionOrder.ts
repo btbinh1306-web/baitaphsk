@@ -21,6 +21,7 @@ export interface OrderedTeacherQuestion {
 
 const SUBJECTIVE_TYPES = new Set([
   'essay',
+  'error_correction',
   'writing',
   'speaking',
   'speaking_record',
