@@ -1353,7 +1353,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       )}
 
       {isExamContentVisible && isTimedExam && !submittedId && (
-        <div className={`${hasExamPinyin ? '' : 'sticky top-2 z-20 '}rounded-xl border p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 ${
+        <div className={`sticky top-28 z-40 rounded-xl border p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 sm:top-20 ${
           remainingSeconds !== null && remainingSeconds <= 60
             ? 'bg-rose-50 border-rose-300 text-rose-950'
             : 'bg-amber-50 border-amber-300 text-amber-950'
@@ -1614,7 +1614,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
         ) : (
           <div className="space-y-6 animate-in fade-in duration-300">
             {hasExamPinyin && (
-              <div className="sticky top-28 z-40 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/95 px-4 py-3 shadow-md backdrop-blur sm:top-20">
+              <div className={`sticky z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/95 px-4 py-3 shadow-md backdrop-blur ${
+                isTimedExam && !submittedId ? 'top-48 sm:top-40' : 'top-28 sm:top-20'
+              }`}>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-indigo-900">
                   <span>Pinyin toàn bài đang {showStructuredPinyin ? 'hiện' : 'ẩn'}</span>
                   {isTimedExam && !submittedId && (
