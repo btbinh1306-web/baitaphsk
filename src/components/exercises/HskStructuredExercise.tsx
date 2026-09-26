@@ -287,6 +287,7 @@ interface StructuredBlockAudioProps {
   audioScope?: string;
   onAudioAttempt?: (key: string) => { allowed: boolean; count: number };
   sticky?: boolean;
+  stickyBelowTimer?: boolean;
 }
 
 export const StructuredBlockAudio: React.FC<StructuredBlockAudioProps> = ({
@@ -296,7 +297,8 @@ export const StructuredBlockAudio: React.FC<StructuredBlockAudioProps> = ({
   audioPlayCounts = {},
   audioScope = '',
   onAudioAttempt,
-  sticky = false
+  sticky = false,
+  stickyBelowTimer = false
 }) => {
   const data = item.data || {};
   const src = getText(data.audio) || getText(data.audioUrl) || getText(data.audioPromptUrl);
@@ -313,7 +315,11 @@ export const StructuredBlockAudio: React.FC<StructuredBlockAudioProps> = ({
 
   return (
     <div className={`rounded-lg border border-indigo-200 bg-indigo-50/95 p-3 space-y-1 backdrop-blur ${
-      sticky ? 'sticky top-44 sm:top-32 z-30 shadow-lg' : ''
+      sticky
+        ? stickyBelowTimer
+          ? 'sticky top-52 sm:top-40 z-30 shadow-lg'
+          : 'sticky top-44 sm:top-32 z-30 shadow-lg'
+        : ''
     }`}>
       <p className="text-xs font-semibold text-indigo-900">File nghe dùng chung</p>
       {studentMode && data.singlePass === true ? <SinglePassAudio key={singlePassKey} src={getDriveAudioPlayerUrl(src)} audioKey={singlePassKey} /> : <LimitedAudio

@@ -1667,6 +1667,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         audioScope={structuredAudioScope}
                         onAudioAttempt={handleStructuredAudioAttempt}
                         sticky
+                        stickyBelowTimer={isTimedExam && !submittedId}
                       />
                     )}
                     <div className="space-y-6">
