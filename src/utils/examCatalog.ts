@@ -151,6 +151,22 @@ const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson
     return changed ? { ...exam, fillQuestions } : exam;
   }
 
+  if (exam.id === 'hsk1-bai7-5-ky-nang') {
+    const bundledQuestion = bundledExam.listeningQuestions?.find((question) => question.id === 'hsk1_b7_listen_05');
+    const savedQuestion = exam.listeningQuestions?.find((question) => question.id === 'hsk1_b7_listen_05');
+    if (!bundledQuestion || !savedQuestion) return exam;
+    const bundledAnswers = String(bundledQuestion.acceptableAnswers || '').trim();
+    if (!bundledAnswers || String(savedQuestion.acceptableAnswers || '').trim() === bundledAnswers) return exam;
+    return {
+      ...exam,
+      listeningQuestions: exam.listeningQuestions?.map((question) => (
+        question.id === savedQuestion.id
+          ? { ...question, answer: bundledQuestion.answer, acceptableAnswers: bundledQuestion.acceptableAnswers, audioText: bundledQuestion.audioText, explanation: bundledQuestion.explanation }
+          : question
+      ))
+    };
+  }
+
   if (exam.id !== 'hsk1-bai2-5-ky-nang') return exam;
 
   const bundledQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai2_fill_04');

@@ -803,10 +803,17 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     const normalizedLabel = normalizedText(label);
     const normalizedPrompt = normalizedText(question.prompt);
     const normalizedQuestionId = normalizedText(question.id);
+    const normalizedTranslationPrompt = question.translationType === 'vi_to_zh_audio'
+      ? normalizedText(question.prompt
+        .trim()
+        .replace(/^Dịch(?:\s+sang\s+tiếng\s+Trung)?(?:\s*(?:&|và)\s*Ghi âm(?:\s+phát âm)?)?\s*:\s*/iu, '')
+        .replace(/^\s*[“"](.*)[”"]\s*$/u, '$1'))
+      : '';
     return Boolean(normalizedLabel && (
       (normalizedPrompt && (
         normalizedLabel.includes(normalizedPrompt) || normalizedPrompt.includes(normalizedLabel)
       )) ||
+      (normalizedTranslationPrompt && normalizedLabel.includes(normalizedTranslationPrompt)) ||
       (normalizedQuestionId && normalizedLabel.includes(normalizedQuestionId))
     ));
   };

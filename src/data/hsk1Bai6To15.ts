@@ -300,7 +300,7 @@ const b7Listening = [
   listeningQuestion('hsk1_b7_listen_02', 'Nghe và chọn buổi trong ngày.', ['上午', '中午', '晚上'], 2, '我晚上六点半下班。'),
   listeningQuestion('hsk1_b7_listen_03', 'Nghe và chọn hoạt động.', ['上课', '下课', '看电影'], 0, '我下午两点半上课。'),
   listeningQuestion('hsk1_b7_listen_04', 'Nghe và chọn lời đề nghị phù hợp.', ['我们下午四点见吧。', '我们下午四点上课。', '我们下午四点下班。'], 0, '我们下午四点见吧。'),
-  listeningFill('hsk1_b7_listen_05', 'Nghe và điền từ chỉ thời gian.', '中午', '中午十二点吃午饭。')
+  listeningFill('hsk1_b7_listen_05', 'Nghe và điền từ chỉ thời gian.', '中午|中午十二点|中午十二点吃午饭', '中午十二点吃午饭。')
 ];
 const b7Essay = [
   essayQuestion('hsk1_b7_essay_01', 'Viết bằng tiếng Trung: 9 giờ 15 phút buổi sáng.', '上午九点十五分。'),

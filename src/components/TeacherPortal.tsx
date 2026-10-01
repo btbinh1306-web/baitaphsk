@@ -1811,7 +1811,16 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
       if (byId) return byId;
     }
     const labelText = String(label || '');
-    return questions.find((question) => labelText.includes(question.prompt));
+    return questions.find((question) => {
+      if (labelText.includes(question.prompt)) return true;
+      if (question.translationType !== 'vi_to_zh_audio') return false;
+      const translationPrompt = question.prompt
+        .trim()
+        .replace(/^Dịch(?:\s+sang\s+tiếng\s+Trung)?(?:\s*(?:&|và)\s*Ghi âm(?:\s+phát âm)?)?\s*:\s*/iu, '')
+        .replace(/^\s*[“"](.*)[”"]\s*$/u, '$1')
+        .trim();
+      return Boolean(translationPrompt && labelText.includes(translationPrompt));
+    });
   };
 
   const renderReviewDetails = (question: Question | undefined, showImage = true) => {
