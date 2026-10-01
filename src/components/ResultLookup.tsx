@@ -468,7 +468,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     }
 
     const userAnsMatch = mainBody.match(
-      /(?:Bạn chọn|Chọn|Bạn nhập|Nhập|Bạn xếp)\s*(?:\[|\:\s*)(.*?)(?:\]|\s*—|\s*-\s*Đáp|\s*\||$)/i
+      /(?:Bạn chọn|Chọn|Bạn nhập|Bạn điền|Nhập|Bạn xếp)\s*(?:\[|\:\s*)(.*?)(?:\]|\s*—|\s*-\s*Đáp|\s*\||$)/i
     );
     if (userAnsMatch) {
       userAns = userAnsMatch[1].trim();
@@ -1251,17 +1251,9 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     const resultItem = findResultItemForPrompt(item.prompt);
     return !resultItem?.audioResponse && normalizedText(item.answer) !== 'đã ghi âm';
   });
-  const renderTeacherReview = (item?: PrintableItem) => item && (item.teacherReviewStatus || item.teacherMaxScore) ? (
+  const renderTeacherReview = (item?: PrintableItem) => item?.teacherReviewStatus ? (
     <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
-      {item.teacherReviewStatus && (
-        <p><span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}</p>
-      )}
-      {item.teacherMaxScore && (
-        <p>
-          <span className="font-bold">Điểm câu: </span>
-          {item.teacherItemScore !== undefined ? `${item.teacherItemScore}/${item.teacherMaxScore}` : `Chưa chấm/${item.teacherMaxScore}`}
-        </p>
-      )}
+      <p><span className="font-bold">Đánh giá câu: </span>{item.teacherReviewStatus}</p>
     </div>
   ) : null;
   const allQuestionCount = resultSections.reduce((count, section) => count + section.items.length, 0);
