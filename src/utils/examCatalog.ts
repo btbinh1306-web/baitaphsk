@@ -64,6 +64,13 @@ const isStaleHsk1Mock02Snapshot = (exam: ExamLesson, bundledExam: ExamLesson | u
   )
 );
 
+const isStaleHsk1AggregateSnapshot = (exam: ExamLesson, bundledExam: ExamLesson | undefined): boolean => {
+  if (exam.id !== 'hsk1-de-tong-hop-bai1-5-5-ky-nang' || !bundledExam) return false;
+  const savedQuestionIds = new Set((exam.listeningQuestions || []).map((question) => question.id));
+  return (exam.listeningQuestions?.length || 0) < (bundledExam.listeningQuestions?.length || 0) ||
+    bundledExam.listeningQuestions.some((question) => !savedQuestionIds.has(question.id));
+};
+
 const isLocalUploadAudioUrl = (value: unknown): boolean => (
   typeof value === 'string' && /^\/api\/media\/file_[^/]+\.(?:mp3|wav|ogg|m4a|webm)$/iu.test(value.trim())
 );
@@ -193,10 +200,12 @@ const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson
 /** Prefer the bundled expanded aggregate over an older saved snapshot with the same id. */
 export const buildExamCatalog = (customExams: ExamLesson[], bundledExams: ExamLesson[]): ExamLesson[] => {
   const bundledMock02 = bundledExams.find((exam) => exam.id === 'hsk1-mock-02');
+  const bundledAggregate = bundledExams.find((exam) => exam.id === 'hsk1-de-tong-hop-bai1-5-5-ky-nang');
   const bundledById = new Map(bundledExams.map((exam) => [exam.id, normalizeBundledExamIdentity(exam)]));
   const usableCustomExams = Array.from(new Map(
     customExams
       .filter((exam) => !isStaleHsk1Mock02Snapshot(exam, bundledMock02))
+      .filter((exam) => !isStaleHsk1AggregateSnapshot(exam, bundledAggregate))
       .map(normalizeBundledExamIdentity)
       .map((exam) => migrateKnownAnswerCorrections(exam, bundledById.get(exam.id)))
       .map((exam) => migrateMissingBundledAudio(exam, bundledById.get(exam.id)))
