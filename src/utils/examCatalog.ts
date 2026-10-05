@@ -11,13 +11,25 @@ const migrateLocalAudio = (exam: ExamLesson): ExamLesson => {
   }
 
   if (exam.id === 'hsk1-de-tong-hop-bai1-5-5-ky-nang') {
+    const aggregateAudioByQuestionId: Record<string, string> = {
+      q41: '/audio/hsk1_aggregate_0105/q01.mp3',
+      q42: '/audio/hsk1_aggregate_0105/q02.mp3',
+      q43: '/audio/hsk1_aggregate_0105/q03.mp3',
+      q44: '/audio/hsk1_aggregate_0105/q04.mp3',
+      q45: '/audio/hsk1_aggregate_0105/q05.mp3',
+      q47: '/audio/hsk1_aggregate_0105/q07.mp3',
+      q48: '/audio/hsk1_aggregate_0105/q08.mp3',
+      q49: '/audio/hsk1_aggregate_0105/q09.mp3',
+      q50: '/audio/hsk1_aggregate_0105/q10.mp3'
+    };
     return {
       ...exam,
-      listeningQuestions: exam.listeningQuestions.map((question, index) => (
-        index < 10
-          ? { ...question, audioUrl: `/audio/hsk1_aggregate_0105/q${String(index + 1).padStart(2, '0')}.mp3` }
-          : question
-      ))
+      listeningQuestions: exam.listeningQuestions
+        .filter((question) => question.id !== 'q46' && question.id !== 'q53')
+        .map((question) => {
+          const audioUrl = aggregateAudioByQuestionId[question.id];
+          return audioUrl ? { ...question, audioUrl } : question;
+        })
     };
   }
 
