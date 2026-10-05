@@ -15,7 +15,7 @@ const migrateLocalAudio = (exam: ExamLesson): ExamLesson => {
       ...exam,
       listeningQuestions: exam.listeningQuestions.map((question, index) => (
         index < 10
-          ? { ...question, audioUrl: `/audio/hsk1_aggregate_0105/q${String(index + 1).padStart(2, '0')}.mp3` }
+          ? { ...question, audioUrl: question.audioUrl || `/audio/hsk1_aggregate_0105/q${String(index + 1).padStart(2, '0')}.mp3` }
           : question
       ))
     };
