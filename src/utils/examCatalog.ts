@@ -106,6 +106,22 @@ const migrateMissingBundledAudio = (exam: ExamLesson, bundledExam: ExamLesson | 
 const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson | undefined): ExamLesson => {
   if (!bundledExam) return exam;
 
+  if (exam.id === 'hsk2-bai1-word') {
+    const correctedIds = new Set(['hsk2_b1_word_arrange_02', 'hsk2_b1_word_arrange_04']);
+    const bundledArrangeById = new Map(
+      (bundledExam.arrangeQuestions || []).map((question) => [question.id, question])
+    );
+    let changed = false;
+    const arrangeQuestions = (exam.arrangeQuestions || []).map((question) => {
+      if (!correctedIds.has(question.id)) return question;
+      const bundledQuestion = bundledArrangeById.get(question.id);
+      if (!bundledQuestion || question.acceptableAnswers === bundledQuestion.acceptableAnswers) return question;
+      changed = true;
+      return { ...question, acceptableAnswers: bundledQuestion.acceptableAnswers };
+    });
+    return changed ? { ...exam, arrangeQuestions } : exam;
+  }
+
   if (exam.id === 'hsk1-bai4-5-ky-nang') {
     const bundledFillQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai4_fill_02');
     const savedFillQuestion = exam.fillQuestions?.find((question) => question.id === 'hsk1_bai4_fill_02');

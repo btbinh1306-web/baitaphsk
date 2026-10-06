@@ -121,9 +121,9 @@ const fillQuestions = [
 
 const arrangeQuestions = [
   arrange('hsk2_b1_word_arrange_01', 'Sắp xếp thành câu hoàn chỉnh.', ['吧', '北京烤鸭', '我们', '吃'], '我们吃北京烤鸭吧。|我们吃北京烤鸭吧'),
-  arrange('hsk2_b1_word_arrange_02', 'Sắp xếp thành câu hoàn chỉnh.', ['让', '姐姐', '我', '接', '你们'], '让我姐姐接你们。|让我姐姐接你们'),
+  arrange('hsk2_b1_word_arrange_02', 'Sắp xếp thành câu hoàn chỉnh.', ['让', '姐姐', '我', '接', '你们'], '让我姐姐接你们。|让我姐姐接你们|姐姐让我接你们。|姐姐让我接你们'),
   arrange('hsk2_b1_word_arrange_03', 'Sắp xếp thành câu hoàn chỉnh.', ['已经', '我们', '旅游', '来北京'], '我们已经来北京旅游。|我们已经来北京旅游'),
-  arrange('hsk2_b1_word_arrange_04', 'Sắp xếp thành câu hoàn chỉnh.', ['有时', '我', '意思', '不懂', '她的'], '有时我不懂她的意思。|有时我不懂她的意思'),
+  arrange('hsk2_b1_word_arrange_04', 'Sắp xếp thành câu hoàn chỉnh.', ['有时', '我', '意思', '不懂', '她的'], '有时我不懂她的意思。|有时我不懂她的意思|我有时不懂她的意思。|我有时不懂她的意思'),
   arrange('hsk2_b1_word_arrange_05', 'Sắp xếp thành câu hoàn chỉnh.', ['次', '第一次', '这是', '他', '来这儿'], '这是他第一次来这儿。|这是他第一次来这儿'),
   arrange('hsk2_b1_word_arrange_06', 'Sắp xếp thành câu hoàn chỉnh.', ['那', '打电话', '我', '他', '给'], '那我给他打电话。|那我给他打电话'),
   arrange('hsk2_b1_word_arrange_07', 'Sắp xếp thành câu hoàn chỉnh.', ['帮忙', '请你', '我', '个'], '请你帮我个忙。|请你帮我个忙'),
