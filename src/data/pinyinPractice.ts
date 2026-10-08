@@ -32,7 +32,7 @@ const readingQuestion = (id: string, pinyin: string, taskGroup: string, taskGrou
 const listeningQuestions: Question[] = [
   listeningQuestion('pinyin_listen_1_01', 'Nghe 1 âm tiết và chọn Pinyin đúng.', ['mǎi', 'mái', 'mài'], 0, '买'),
   listeningQuestion('pinyin_listen_1_02', 'Nghe 1 âm tiết và chọn Pinyin đúng.', ['pái', 'pǎi', 'pài'], 0, '排'),
-  listeningQuestion('pinyin_listen_1_03', 'Nghe 1 âm tiết và chọn Pinyin đúng.', ['fō', 'fó', 'fò'], 2, '佛'),
+  listeningQuestion('pinyin_listen_1_03', 'Nghe 1 âm tiết và chọn Pinyin đúng.', ['fō', 'fó', 'fò'], 1, '佛'),
   listeningQuestion('pinyin_listen_1_04', 'Nghe 1 âm tiết và chọn Pinyin đúng.', ['tóng', 'tǒng', 'tòng'], 2, '痛'),
   listeningQuestion('pinyin_listen_1_05', 'Nghe 1 âm tiết và chọn Pinyin đúng.', ['lóu', 'lǒu', 'lòu'], 0, '楼'),
   listeningQuestion('pinyin_listen_1_06', 'Nghe 1 âm tiết và chọn Pinyin đúng.', ['tā', 'tá', 'tǎ'], 0, '他'),

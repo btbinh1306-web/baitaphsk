@@ -12,7 +12,7 @@ public/audio/pinyin_practice/
 |---|---|
 | `pinyin_listen_1_01.mp3` | 买 |
 | `pinyin_listen_1_02.mp3` | 排 |
-| `pinyin_listen_1_03.mp3` | Âm tiết **fò** |
+| `pinyin_listen_1_03.mp3` | 佛 — **fó** |
 | `pinyin_listen_1_04.mp3` | 痛 |
 | `pinyin_listen_1_05.mp3` | 楼 |
 | `pinyin_listen_1_06.mp3` | 他 |
@@ -45,4 +45,4 @@ public/audio/pinyin_practice/
 
 ## Lưu ý câu 3
 
-Đề gốc ghi đáp án `fò`, nhưng chữ `佛` đọc chuẩn là `fó`. Nếu vẫn giữ đáp án `fò`, file `pinyin_listen_1_03.mp3` cần đọc âm tiết **fò** riêng, không đọc chữ `佛`.
+File `pinyin_listen_1_03.mp3` đọc chữ `佛`, đáp án đúng là **fó**.
