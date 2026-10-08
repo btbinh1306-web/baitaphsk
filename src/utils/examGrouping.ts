@@ -47,6 +47,9 @@ function aggregateRange(exam: ExamLesson): [number, number] | null {
 }
 
 function sortExams(a: ExamLesson, b: ExamLesson): number {
+  const aPinyinPractice = a.id === 'pinyin-nghe-va-doc';
+  const bPinyinPractice = b.id === 'pinyin-nghe-va-doc';
+  if (aPinyinPractice !== bPinyinPractice) return aPinyinPractice ? -1 : 1;
   const aTrialNumber = trialExamNumber(a);
   const bTrialNumber = trialExamNumber(b);
   if ((aTrialNumber === null) !== (bTrialNumber === null)) return aTrialNumber === null ? -1 : 1;

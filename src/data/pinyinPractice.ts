@@ -81,7 +81,7 @@ const speakingQuestions: Question[] = [
 export const PINYIN_PRACTICE_EXAM: ExamLesson = {
   id: 'pinyin-nghe-va-doc',
   title: 'Luyện Pinyin — Nghe và Đọc',
-  level: 'Luyện nói',
+  level: 'HSK 1',
   description: 'Dành cho học sinh mới học xong Pinyin: nghe nhận dạng thanh điệu, sau đó đọc và ghi âm Pinyin.',
   instruction: 'Không tách thanh mẫu – vận mẫu và không hiển thị chữ Hán. Phần nghe có 22 câu; mỗi câu được phát âm tối đa 2 lần. Phần đọc gồm 12 lượt 1 âm tiết và 28 lượt 2 âm tiết, chỉ tính hoàn thành khi đã có bản ghi.',
   timeLimitEnabled: false,
