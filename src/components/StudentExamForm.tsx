@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { AudioRecorder } from './AudioRecorder';
-import { AnswerSnapshotItem, AudioRecordItem, ExamLesson, Question } from '../types';
+import { AnswerSnapshotItem, AudioRecordItem, ExamLesson, Question, StudentAccount } from '../types';
 import { submitToGas } from '../services/gasService';
 import { speakText } from '../utils/tts';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
@@ -57,6 +57,9 @@ import {
 interface StudentExamFormProps {
   customExams?: ExamLesson[];
   deletedExamIds?: string[];
+  allowedExamIds?: string[];
+  studentAccount?: Pick<StudentAccount, 'id' | 'name' | 'className'>;
+  assignmentId?: string;
   onSuccessNavigateToResult: (submissionId: string) => void;
 }
 
@@ -241,29 +244,41 @@ const answerTextForQuestion = (question: Question, answer: unknown): string => {
 export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   customExams = [],
   deletedExamIds = [],
+  allowedExamIds,
+  studentAccount,
+  assignmentId,
   onSuccessNavigateToResult
 }) => {
   const { allExams } = useStudentExamCatalog(customExams, deletedExamIds);
 
-  const filteredExams = allExams;
+  const filteredExams = allowedExamIds?.length
+    ? allExams.filter((exam) => allowedExamIds.includes(exam.id))
+    : allExams;
   const examGroups = useMemo(() => groupExamsForSelection(filteredExams), [filteredExams]);
 
   // Load draft from localStorage on initial mount
   const initialDraft = useMemo(() => loadFormDraft(), []);
+  const draftExamId = initialDraft?.selectedExamId || '';
+  const assignedExamId = allowedExamIds?.length === 1 && filteredExams.some((exam) => exam.id === allowedExamIds[0])
+    ? allowedExamIds[0]
+    : '';
+  const initialExamId = allowedExamIds?.length
+    ? (allowedExamIds.includes(draftExamId) ? draftExamId : assignedExamId)
+    : draftExamId;
 
-  const [studentName, setStudentName] = useState(() => initialDraft?.studentName || '');
-  const [studentClass, setStudentClass] = useState(() => initialDraft?.studentClass || '');
+  const [studentName, setStudentName] = useState(() => studentAccount?.name || initialDraft?.studentName || '');
+  const [studentClass, setStudentClass] = useState(() => studentAccount?.className || initialDraft?.studentClass || '');
   const [selectedExamGroupLabel, setSelectedExamGroupLabel] = useState(() => {
-    if (initialDraft?.selectedExamGroupLabel) return initialDraft.selectedExamGroupLabel;
-    return examGroups.find((group) => group.exams.some((exam) => exam.id === initialDraft?.selectedExamId))?.label || '';
+    if (initialExamId && initialDraft?.selectedExamGroupLabel) return initialDraft.selectedExamGroupLabel;
+    return examGroups.find((group) => group.exams.some((exam) => exam.id === initialExamId))?.label || '';
   });
-  const [selectedExamId, setSelectedExamId] = useState(() => initialDraft?.selectedExamId || '');
+  const [selectedExamId, setSelectedExamId] = useState(() => initialExamId);
   const examsInSelectedGroup =
     examGroups.find((group) => group.label === selectedExamGroupLabel)?.exams || [];
 
   // Vocabulary lock state - per exam
   const [vocabUnlocked, setVocabUnlocked] = useState<Record<string, boolean>>(
-    () => initialDraft?.vocabUnlocked || {}
+    () => (studentAccount ? {} : (initialDraft?.vocabUnlocked || {}))
   );
   const [showVocabTable, setShowVocabTable] = useState(true);
 
@@ -1210,6 +1225,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
       const res = await submitToGas({
         submissionId,
+        studentId: studentAccount?.id,
+        assignmentId,
         time: fullTimeStr,
         name: studentName.trim(),
         class: studentClass.trim(),
@@ -1398,6 +1415,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 onChange={(e) => setStudentName(e.target.value)}
                 placeholder="Ví dụ: Nguyễn Văn An"
                 required
+                disabled={Boolean(studentAccount)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition"
               />
             </div>
@@ -1412,11 +1430,19 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 onChange={(e) => setStudentClass(e.target.value)}
                 placeholder="Ví dụ: HSK3-T24"
                 required
+                disabled={Boolean(studentAccount)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition"
               />
             </div>
 
-            <div className="space-y-3">
+            {studentAccount ? (
+              <div className="space-y-1">
+                <p className="block text-xs font-semibold text-slate-700">Bài được giao</p>
+                <div className="w-full px-3 py-2 border border-teal-200 rounded-lg text-sm bg-teal-50 text-teal-900 font-semibold">
+                  {currentExam.title}
+                </div>
+              </div>
+            ) : <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1469,7 +1495,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   </span>
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -1948,6 +1974,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     const subQuestions = q.subQuestions?.length ? q.subQuestions : [q];
                     const isConversation = !!q.subQuestions?.length;
                     const isTfType = q.type === 'listening_tf' || q.type === 'listening_true_false';
+                    const hasTtsPlayLimit = !q.audioUrl && !q.audioPromptUrl && q.maxAudioPlayCount === 2;
+                    const ttsPlayKey = `${structuredAudioScope}::${q.id}`;
+                    const ttsPlaysUsed = listeningPlayCounts[ttsPlayKey] || 0;
 
                     return (
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-indigo-50/40 border border-indigo-100 space-y-3.5">
@@ -1992,10 +2021,17 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           ) : (
                             <button
                               type="button"
-                              onClick={() => speakText(q.audioText || q.pinyin || q.prompt)}
-                              className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition cursor-pointer shadow-xs"
+                              onClick={() => {
+                                if (hasTtsPlayLimit && !handleStructuredAudioAttempt(ttsPlayKey).allowed) return;
+                                speakText(q.audioText || q.pinyin || q.prompt);
+                              }}
+                              disabled={hasTtsPlayLimit && ttsPlaysUsed >= 2}
+                              className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-400 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition cursor-pointer shadow-xs"
                             >
-                              <Volume2 className="w-4 h-4" /> Bấm để phát âm thanh (Giọng đọc tự động TTS)
+                              <Volume2 className="w-4 h-4" />
+                              {hasTtsPlayLimit
+                                ? ttsPlaysUsed >= 2 ? 'Đã nghe đủ 2 lần' : `Bấm để phát âm thanh (${ttsPlaysUsed}/2)`
+                                : 'Bấm để phát âm thanh (Giọng đọc tự động TTS)'}
                             </button>
                           )}
                         </div>

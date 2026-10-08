@@ -48,6 +48,7 @@ export interface Question {
   audioText?: string; // Hidden TTS script used when a listening audio file is not attached
   audioPromptUrl?: string;
   audioUrl?: string; // Attached audio file data/URL for listening questions
+  maxAudioPlayCount?: number; // Optional limit for fallback/TTS listening playback
   imageUrl?: string; // Attached image file data/URL for questions
   items?: (string | Record<string, unknown>)[];
   questions?: Record<string, unknown>[];
@@ -121,6 +122,8 @@ export interface AudioRecordItem {
 
 export interface SubmissionData {
   id: string;
+  studentId?: string;
+  assignmentId?: string;
   duplicateIds?: string[]; // IDs of older duplicate records merged into this row
   time: string;
   name: string;
@@ -149,6 +152,23 @@ export interface SubmissionData {
   handwritingStatus?: 'not_submitted' | 'submitted' | 'graded';
   submittedAt?: string;
   gradedAt?: string;
+}
+
+export interface StudentAssignment {
+  id: string;
+  examId: string;
+  assignedAt: string;
+  dueAt?: string;
+}
+
+export interface StudentAccount {
+  id: string;
+  username: string;
+  name: string;
+  className: string;
+  active: boolean;
+  linkedAccountIds?: string[];
+  assignments: StudentAssignment[];
 }
 
 export type AnswerSnapshotStatus = 'correct' | 'wrong' | 'unanswered' | 'manual';
