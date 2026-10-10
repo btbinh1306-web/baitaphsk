@@ -370,7 +370,10 @@ const b8Listening = [
   listeningQuestion('hsk1_b8_listen_02', 'Nghe và chọn câu đúng.', ['我有一只狗。', '我有一只猫。', '我有一张桌子。'], 0, '我有一只小狗。'),
   listeningQuestion('hsk1_b8_listen_03', 'Nghe và chọn địa điểm.', ['北京', '学校', '医院'], 2, '爸爸在医院工作。'),
   listeningQuestion('hsk1_b8_listen_04', 'Nghe và chọn khả năng.', ['能说汉语', '不能说汉语', '能坐出租车'], 0, '她能说汉语。'),
-  listeningFill('hsk1_b8_listen_05', 'Nghe và điền tính từ.', '漂亮', '我家的小猫很漂亮。')
+  {
+    ...listeningFill('hsk1_b8_listen_05', 'Nghe và điền tính từ.', '漂亮', '我家的小猫很漂亮。'),
+    acceptableAnswers: '漂亮|漂亮。|我家的小猫很漂亮|我家的小猫很漂亮。'
+  }
 ];
 const b8Essay = [
   essayQuestion('hsk1_b8_essay_01', 'Viết 2 câu giới thiệu căn phòng và một đồ vật trong phòng.', '我的房间很大。桌子上有一本书。'),
