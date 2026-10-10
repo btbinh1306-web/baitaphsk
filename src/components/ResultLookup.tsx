@@ -773,10 +773,6 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
     }
 
     const acceptedAnswers = sourceQuestion?.question.acceptableAnswers || correctAnswer;
-    const legacyAnswerChanged = Boolean(
-      legacyWrong?.correctAns && correctAnswer &&
-      !answersMatchForRegrade(legacyWrong.correctAns, correctAnswer)
-    );
     const legacyUserAnswer = legacyWrong?.userAns || '';
 
     return {
@@ -788,7 +784,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({ initialSubmissionId 
       correctAnswer,
       teacherReviewRequired,
       status: legacyWrong
-        ? (legacyAnswerChanged && answerMatchesAccepted(legacyUserAnswer, acceptedAnswers) ? 'correct' : 'wrong')
+        ? (answerMatchesAccepted(legacyUserAnswer, acceptedAnswers) ? 'correct' : 'wrong')
         : (media.subjectiveKind || teacherReviewRequired
           ? 'manual'
           : !resultExam
