@@ -211,6 +211,23 @@ const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson
     };
   }
 
+  if (exam.id === 'hsk1-bai9-5-ky-nang' || exam.id === 'hsk1-bai10-5-ky-nang') {
+    const questionId = exam.id === 'hsk1-bai9-5-ky-nang' ? 'hsk1_b9_listen_05' : 'hsk1_b10_listen_05';
+    const bundledQuestion = bundledExam.listeningQuestions?.find((question) => question.id === questionId);
+    const savedQuestion = exam.listeningQuestions?.find((question) => question.id === questionId);
+    if (!bundledQuestion || !savedQuestion) return exam;
+    const bundledAnswers = String(bundledQuestion.acceptableAnswers || '').trim();
+    if (!bundledAnswers || String(savedQuestion.acceptableAnswers || '').trim() === bundledAnswers) return exam;
+    return {
+      ...exam,
+      listeningQuestions: exam.listeningQuestions?.map((question) => (
+        question.id === savedQuestion.id
+          ? { ...question, answer: bundledQuestion.answer, acceptableAnswers: bundledQuestion.acceptableAnswers, audioText: bundledQuestion.audioText, explanation: bundledQuestion.explanation }
+          : question
+      ))
+    };
+  }
+
   if (exam.id !== 'hsk1-bai2-5-ky-nang') return exam;
 
   const bundledQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai2_fill_04');

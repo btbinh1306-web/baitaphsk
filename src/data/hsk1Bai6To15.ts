@@ -443,7 +443,10 @@ const b9Listening = [
   listeningQuestion('hsk1_b9_listen_02', 'Nghe và chọn hoạt động.', ['读书', '看电视', '买水果'], 1, '妹妹想看电视。'),
   listeningQuestion('hsk1_b9_listen_03', 'Nghe và chọn ngôn ngữ.', ['中文', '法语', '英语'], 0, '我会说中文。'),
   listeningQuestion('hsk1_b9_listen_04', 'Nghe và chọn người cùng chơi.', ['小猫', '小狗', '老师'], 1, '我喜欢和小狗玩。'),
-  listeningFill('hsk1_b9_listen_05', 'Nghe và điền động từ.', '唱', '她会唱歌。')
+  {
+    ...listeningFill('hsk1_b9_listen_05', 'Nghe và điền động từ.', '唱', '她会唱歌。'),
+    acceptableAnswers: '唱|唱歌|唱。|唱歌。'
+  }
 ];
 const b9Essay = [
   essayQuestion('hsk1_b9_essay_01', 'Viết 2 câu về việc em làm ban ngày và buổi tối.', '白天我学习中文。晚上我看电视。'),
@@ -516,7 +519,10 @@ const b10Listening = [
   listeningQuestion('hsk1_b10_listen_02', 'Nghe và chọn đồ vật.', ['杯子', '衣服', '苹果'], 0, '这个杯子太小了。'),
   listeningQuestion('hsk1_b10_listen_03', 'Nghe và chọn đánh giá.', ['便宜', '贵', '少'], 0, '这家商店的水果很便宜。'),
   listeningQuestion('hsk1_b10_listen_04', 'Nghe và chọn giá của quần áo.', ['二十元', '八十元', '一百元'], 2, '这件衣服一百元。'),
-  listeningFill('hsk1_b10_listen_05', 'Nghe và điền động từ.', '穿', '我不想穿这件衣服。')
+  {
+    ...listeningFill('hsk1_b10_listen_05', 'Nghe và điền động từ.', '穿', '我不想穿这件衣服。'),
+    acceptableAnswers: '穿|不想穿|穿。|不想穿。'
+  }
 ];
 const b10Essay = [
   essayQuestion('hsk1_b10_essay_01', 'Viết một câu hỏi giá và một câu trả lời dùng 块.', '这个杯子多少钱？二十块。'),
