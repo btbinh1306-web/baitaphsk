@@ -1325,7 +1325,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     if (!question.options) return null;
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+      <div className="grid grid-cols-1 gap-2 pt-1">
         {(shuffledChoiceOptions.get(question.id) || question.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: option, originalIndex }) => {
           const isSelected = mcAnswers[question.id] === originalIndex;
           return (
@@ -1755,7 +1755,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       </div>
 
                       {q.options && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div className="grid grid-cols-1 gap-2 pt-1">
                           {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
                             const isSelected = mcAnswers[q.id] === originalIndex;
                             return (
@@ -2103,7 +2103,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                               Câu {qIdx + 1}: {q.prompt}
                             </p>
                             {q.options && q.options.length > 0 ? (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                              <div className="grid grid-cols-1 gap-2 pt-1">
                                 {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
                                   const isSelected = mcAnswers[q.id] === originalIndex;
                                   return (
