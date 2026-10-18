@@ -117,11 +117,9 @@ const hsk3ListeningRows = (
   start: number,
   prompts: string[],
   answers: string[],
-  choices: string[][],
-  transcripts: string[] = []
+  choices: string[][]
 ) => prompts.map((prompt, index) => row(`${id}-l${start + index}`, start + index, prompt, answers[index], {
-  options: options(choices[index] || []),
-  ...(transcripts[index] ? { transcript: transcripts[index] } : {})
+  options: options(choices[index] || [])
 }));
 
 const hsk3Test1Part2 = [
@@ -166,37 +164,11 @@ const hsk3Listening = (id: string, number: 1 | 2): LessonItem[] => {
     : hsk3ImageOptions('02-listen-p2', {
       A: '树被风吹倒了', B: '两个人拿着电影票', C: '骑自行车', D: '在桌边聊天', E: '在教室里递东西'
     });
-  const part1Transcripts = first
-    ? [
-      '女：您今天觉得舒服一点儿了吗？男：还是有一点儿头疼，可以再帮我检查一下吗？',
-      '女：你今天好像不太开心，怎么了？男：我丢了银行卡，现在心里很难过。',
-      '男：你想吃什么？我帮你点。女：我想吃米饭和鱼。',
-      '男：你最近怎么总是很晚才睡觉？女：我在准备考试，每天都要复习到很晚。',
-      '女：你觉得这条裙子怎么样？男：我觉得很好看，你穿上试试吧。',
-      '女：你站在那儿，我帮你拍张照片。男：好的，这儿太漂亮了！',
-      '男：这个礼物我选了很久，希望你会喜欢。女：你总是知道我喜欢什么。',
-      '女：听说你对体育很感兴趣？男：是啊，我周末经常跟朋友一起打网球。',
-      '女：这本书你看了这么久，还没看完吗？男：这本书很有意思，我想再读一遍。',
-      '男：你能帮我一下吗？女：没问题，我们一起把这些书搬到三楼去吧。'
-    ]
-    : [
-      '女：这个蛋糕真好吃，是你自己做的吗？男：不是，是我妈妈给我做的。',
-      '女：你想喝点儿什么？咖啡还是茶？男：我喝茶，谢谢。',
-      '男：现在几点了？我们要迟到了吧？女：别着急，现在七点半，还早呢。',
-      '男：外面下雨了，你带雨伞了吗？女：没带，可是没关系，我可以在教室里看书等一会儿。',
-      '女：这本书很有意思。男：那你看完可以借给我吗？我也想读一读。',
-      '女：刚才外面风好大，把树都吹倒了。男：是啊，最近出门一定要注意安全。',
-      '男：我的铅笔忘带了，你的借我用一下可以吗？女：当然可以，给你。',
-      '女：我在网上看到大家都说这个新电影特别好看。男：我已经买好票了，咱们今天下午就去看。',
-      '男：你喜欢听音乐吗？女：非常喜欢，看来咱们两个爱好一样。',
-      '女：今天天气很好，我们去公园玩一会儿吧。男：好的，我们骑自行车去吧。'
-    ];
   const imageRows = (answers: string[], group: string) => Array.from({ length: 5 }, (_, index) => row(
     `${id}-l${index + (group === 'p1' ? 1 : 6)}`,
     index + (group === 'p1' ? 1 : 6),
     '听录音，选择相应的图片。',
-    answers[index],
-    { transcript: part1Transcripts[index + (group === 'p1' ? 0 : 5)] }
+    answers[index]
   ));
   const part1 = item(`${id}-listen-p1`, 'listening_shared_image_match', '第一部分：听对话，选择最匹配的图片。', {
     sharedOptions: imagePart1,
