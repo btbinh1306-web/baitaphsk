@@ -23,67 +23,70 @@ const textChoice = (id: string, number: number, prompt: string, answer: string, 
 const imageChoice = (id: string, number: number, prompt: string, answer: string, choices: string[]) => row(id, number, prompt, answer, { options: options(choices.map((text) => `Hình ${text}`)) });
 const audioSection = (id: string, title: string, audio: string, items: LessonItem[]): LessonSection => ({ id, title, items: items.map((entry, index) => index === 0 ? { ...entry, data: { ...entry.data, audio, hidePrompt: true } } : entry) });
 
+const HSK2_MOCK_IMAGE_ROOT = '/images/hsk2-mock-colored';
+
+const hsk2ImageOptions = (entries: Record<string, { text: string; file: string }>): Option[] => Object.entries(entries).map(([id, entry]) => ({
+  id, text: entry.text, image: `${HSK2_MOCK_IMAGE_ROOT}/${entry.file}`, alt: entry.text
+}));
+const hsk2ImageChoice = (id: string, number: number, prompt: string, answer: string, entries: Record<string, { text: string; file: string }>) => row(id, number, prompt, answer, { options: hsk2ImageOptions(entries) });
+
 const hsk2Test1Listening: LessonItem[] = [
   item('hsk2-1-listen-p1', 'listening_image_choice', '第一部分：听句子，选择与句子相符的图片。', { items: [
-    imageChoice('hsk2-1-l1', 1, '别忘了你的咖啡。', 'C', ['A', 'B', 'C']), imageChoice('hsk2-1-l2', 2, '她的头有点儿疼。', 'B', ['A', 'B', 'C']), imageChoice('hsk2-1-l3', 3, '孩子们正在快乐地游泳呢。', 'A', ['A', 'B', 'C']), imageChoice('hsk2-1-l4', 4, '朋友送给我两张电影票。', 'C', ['A', 'B', 'C']), imageChoice('hsk2-1-l5', 5, '您一不舒服就给我们打电话。', 'A', ['A', 'B', 'C'])
+    hsk2ImageChoice('hsk2-1-l1', 1, '别忘了你的咖啡。', 'C', { A: { text: '两个人散步', file: 'sheet1-1.png' }, B: { text: '递东西', file: 'sheet3-1.png' }, C: { text: '拿着咖啡', file: 'sheet0-1.png' } }),
+    hsk2ImageChoice('hsk2-1-l2', 2, '她的头有点儿疼。', 'B', { A: { text: '肚子疼', file: 'sheet1-6.png' }, B: { text: '头疼', file: 'sheet0-2.png' }, C: { text: '牙疼', file: 'sheet1-5.png' } }),
+    hsk2ImageChoice('hsk2-1-l3', 3, '孩子们正在快乐地游泳呢。', 'A', { A: { text: '孩子游泳', file: 'sheet0-3.png' }, B: { text: '孩子玩耍', file: 'sheet2-3.png' }, C: { text: '孩子学习', file: 'sheet2-1.png' } }),
+    hsk2ImageChoice('hsk2-1-l4', 4, '朋友送给我两张电影票。', 'C', { A: { text: '钢笔', file: 'sheet3-2.png' }, B: { text: '手表', file: 'sheet3-3.png' }, C: { text: '电影票', file: 'sheet0-4.png' } }),
+    hsk2ImageChoice('hsk2-1-l5', 5, '您一不舒服就给我们打电话。', 'A', { A: { text: '医生检查病人', file: 'sheet1-6.png' }, B: { text: '超市买东西', file: 'sheet2-4.png' }, C: { text: '骑自行车', file: 'sheet4-1.png' } })
   ] }),
-  item('hsk2-1-listen-p2', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
-    sharedOptions: options(['人物与家人', '进商店', '买衣服', '介绍朋友', '出门', '使用电脑']),
-    items: [row('hsk2-1-l6', 6, '你们家谁个子最高？', 'E'), row('hsk2-1-l7', 7, '请进！先生，您几位？', 'B'), row('hsk2-1-l8', 8, '你知道哪儿卖衣服便宜吗？', 'A'), row('hsk2-1-l9', 9, '我来介绍一下，这是我最好的朋友。', 'C'), row('hsk2-1-l10', 10, '这么早就出门啊？', 'F'), row('hsk2-1-l11', 11, '你还是自己点吧。', 'A'), row('hsk2-1-l12', 12, '您要找的包是什么样的？', 'C'), row('hsk2-1-l13', 13, '就要下雨了，大家别踢了。', 'E'), row('hsk2-1-l14', 14, '你坐得离电脑太近了。', 'B'), row('hsk2-1-l15', 15, '妈妈不希望我花太多钱给孩子买衣服。', 'D')]
+  item('hsk2-1-listen-p2a', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
+    sharedOptions: hsk2ImageOptions({ A: { text: '在网上买东西', file: 'sheet3-2.png' }, B: { text: '在饭店吃饭', file: 'sheet3-6.png' }, C: { text: '介绍朋友', file: 'sheet3-1.png' }, D: { text: '踢足球', file: 'sheet3-5.png' }, E: { text: '一家人在一起', file: 'sheet0-6.png' }, F: { text: '跑步出门', file: 'sheet3-5.png' } }),
+    items: [row('hsk2-1-l6', 6, '你们家谁个子最高？', 'E'), row('hsk2-1-l7', 7, '请进！先生，您几位？', 'B'), row('hsk2-1-l8', 8, '你知道哪儿卖衣服便宜吗？', 'A'), row('hsk2-1-l9', 9, '我来介绍一下，这是我最好的朋友。', 'C'), row('hsk2-1-l10', 10, '这么早就出门啊？', 'F')]
+  }),
+  item('hsk2-1-listen-p2b', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
+    sharedOptions: hsk2ImageOptions({ A: { text: '在饭店点菜', file: 'sheet3-6.png' }, B: { text: '在电脑前学习', file: 'sheet3-2.png' }, C: { text: '有小鸟图案的包', file: 'sheet3-3.png' }, D: { text: '在商场买衣服', file: 'sheet4-2.png' }, E: { text: '踢足球', file: 'sheet3-5.png' } }),
+    items: [row('hsk2-1-l11', 11, '你还是自己点吧。', 'A'), row('hsk2-1-l12', 12, '您要找的包是什么样的？', 'C'), row('hsk2-1-l13', 13, '就要下雨了，大家别踢了。', 'E'), row('hsk2-1-l14', 14, '你坐得离电脑太近了，这样对眼睛不好。', 'B'), row('hsk2-1-l15', 15, '妈妈不希望我花太多钱给孩子买衣服。', 'D')]
   }),
   item('hsk2-1-listen-p3', 'listening_comprehension_choice', '第三部分：听短文和问题，选择正确答案。', { questions: [
-    textChoice('hsk2-1-l16', 16, '他们在哪儿？', 'C', ['机场', '地铁站', '公交车站']), textChoice('hsk2-1-l17', 17, '男的要做什么？', 'A', ['回北京', '介绍北京', '去北京旅游']), textChoice('hsk2-1-l18', 18, '名字写在哪儿？', 'C', ['本子上', '书包上', '桌子上']), textChoice('hsk2-1-l19', 19, '男的是怎么学会跳舞的？', 'C', ['老师教的', '朋友教的', '自己学的']), textChoice('hsk2-1-l20', 20, '今天星期几？', 'A', ['星期五', '星期六', '星期日']), textChoice('hsk2-1-l21', 21, '那家饭馆怎么样？', 'C', ['很新', '很远', '很好吃']), textChoice('hsk2-1-l22', 22, '电影几点开始？', 'C', ['六点', '六点半', '七点半']), textChoice('hsk2-1-l23', 23, '医生让女的做什么？', 'B', ['多吃肉', '多吃菜', '喝奶茶']), textChoice('hsk2-1-l24', 24, '男的怎么回家？', 'C', ['开车', '坐火车', '坐飞机']), textChoice('hsk2-1-l25', 25, '说话人哥哥的学校怎么样？', 'C', ['教室很大', '开学很晚', '学生很多'])
+    textChoice('hsk2-1-l16', 16, '他们在哪儿？', 'C', ['机场', '地铁站', '公交车站']), textChoice('hsk2-1-l17', 17, '男的要做什么？', 'A', ['去找朋友', '准备考试', '去上班']), textChoice('hsk2-1-l18', 18, '名字写在哪儿？', 'A', ['本子上', '书包上', '桌子上']), textChoice('hsk2-1-l19', 19, '男的是怎么学会跳舞的？', 'C', ['老师教的', '朋友教的', '跟着网上的音乐学的']), textChoice('hsk2-1-l20', 20, '今天星期几？', 'A', ['星期六', '星期五', '星期日']), textChoice('hsk2-1-l21', 21, '那家饭馆怎么样？', 'C', ['很新', '很远', '很好吃']), textChoice('hsk2-1-l22', 22, '电影几点开始？', 'C', ['六点', '六点半', '七点半']), textChoice('hsk2-1-l23', 23, '医生让女的做什么？', 'B', ['多喝咖啡', '多喝牛奶、多吃菜', '多喝奶茶']), textChoice('hsk2-1-l24', 24, '男的怎么回家？', 'C', ['开车', '坐火车', '坐飞机']), textChoice('hsk2-1-l25', 25, '说话人哥哥的学校怎么样？', 'C', ['教室很小', '学生很少', '学生很多'])
   ] })
 ];
 
 const hsk2Test2Listening: LessonItem[] = [
   item('hsk2-2-listen-p1', 'listening_image_choice', '第一部分：听句子，选择与句子相符的图片。', { items: [
-    imageChoice('hsk2-2-l1', 1, '老师，这个题我会做。', 'B', ['A', 'B', 'C']), imageChoice('hsk2-2-l2', 2, '大家在地铁上可以玩玩手机。', 'A', ['A', 'B', 'C']), imageChoice('hsk2-2-l3', 3, '有你帮忙，妈妈做得快多了。', 'A', ['A', 'B', 'C']), imageChoice('hsk2-2-l4', 4, '我太喜欢家门口这些花了。', 'C', ['A', 'B', 'C']), imageChoice('hsk2-2-l5', 5, '他们经常一起看电影。', 'C', ['A', 'B', 'C'])
+    hsk2ImageChoice('hsk2-2-l1', 1, '老师，这个题我会做。', 'B', { A: { text: '看电视', file: 'sheet2-1.png' }, B: { text: '在教室学习', file: 'sheet3-2.png' }, C: { text: '一个人学习', file: 'sheet4-2.png' } }),
+    hsk2ImageChoice('hsk2-2-l2', 2, '大家在地铁上可以玩玩手机、上上网。', 'A', { A: { text: '在地铁上看手机', file: 'sheet2-2.png' }, B: { text: '在办公室工作', file: 'sheet3-2.png' }, C: { text: '在地铁上看书', file: 'sheet4-1.png' } }),
+    hsk2ImageChoice('hsk2-2-l3', 3, '谢谢！有你帮忙，妈妈做得快多了。', 'A', { A: { text: '妈妈和孩子做饭', file: 'sheet2-3.png' }, B: { text: '骑自行车', file: 'sheet4-1.png' }, C: { text: '一起跑步', file: 'sheet3-5.png' } }),
+    hsk2ImageChoice('hsk2-2-l4', 4, '我太喜欢家门口这些花了。', 'C', { A: { text: '送花', file: 'sheet3-6.png' }, B: { text: '买花', file: 'sheet2-4.png' }, C: { text: '阳台上的花', file: 'sheet2-5.png' } }),
+    hsk2ImageChoice('hsk2-2-l5', 5, '他们经常一起看电影。', 'C', { A: { text: '在家聊天', file: 'sheet2-1.png' }, B: { text: '看书', file: 'sheet0-6.png' }, C: { text: '在电影院看电影', file: 'sheet2-4.png' } })
   ] }),
-  item('hsk2-2-listen-p2', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
-    sharedOptions: options(['慢慢走路', '家人过年', '地铁站', '下雪', '身体不舒服', '跳舞']),
-    items: [row('hsk2-2-l6', 6, '您慢一点儿，请坐这儿吧。', 'B'), row('hsk2-2-l7', 7, '和爸、妈，新年快乐！', 'F'), row('hsk2-2-l8', 8, '请问去地铁站怎么走？', 'A'), row('hsk2-2-l9', 9, '我们一起出去玩雪吧。', 'E'), row('hsk2-2-l10', 10, '你哪儿不舒服？', 'C'), row('hsk2-2-l11', 11, '她们几个谁跳得最好？', 'D'), row('hsk2-2-l12', 12, '不好意思，我晚十分钟到！', 'B'), row('hsk2-2-l13', 13, '你看见我的手表了吗？', 'C'), row('hsk2-2-l14', 14, '这是我第一次来这家饭店。', 'A'), row('hsk2-2-l15', 15, '她们两个是姐妹吗？', 'B')]
+  item('hsk2-2-listen-p2a', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
+    sharedOptions: hsk2ImageOptions({ A: { text: '在超市买东西', file: 'sheet2-4.png' }, B: { text: '在公交车上让座', file: 'sheet1-1.png' }, C: { text: '医生给病人检查', file: 'sheet1-6.png' }, D: { text: '踢足球', file: 'sheet3-5.png' }, E: { text: '在窗边看风景', file: 'sheet0-6.png' }, F: { text: '家人一起吃饭', file: 'sheet4-6.png' } }),
+    items: [row('hsk2-2-l6', 6, '您慢一点儿，请坐这儿吧。', 'B'), row('hsk2-2-l7', 7, '和爸、妈，新年快乐！', 'F'), row('hsk2-2-l8', 8, '请问去地铁站怎么走？', 'A'), row('hsk2-2-l9', 9, '我们一起出去玩雪吧。', 'E'), row('hsk2-2-l10', 10, '你哪儿不舒服？', 'C')]
+  }),
+  item('hsk2-2-listen-p2b', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
+    sharedOptions: hsk2ImageOptions({ A: { text: '在饭店看菜单', file: 'sheet3-6.png' }, B: { text: '雨天骑车', file: 'sheet4-1.png' }, C: { text: '包里的东西', file: 'sheet3-3.png' }, D: { text: '一起跳舞', file: 'sheet3-5.png' }, E: { text: '两个好朋友', file: 'sheet3-1.png' } }),
+    items: [row('hsk2-2-l11', 11, '她们几个谁跳得最好？', 'D'), row('hsk2-2-l12', 12, '不好意思，我晚十分钟到！', 'B'), row('hsk2-2-l13', 13, '你看见我的手表了吗？', 'C'), row('hsk2-2-l14', 14, '这是我第一次来这家饭店。', 'A'), row('hsk2-2-l15', 15, '她们两个是姐妹吗？', 'E')]
   }),
   item('hsk2-2-listen-p3', 'listening_comprehension_choice', '第三部分：听短文和问题，选择正确答案。', { questions: [
-    textChoice('hsk2-2-l16', 16, '他们在哪儿？', 'B', ['书店', '饭店', '花店']), textChoice('hsk2-2-l17', 17, '男的想做什么？', 'B', ['回北京', '介绍北京', '去北京旅游']), textChoice('hsk2-2-l18', 18, '女的要男的帮着做什么？', 'C', ['买东西', '找东西', '拿东西']), textChoice('hsk2-2-l19', 19, '女的不让男的做什么？', 'C', ['看时间', '看电脑', '看手机']), textChoice('hsk2-2-l20', 20, '女的现在在哪儿？', 'B', ['楼外边', '楼上边', '楼下边']), textChoice('hsk2-2-l21', 21, '男的怎么了？', 'A', ['生病了', '没药了', '家里有事']), textChoice('hsk2-2-l22', 22, '男的现在最可能在哪儿？', 'B', ['公司', '机场', '地铁站']), textChoice('hsk2-2-l23', 23, '女的让男的做什么？', 'A', ['做饭', '工作', '跟孩子玩']), textChoice('hsk2-2-l24', 24, '电影什么时候开始？', 'C', ['八点', '七点五十', '八点十分']), textChoice('hsk2-2-l25', 25, '奶奶正在忙什么？', 'C', ['准备回家', '买衣服', '做吃的'])
+    textChoice('hsk2-2-l16', 16, '他们在哪儿？', 'B', ['书店', '饭店', '花店']), textChoice('hsk2-2-l17', 17, '男的想做什么？', 'B', ['回北京', '去北京旅游', '介绍北京']), textChoice('hsk2-2-l18', 18, '女的要男的帮着做什么？', 'C', ['买东西', '找东西', '拿书包']), textChoice('hsk2-2-l19', 19, '女的不让男的做什么？', 'C', ['看时间', '看电脑', '看手机']), textChoice('hsk2-2-l20', 20, '女的现在在哪儿？', 'B', ['楼外边', '楼上边', '楼下边']), textChoice('hsk2-2-l21', 21, '男的怎么了？', 'A', ['生病了', '没药了', '家里有事']), textChoice('hsk2-2-l22', 22, '男的现在最可能在哪儿？', 'B', ['公司', '机场', '地铁站']), textChoice('hsk2-2-l23', 23, '女的让男的做什么？', 'A', ['做饭', '工作', '跟孩子玩']), textChoice('hsk2-2-l24', 24, '电影什么时候开始？', 'C', ['八点', '八点二十', '八点十分']), textChoice('hsk2-2-l25', 25, '奶奶正在忙什么？', 'A', ['准备过年的饭菜', '买衣服', '准备回家'])
   ] })
 ];
 
-const hsk2Reading = (id: string, second: boolean): LessonItem[] => [
-  item(`${id}-read-p1`, 'reading_shared_image_match', '第一部分：读句子，选择对应的图片。', {
-    sharedOptions: options(['人物活动', '地点', '食物', '衣服', '学习', '交通']),
-    items: (second ? [
-      ['今天下雪了。', 'E'], ['他在商场买东西。', 'C'], ['孩子正在看书。', 'F'], ['她穿着一件红色的衣服。', 'A'], ['我们坐地铁回家。', 'B']
-    ] : [
-      ['他正在看电视。', 'C'], ['她在商场买衣服。', 'E'], ['孩子在学校学习。', 'A'], ['桌子上有很多水果。', 'D'], ['他们坐飞机去北京。', 'B']
-    ]).map(([prompt, answer], index) => row(`${id}-r${26 + index}`, 26 + index, prompt, answer))
-  }),
-  item(`${id}-read-p2`, 'fill', '第二部分：选择词语填空。', {
-    wordBank: options(second ? ['因为', '所以', '过去', '试', '更', '过'] : ['进去', '条', '商场', '书包', '颜色', '件']),
-    items: (second ? [
-      ['我没吃过这种水果，我想试一下。', 'F'], ['因为今天天气不好，所以我们不去商场了。', 'A'], ['那边卖裤子，我们过去看看吧。', 'C'], ['绿色的很好看，我觉得黑色的更好看。', 'E'], ['我已经去过北京两次了。', 'D']
-    ] : [
-      ['我看见老师在里面，我们进去找她吧。', 'A'], ['我想买一条新裤子。', 'B'], ['这家商场是新开的。', 'C'], ['我的书包不见了。', 'D'], ['这件衣服什么颜色？', 'E']
-    ]).map(([prompt, answer], index) => row(`${id}-r${31 + index}`, 31 + index, prompt, answer))
-  }),
-  item(`${id}-read-p3`, 'sentence_matching', '第三部分：选择合适的回答。', {
-    answerBank: options(second ? ['快一点儿。', '我在下面等你。', '请坐一会儿。', '这是给你的礼物。', '我跟朋友回去。', '九点了，我们走吧。'] : ['好的，谢谢。', '我也觉得很好看。', '我在商场买的。', '因为今天下雨。', '你先进去吧。', '我昨天看过。']),
-    items: (second ? ['你快一点儿，我们要迟到了。', '我不上去，我在下面等你。', '请你坐一会儿，他马上就到。', '这是我给朋友准备的礼物。', '我跟朋友回家了。'] : ['这件衣服真漂亮。', '你为什么不去商场？', '你在哪里买的书包？', '你看过这部电影吗？', '请进来坐吧。']).map((prompt, index) => row(`${id}-r${36 + index}`, 36 + index, prompt, String.fromCharCode(65 + index)))
-  }),
-  item(`${id}-read-p3b`, 'sentence_matching', '第四部分：选择合适的回答。', {
-    answerBank: options(second ? ['快一点儿。', '我在下面等你。', '请坐一会儿。', '这是给你的礼物。', '我跟朋友回去。', '九点了，我们走吧。'] : ['好的，谢谢。', '我也觉得很好看。', '我在商场买的。', '因为今天下雨。', '你先进去吧。', '我昨天看过。']),
-    items: (second ? ['都九点了，我们快走吧。', '外边很冷，你们快进来吧。', '我在楼上，你上来找我吧。', '我在楼下，你下来吧。', '吃完饭，我跟朋友回去。'] : ['你喜欢什么颜色？', '你什么时候去的？', '你为什么没来？', '你先进去吧。', '你看过这本书吗？']).map((prompt, index) => row(`${id}-r${41 + index}`, 41 + index, prompt, String.fromCharCode(65 + index)))
-  }),
-  item(`${id}-read-p4`, 'reading_comprehension_choice', '第五部分：读短文和问题，选择正确答案。', { questions: (second ? [
-    ['小雪今天过生日，朋友送给她一个大蛋糕。', '她今天是什么日子？', 'B', ['生日', '考试', '旅行']], ['下班以后我想舒舒服服地睡一觉。', '说话人想做什么？', 'A', ['睡觉', '吃饭', '买衣服']], ['桌子上有苹果、香蕉什么的。', '桌子上有什么？', 'C', ['书', '衣服', '水果']], ['我不上去，我在下面等你。', '说话人在哪里？', 'B', ['楼上', '楼下', '商场']], ['都九点了，我们快走吧。', '现在几点？', 'C', ['八点', '八点半', '九点']]
-  ] : [
-    ['我喜欢绿色的衣服，因为绿色很好看。', '说话人喜欢什么颜色？', 'A', ['绿色', '黑色', '红色']], ['这家商场的东西很便宜。', '商场怎么样？', 'B', ['很远', '很便宜', '很小']], ['我第一次去中国朋友家，带了一件礼物。', '他带了什么？', 'C', ['书包', '蛋糕', '礼物']], ['她穿红色的很好看。', '她穿什么颜色好看？', 'A', ['红色', '白色', '黑色']], ['因为下雨，所以我们没有去商场。', '他们为什么没去商场？', 'B', ['太晚了', '下雨了', '没钱']]
-  ]).map(([text, question, answer, choices], index) => ({ ...row(`${id}-r${46 + index}`, 46 + index, `${text}\n${question}`, answer as string), options: options(choices as string[]) })) })
-];
+const hsk2Reading = (id: string, second: boolean): LessonItem[] => {
+  const imageBank = second ? { A: { text: '妈妈教孩子游泳', file: 'sheet5-1.png' }, B: { text: '熬夜睡觉', file: 'sheet5-2.png' }, C: { text: '老师给学生改作业', file: 'sheet5-3.png' }, D: { text: '打篮球', file: 'sheet5-4.png' }, E: { text: '妈妈安慰孩子', file: 'sheet5-5.png' }, F: { text: '在健身房跑步', file: 'sheet5-6.png' } } : { A: { text: '两个人在地铁站等车', file: 'sheet4-1.png' }, B: { text: '做饭', file: 'sheet2-3.png' }, C: { text: '坐公交车', file: 'sheet2-2.png' }, D: { text: '打篮球', file: 'sheet4-5.png' }, E: { text: '喝热茶', file: 'sheet0-1.png' }, F: { text: '在商场看衣服', file: 'sheet4-2.png' } };
+  const matching = (answers: string[], prompts: string[], start: number) => prompts.map((prompt, index) => row(`${id}-r${start + index}`, start + index, prompt, answers[index]));
+  return [
+    item(`${id}-read-p1`, 'reading_shared_image_match', '第一部分：读句子，选择对应的图片。', { sharedOptions: hsk2ImageOptions(imageBank), items: second ? matching(['E', 'C', 'F', 'A', 'B'], ['你怎么了？可以跟我说说吗？', '你看，这里是不是写错了？我没看懂。', '她喜欢听着歌做运动。', '我的游泳是妈妈教的。', '别睡那么晚，对身体不好。'], 26) : matching(['C', 'F', 'A', 'E', 'B'], ['请让一让好吗？我要下车。', '你想好买哪条裤子了吗？', '我们可以坐地铁去机场。', '天一冷，我就想喝杯热茶。', '做这个菜太花时间了，我们还是出去吃吧。'], 26) }),
+    item(`${id}-read-p2`, 'fill', '第二部分：选择词语填空。', { wordBank: options(second ? ['进去', '回去', '出来', '里面', '多', '前面'] : ['过', '次', '得', '的', '多', '但']), items: second ? matching(['B', 'C', 'D', 'A', 'F'], ['喂，我现在有事，一会儿给你打（ ）好吗？', '她弟弟已经上中学了，我一开始都没认（ ）。', '我爱看书，因为书（ ）有很多好玩儿的东西。', '快（ ）吧，外面太冷了。', '开车的时候，看好（ ）的路。'], 31) : matching(['D', 'B', 'A', 'F', 'C'], ['她是昨天下午去（ ）医院。', '这个药一天吃三（ ）。', '你出（ ）国吗？', '这家商场不大，（ ）东西很多。', '孩子们笑（ ）真好看。'], 31) }),
+    item(`${id}-read-p3`, 'sentence_matching', '第三部分：选择合适的回答。', { answerBank: options(second ? ['你买到回家的机票了吗？', '小林画的画儿真漂亮啊！', '我们什么时候再见面啊？', '我们今晚去KTV唱歌，你也一起去吧。', '李老师在哪儿？你看见他了吗？', '站在他右边的那位女士是谁啊？'] : ['你什么时候过生日啊？', '我站的时间太长了，好累啊！', '你学了多长时间汉语了？', '你能帮我买杯奶茶吗？', '李老师在哪儿？你看见他了吗？', '不工作的时候，你都做什么？']), items: second ? matching(['D', 'B', 'C', 'A', 'F'], ['我也想去啊，但是明天有考试。', '是啊，比去年画得好多了。', '很快，我一开学就去找你。', '还没，正想着要不要坐火车呢。', '我也不认识，可能是他妻子吧。'], 36) : matching(['A', 'F', 'D', 'B', 'C'], ['还有半个月呢。', '有时候跟朋友一起喝喝咖啡、看看电影。', '我已经买了，正在回去的路上呢。', '那快坐下休息休息吧。', '我从两个月前开始学的。'], 36) }),
+    item(`${id}-read-p3b`, 'sentence_matching', '第四部分：选择合适的回答。', { answerBank: options(second ? ['这苹果怎么买啊？', '请进，你找我有什么事？', '怎么没见你用新书包了啊？', '您来杯咖啡还是奶茶？', '自己的事情自己做。'] : ['先生，您觉得这件怎么样？', '请问去地铁站怎么走？', '您好，是您叫的出租车吗？', '你什么时候回北京？', '你新买的那本书好看吗？']), items: second ? matching(['E', 'D', 'B', 'A', 'C'], ['知道了，不用你帮忙。', '有热牛奶吗？', '我听了您的课，想问您几个问题。', '便宜了，十块钱都给你了。', '就用了一次，我不太喜欢那个颜色。'], 41) : matching(['D', 'E', 'B', 'C', 'A'], ['不好说，等忙完这边的工作吧。', '太有意思了，我已经看完了。', '从这条路往东走，十分钟就到了。', '对，我去黄河高中南门。', '穿着没上一件舒服呢。'], 41) }),
+    item(`${id}-read-p4`, 'reading_comprehension_choice', '第五部分：读短文和问题，选择正确答案。', { questions: (second ? [['他就住在学校旁边，离得比我近多了。\n“我”家：', 'C', ['在学校旁边', '离学校很近', '离学校很远']], ['这个药一天吃三次，每次一包。\n这个药：', 'C', ['每天吃一次', '每天吃一包', '一次吃一包']], ['看她们笑得！什么事情这么有意思？\n她们：', 'A', ['很高兴', '没事做', '没意思']], ['虽然王先生有时候人不在公司，但工作没少做。\n王先生：', 'C', ['不爱工作', '经常不上班', '有时不去公司']], ['奶奶一回家就开始忙着准备过年的东西。\n奶奶：', 'A', ['在准备过年', '工作很忙', '过年不回家']]] : [['我爱跳舞，但跳得不太好。\n他：', 'B', ['下课了', '喜欢跳舞', '是小学生']], ['每次妈妈一包饺子，我就去帮忙。\n妈妈包饺子的时候，“我”：', 'B', ['做作业', '跟妈妈一起包', '准备吃']], ['从小爷爷就告诉我：做错事情的时候，要说“对不起”。\n爷爷：', 'C', ['经常做错事情', '不爱说“对不起”', '教我说“对不起”']], ['这一周都是阴天，我们等天晴了再去游泳吧。\n他们可能：', 'C', ['喜欢阴天', '喜欢晴天', '下周游泳']], ['我怎么每次见他，他都在看书？\n他的爱好是：', 'B', ['见我', '看书', '买书']]]).map(([prompt, answer, choices], index) => ({ ...row(`${id}-r${46 + index}`, 46 + index, prompt as string, answer as string), options: options(choices as string[]) })) })
+  ];
+};
 
 const hsk2Writing = (id: string, second: boolean): Pick<ExamLesson, 'fillQuestions' | 'essayQuestions'> => ({
-  fillQuestions: (second ? ['一', '过', '常', '叫', '字'] : ['曲', '胡', '年', '笔', '进']).map((answer, index) => ({ id: `${id}-w${51 + index}`, type: 'fill', prompt: `第${51 + index}题：听写/看图写出汉字。`, acceptableAnswers: answer })),
-  essayQuestions: (second ? ['我每天早上七点起床。', '我和朋友一起去商场。', '生日那天大家都很快乐。', '我喜欢吃鱼和肉。', '请写一句使用“什么的”的句子。'] : ['我想买一条新裤子。', '我喜欢绿色，因为绿色很好看。', '我第一次去中国朋友家。', '这是给朋友准备的礼物。', '请写一句使用“因为……所以……”的句子。']).map((suggestedAnswer, index) => ({ id: `${id}-w${56 + index}`, type: 'essay', prompt: `第${56 + index}题：请写一句完整的汉语句子。`, suggestedAnswer }))
+  fillQuestions: (second ? [['第51题：请写出“过来”中缺少的汉字部件。', '寸'], ['第52题：请写出“爸爸”中缺少的汉字部件。', '巴'], ['第53题：请写出“工作”中缺少的汉字部件。', '乍'], ['第54题：请写出“我们”中缺少的汉字部件。', '门'], ['第55题：请写出“打球”中缺少的汉字部件。', '丁'], ['第56题：请问，这里有人教汉（ ）吗？', '语'], ['第57题：过年了，很多人喜欢去（ ）旅游。', '国'], ['第58题：快走吧，别让人等你太（ ）时间。', '长'], ['第59题：你能告诉我他（ ）什么名字吗？', '叫'], ['第60题：不好意思，你名字里面的这个（ ）怎么读啊？', '字']] : [['第51题：男生中缺少的汉字部件是什么？', '田'], ['第52题：几岁中缺少的汉字部件是什么？', '夕'], ['第53题：汉字中缺少的汉字部件是什么？', '又'], ['第54题：现在中缺少的汉字部件是什么？', '见'], ['第55题：姐妹中缺少的汉字部件是什么？', '且'], ['第56题：这（ ）天下雪，路上不好走。', '两'], ['第57题：那是我（ ），要不要认识一下？', '哥'], ['第58题：过（ ）的时候，我们一家人要去旅游。', '年'], ['第59题：和玩手机（ ），学习很累，但很有意思。', '比'], ['第60题：（ ）天李老师身体不舒服，不能来上课了。', '今']]).map(([prompt, answer], index) => ({ id: `${id}-w${51 + index}`, type: 'fill' as const, prompt, acceptableAnswers: answer })),
+  essayQuestions: []
 });
 
 const makeHsk2 = (number: 1 | 2): ExamLesson => {
@@ -91,16 +94,7 @@ const makeHsk2 = (number: 1 | 2): ExamLesson => {
   const listening = number === 1 ? hsk2Test1Listening : hsk2Test2Listening;
   const reading = hsk2Reading(id, number === 2);
   const writing = hsk2Writing(id, number === 2);
-  return {
-    id, title: `HSK 2 (3.0) - Đề thi thử số ${number}`, level: 'HSK 2',
-    description: `Đề thi thử HSK2 (3.0) theo PDF gốc, gồm 60 câu nghe, đọc và viết. Audio dùng chung đặt ở đầu phần nghe.`,
-    timeLimitEnabled: true, timeLimitMinutes: 60, mcQuestions: [], fillQuestions: writing.fillQuestions, arrangeQuestions: [], readingPassages: [], listeningQuestions: [], essayQuestions: writing.essayQuestions, speakingQuestions: [], translationQuestions: [], handwritingQuestions: [],
-    sections: [
-      audioSection(`${id}-listening`, 'Phần 1 · 听力 · Nghe (25 câu)', `/audio/hsk2_mock_0${number}.mp3`, listening),
-      { id: `${id}-reading`, title: 'Phần 2 · 阅读 · Đọc (25 câu)', items: reading },
-      { id: `${id}-writing`, title: 'Phần 3 · 写作 · Viết (10 câu · tự luận)', items: [] }
-    ]
-  };
+  return { id, title: `HSK 2 (3.0) - Đề thi thử số ${number}`, level: 'HSK 2', description: 'Đề thi thử HSK2 (3.0) theo PDF gốc: 60 câu (25 nghe, 25 đọc, 10 viết). Audio dùng chung đặt ở đầu phần nghe.', timeLimitEnabled: true, timeLimitMinutes: 60, mcQuestions: [], fillQuestions: writing.fillQuestions, arrangeQuestions: [], readingPassages: [], listeningQuestions: [], essayQuestions: writing.essayQuestions, speakingQuestions: [], translationQuestions: [], handwritingQuestions: [], sections: [audioSection(`${id}-listening`, 'Phần 1 · 听力 · Nghe (25 câu)', `/audio/hsk2_mock_0${number}.mp3`, listening), { id: `${id}-reading`, title: 'Phần 2 · 阅读 · Đọc (25 câu)', items: reading }, { id: `${id}-writing`, title: 'Phần 3 · 书写 · Viết (10 câu)', items: [] }] };
 };
 
 const HSK3_MOCK_IMAGE_ROOT = '/images/hsk3-mock-colored';

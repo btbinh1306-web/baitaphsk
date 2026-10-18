@@ -391,7 +391,7 @@ function OptionCard({
           {option.id}
         </span>
         <span className="min-w-0">
-          {option.text && <span className={`block text-sm font-semibold ${selected && !status ? 'text-white' : 'text-slate-900'}`}>{option.text}</span>}
+          {!option.image && option.text && <span className={`block text-sm font-semibold ${selected && !status ? 'text-white' : 'text-slate-900'}`}>{option.text}</span>}
           {showPinyin && option.pinyin && <span className={`block text-xs leading-5 font-medium mt-0.5 ${selected && !status ? 'text-emerald-50' : 'text-indigo-600/90'}`}>{option.pinyin}</span>}
         </span>
       </div>
