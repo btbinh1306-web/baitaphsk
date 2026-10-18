@@ -424,7 +424,7 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
                 )}
 
                 {subjectiveQuestion || fillQuestion || orderingQuestion ? null : item.options && item.options.length > 0 ? (
-                  <div className={`mt-3 grid gap-2 ${item.options.length >= 3 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                  <div className="mt-3 grid grid-cols-1 gap-2">
                     {item.options.map((option, optionIndex) => {
                       const selected = exactAnswerMatches(userAnswer, option);
                       const correct = exactAnswerMatches(correctAnswer, option);
