@@ -132,7 +132,7 @@ function ExampleChoiceCards({
                 <img src={getDriveMediaPlayerUrl(option.image)} alt={option.alt || `Đáp án ví dụ ${option.id}`} className="h-full w-full object-contain" />
               </div>
             )}
-            <p className="mt-1 text-sm font-bold">{option.id}{option.text ? (option.id === '✓' || option.id === '×' ? ` ${option.text}` : `. ${option.text}`) : ''}</p>
+            <p className="mt-1 text-sm font-bold">{option.image ? option.id : `${option.id}${option.text ? `. ${option.text}` : ''}`}</p>
             {showPinyin && option.pinyin && <p className="text-xs leading-5 font-medium text-indigo-600/90">{option.pinyin}</p>}
             {isCorrect && <p className="mt-1 text-xs font-extrabold text-emerald-800">✓ Đáp án đúng</p>}
           </div>
@@ -515,7 +515,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                       />
                     </div>
                   )}
-                  <p className="text-sm font-bold text-slate-900">{option.id}. {option.text}</p>
+                  <p className="text-sm font-bold text-slate-900">{option.image ? option.id : `${option.id}${option.text ? `. ${option.text}` : ''}`}</p>
                   {showPinyin && option.pinyin && <p className="text-xs leading-5 font-medium text-indigo-600/90">{option.pinyin}</p>}
                 </div>
               ))}
