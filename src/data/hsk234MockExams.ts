@@ -103,12 +103,12 @@ const makeHsk2 = (number: 1 | 2): ExamLesson => {
   };
 };
 
-const HSK3_MOCK_IMAGE_ROOT = '/images/hsk3-mock';
+const HSK3_MOCK_IMAGE_ROOT = '/images/hsk3-mock-colored';
 
 const hsk3ImageOptions = (group: string, descriptions: Record<string, string>): Option[] => Object.entries(descriptions).map(([id, text]) => ({
   id,
   text,
-  image: `${HSK3_MOCK_IMAGE_ROOT}/${group}-${id}.jpg`,
+  image: `${HSK3_MOCK_IMAGE_ROOT}/${group}-${id}.png`,
   alt: text
 }));
 
@@ -316,18 +316,18 @@ const hsk3Writing = (id: string, number: 1 | 2): Pick<ExamLesson, 'fillQuestions
     ]).map(([prompt, answer], index) => ({ id: `${id}-w${61 + index}`, type: 'fill' as const, prompt: `第${61 + index}题：${prompt}`, acceptableAnswers: answer }));
   const essayQuestions = (first
     ? [
-      ['看图，用“电话”造句。', '她在给妈妈打电话。', '01-writing-66.jpg'],
-      ['看图，用“聊天儿”造句。', '她正在和朋友聊天儿。', '01-writing-67.jpg'],
-      ['看图，用“环境”造句。', '这家咖啡店的环境很好。', '01-writing-68.jpg'],
-      ['看图，用“洗衣机”造句。', '妈妈每个周末都用洗衣机洗衣服。', '01-writing-69.jpg'],
-      ['看图，用“放学”造句。', '放学后，男孩儿自己回家。', '01-writing-70.jpg']
+      ['看图，用“电话”造句。', '她在给妈妈打电话。', '01-writing-66.png'],
+      ['看图，用“聊天儿”造句。', '她正在和朋友聊天儿。', '01-writing-67.png'],
+      ['看图，用“环境”造句。', '这家咖啡店的环境很好。', '01-writing-68.png'],
+      ['看图，用“洗衣机”造句。', '妈妈每个周末都用洗衣机洗衣服。', '01-writing-69.png'],
+      ['看图，用“放学”造句。', '放学后，男孩儿自己回家。', '01-writing-70.png']
     ]
     : [
-      ['看图，用“检票”造句。', '上火车前要先检票。', '02-writing-66.jpg'],
-      ['看图，用“假期”造句。', '假期里，我和朋友去旅游。', '02-writing-67.jpg'],
-      ['看图，用“信用卡”造句。', '我办了一张信用卡。', '02-writing-68.jpg'],
-      ['看图，用“经过”造句。', '我放学回家的时候会经过一家水果店。', '02-writing-69.jpg'],
-      ['看图，用“干净”造句。', '房间里打扫得很干净。', '02-writing-70.jpg']
+      ['看图，用“检票”造句。', '上火车前要先检票。', '02-writing-66.png'],
+      ['看图，用“假期”造句。', '假期里，我和朋友去旅游。', '02-writing-67.png'],
+      ['看图，用“信用卡”造句。', '我办了一张信用卡。', '02-writing-68.png'],
+      ['看图，用“经过”造句。', '我放学回家的时候会经过一家水果店。', '02-writing-69.png'],
+      ['看图，用“干净”造句。', '房间里打扫得很干净。', '02-writing-70.png']
     ]).map(([prompt, suggestedAnswer, imageName], index) => ({
       id: `${id}-w${66 + index}`,
       type: 'essay' as const,
