@@ -32,9 +32,9 @@ const hsk2ImageChoice = (id: string, number: number, prompt: string, answer: str
 
 const hsk2Test1Listening: LessonItem[] = [
   item('hsk2-1-listen-p1', 'listening_image_choice', '第一部分：听句子，选择与句子相符的图片。', { items: [
-    hsk2ImageChoice('hsk2-1-l1', 1, '别忘了你的咖啡。', 'C', { A: { text: '两个人散步', file: 'sheet1-1.png' }, B: { text: '递东西', file: 'sheet3-1.png' }, C: { text: '拿着咖啡', file: 'hot-tea.png' } }),
-    hsk2ImageChoice('hsk2-1-l2', 2, '她的头有点儿疼。', 'B', { A: { text: '肚子疼', file: 'sheet1-6.png' }, B: { text: '头疼', file: 'sheet0-2.png' }, C: { text: '牙疼', file: 'sheet1-5.png' } }),
-    hsk2ImageChoice('hsk2-1-l3', 3, '孩子们正在快乐地游泳呢。', 'A', { A: { text: '孩子游泳', file: 'sheet0-3.png' }, B: { text: '孩子玩耍', file: 'sheet2-3.png' }, C: { text: '孩子学习', file: 'sheet2-1.png' } }),
+    hsk2ImageChoice('hsk2-1-l1', 1, '别忘了你的咖啡。', 'C', { A: { text: '两个人散步', file: 'walk-together.png' }, B: { text: '递东西', file: 'give-gift.png' }, C: { text: '拿着咖啡', file: 'hot-tea.png' } }),
+    hsk2ImageChoice('hsk2-1-l2', 2, '她的头有点儿疼。', 'B', { A: { text: '肚子疼', file: 'stomach-pain.png' }, B: { text: '头疼', file: 'sheet0-2.png' }, C: { text: '牙疼', file: 'tooth-pain.png' } }),
+    hsk2ImageChoice('hsk2-1-l3', 3, '孩子们正在快乐地游泳呢。', 'A', { A: { text: '孩子游泳', file: 'sheet0-3.png' }, B: { text: '孩子玩耍', file: 'children-playing.png' }, C: { text: '孩子学习', file: 'child-studying.png' } }),
     hsk2ImageChoice('hsk2-1-l4', 4, '朋友送给我两张电影票。', 'C', { A: { text: '钢笔', file: 'sheet3-2.png' }, B: { text: '手表', file: 'sheet3-3.png' }, C: { text: '电影票', file: 'sheet0-4.png' } }),
     hsk2ImageChoice('hsk2-1-l5', 5, '您一不舒服就给我们打电话。', 'A', { A: { text: '医生检查病人', file: 'sheet1-6.png' }, B: { text: '超市买东西', file: 'sheet2-4.png' }, C: { text: '骑自行车', file: 'sheet4-1.png' } })
   ] }),
