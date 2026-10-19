@@ -10,6 +10,7 @@ import { HSK1_MOCK_02_EXAM } from './hsk1Mock02';
 import { HSK1_ENTRANCE_EXAM } from './hsk1EntranceTest';
 import { HSK1_AGGREGATE_BAI1_TO_5_EXAM } from './hsk1AggregateBai1To5';
 import { HSK234_MOCK_EXAMS } from './hsk234MockExams';
+import { HSK5_MOCK_EXAMS } from './hsk5MockExams';
 import { HSK3_BAI1_AIRPORT_EXAM } from './hsk3Bai1Airport';
 import { HSK6_YUBING_EXAMS } from './hsk6Yubing';
 import { PINYIN_PRACTICE_EXAM } from './pinyinPractice';
@@ -151,6 +152,7 @@ const SAMPLE_EXAMS_WITH_LOCAL_AUDIO: ExamLesson[] = [
   HSK1_PDF_TRIAL_01_EXAM,
   HSK1_PDF_TRIAL_02_EXAM,
   ...HSK234_MOCK_EXAMS,
+  ...HSK5_MOCK_EXAMS,
   HSK3_BAI1_AIRPORT_EXAM,
   ...HSK6_YUBING_EXAMS,
   PINYIN_PRACTICE_EXAM,
