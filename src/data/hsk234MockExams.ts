@@ -32,7 +32,7 @@ const hsk2ImageChoice = (id: string, number: number, prompt: string, answer: str
 
 const hsk2Test1Listening: LessonItem[] = [
   item('hsk2-1-listen-p1', 'listening_image_choice', '第一部分：听句子，选择与句子相符的图片。', { items: [
-    hsk2ImageChoice('hsk2-1-l1', 1, '别忘了你的咖啡。', 'C', { A: { text: '两个人散步', file: 'sheet1-1.png' }, B: { text: '递东西', file: 'sheet3-1.png' }, C: { text: '拿着咖啡', file: 'sheet0-1.png' } }),
+    hsk2ImageChoice('hsk2-1-l1', 1, '别忘了你的咖啡。', 'C', { A: { text: '两个人散步', file: 'sheet1-1.png' }, B: { text: '递东西', file: 'sheet3-1.png' }, C: { text: '拿着咖啡', file: 'hot-tea.png' } }),
     hsk2ImageChoice('hsk2-1-l2', 2, '她的头有点儿疼。', 'B', { A: { text: '肚子疼', file: 'sheet1-6.png' }, B: { text: '头疼', file: 'sheet0-2.png' }, C: { text: '牙疼', file: 'sheet1-5.png' } }),
     hsk2ImageChoice('hsk2-1-l3', 3, '孩子们正在快乐地游泳呢。', 'A', { A: { text: '孩子游泳', file: 'sheet0-3.png' }, B: { text: '孩子玩耍', file: 'sheet2-3.png' }, C: { text: '孩子学习', file: 'sheet2-1.png' } }),
     hsk2ImageChoice('hsk2-1-l4', 4, '朋友送给我两张电影票。', 'C', { A: { text: '钢笔', file: 'sheet3-2.png' }, B: { text: '手表', file: 'sheet3-3.png' }, C: { text: '电影票', file: 'sheet0-4.png' } }),
@@ -43,7 +43,7 @@ const hsk2Test1Listening: LessonItem[] = [
     items: [row('hsk2-1-l6', 6, '你们家谁个子最高？', 'E'), row('hsk2-1-l7', 7, '请进！先生，您几位？', 'B'), row('hsk2-1-l8', 8, '你知道哪儿卖衣服便宜吗？', 'A'), row('hsk2-1-l9', 9, '我来介绍一下，这是我最好的朋友。', 'C'), row('hsk2-1-l10', 10, '这么早就出门啊？', 'F')]
   }),
   item('hsk2-1-listen-p2b', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
-    sharedOptions: hsk2ImageOptions({ A: { text: '在饭店点菜', file: 'sheet3-6.png' }, B: { text: '在电脑前学习', file: 'sheet3-2.png' }, C: { text: '有小鸟图案的包', file: 'sheet3-3.png' }, D: { text: '在商场买衣服', file: 'sheet4-2.png' }, E: { text: '踢足球', file: 'sheet3-5.png' } }),
+    sharedOptions: hsk2ImageOptions({ A: { text: '在饭店点菜', file: 'sheet3-6.png' }, B: { text: '在电脑前学习', file: 'sheet3-2.png' }, C: { text: '有小鸟图案的包', file: 'sheet3-3.png' }, D: { text: '在商场买衣服', file: 'clothes-shopping.png' }, E: { text: '踢足球', file: 'sheet3-5.png' } }),
     items: [row('hsk2-1-l11', 11, '你还是自己点吧。', 'A'), row('hsk2-1-l12', 12, '您要找的包是什么样的？', 'C'), row('hsk2-1-l13', 13, '就要下雨了，大家别踢了。', 'E'), row('hsk2-1-l14', 14, '你坐得离电脑太近了，这样对眼睛不好。', 'B'), row('hsk2-1-l15', 15, '妈妈不希望我花太多钱给孩子买衣服。', 'D')]
   }),
   item('hsk2-1-listen-p3', 'listening_comprehension_choice', '第三部分：听短文和问题，选择正确答案。', { questions: [
@@ -55,12 +55,12 @@ const hsk2Test2Listening: LessonItem[] = [
   item('hsk2-2-listen-p1', 'listening_image_choice', '第一部分：听句子，选择与句子相符的图片。', { items: [
     hsk2ImageChoice('hsk2-2-l1', 1, '老师，这个题我会做。', 'B', { A: { text: '看电视', file: 'sheet2-1.png' }, B: { text: '在教室学习', file: 'sheet3-2.png' }, C: { text: '一个人学习', file: 'sheet4-2.png' } }),
     hsk2ImageChoice('hsk2-2-l2', 2, '大家在地铁上可以玩玩手机、上上网。', 'A', { A: { text: '在地铁上看手机', file: 'sheet2-2.png' }, B: { text: '在办公室工作', file: 'sheet3-2.png' }, C: { text: '在地铁上看书', file: 'sheet4-1.png' } }),
-    hsk2ImageChoice('hsk2-2-l3', 3, '谢谢！有你帮忙，妈妈做得快多了。', 'A', { A: { text: '妈妈和孩子做饭', file: 'sheet2-3.png' }, B: { text: '骑自行车', file: 'sheet4-1.png' }, C: { text: '一起跑步', file: 'sheet3-5.png' } }),
+    hsk2ImageChoice('hsk2-2-l3', 3, '谢谢！有你帮忙，妈妈做得快多了。', 'A', { A: { text: '妈妈和孩子做饭', file: 'cook-together.png' }, B: { text: '骑自行车', file: 'sheet4-1.png' }, C: { text: '一起跑步', file: 'sheet3-5.png' } }),
     hsk2ImageChoice('hsk2-2-l4', 4, '我太喜欢家门口这些花了。', 'C', { A: { text: '送花', file: 'sheet3-6.png' }, B: { text: '买花', file: 'sheet2-4.png' }, C: { text: '阳台上的花', file: 'sheet2-5.png' } }),
     hsk2ImageChoice('hsk2-2-l5', 5, '他们经常一起看电影。', 'C', { A: { text: '在家聊天', file: 'sheet2-1.png' }, B: { text: '看书', file: 'sheet0-6.png' }, C: { text: '在电影院看电影', file: 'sheet2-4.png' } })
   ] }),
   item('hsk2-2-listen-p2a', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
-    sharedOptions: hsk2ImageOptions({ A: { text: '在超市买东西', file: 'sheet2-4.png' }, B: { text: '在公交车上让座', file: 'sheet1-1.png' }, C: { text: '医生给病人检查', file: 'sheet1-6.png' }, D: { text: '踢足球', file: 'sheet3-5.png' }, E: { text: '在窗边看风景', file: 'sheet0-6.png' }, F: { text: '家人一起吃饭', file: 'sheet4-6.png' } }),
+    sharedOptions: hsk2ImageOptions({ A: { text: '在超市买东西', file: 'sheet2-4.png' }, B: { text: '在公交车上让座', file: 'bus-give-seat.png' }, C: { text: '医生给病人检查', file: 'sheet1-6.png' }, D: { text: '踢足球', file: 'sheet3-5.png' }, E: { text: '在窗边看风景', file: 'sheet0-6.png' }, F: { text: '家人一起吃饭', file: 'sheet4-6.png' } }),
     items: [row('hsk2-2-l6', 6, '您慢一点儿，请坐这儿吧。', 'B'), row('hsk2-2-l7', 7, '和爸、妈，新年快乐！', 'F'), row('hsk2-2-l8', 8, '请问去地铁站怎么走？', 'A'), row('hsk2-2-l9', 9, '我们一起出去玩雪吧。', 'E'), row('hsk2-2-l10', 10, '你哪儿不舒服？', 'C')]
   }),
   item('hsk2-2-listen-p2b', 'listening_shared_image_match', '第二部分：听对话，选择正确的图片。', {
@@ -73,7 +73,7 @@ const hsk2Test2Listening: LessonItem[] = [
 ];
 
 const hsk2Reading = (id: string, second: boolean): LessonItem[] => {
-  const imageBank = second ? { A: { text: '妈妈教孩子游泳', file: 'sheet5-1.png' }, B: { text: '熬夜睡觉', file: 'sheet5-2.png' }, C: { text: '老师给学生改作业', file: 'sheet5-3.png' }, D: { text: '打篮球', file: 'sheet5-4.png' }, E: { text: '妈妈安慰孩子', file: 'sheet5-5.png' }, F: { text: '在健身房跑步', file: 'sheet5-6.png' } } : { A: { text: '两个人在地铁站等车', file: 'sheet4-1.png' }, B: { text: '做饭', file: 'sheet2-3.png' }, C: { text: '坐公交车', file: 'sheet2-2.png' }, D: { text: '打篮球', file: 'sheet4-5.png' }, E: { text: '喝热茶', file: 'sheet0-1.png' }, F: { text: '在商场看衣服', file: 'sheet4-2.png' } };
+  const imageBank = second ? { A: { text: '妈妈教孩子游泳', file: 'sheet5-1.png' }, B: { text: '熬夜睡觉', file: 'sheet5-2.png' }, C: { text: '老师给学生改作业', file: 'sheet5-3.png' }, D: { text: '打篮球', file: 'basketball.png' }, E: { text: '妈妈安慰孩子', file: 'sheet5-5.png' }, F: { text: '在健身房跑步', file: 'sheet5-6.png' } } : { A: { text: '两个人在地铁站等车', file: 'metro-wait.png' }, B: { text: '做饭', file: 'cook-together.png' }, C: { text: '坐公交车', file: 'bus-give-seat.png' }, D: { text: '打篮球', file: 'basketball.png' }, E: { text: '喝热茶', file: 'hot-tea.png' }, F: { text: '在商场看衣服', file: 'clothes-shopping.png' } };
   const matching = (answers: string[], prompts: string[], start: number) => prompts.map((prompt, index) => row(`${id}-r${start + index}`, start + index, prompt, answers[index]));
   return [
     item(`${id}-read-p1`, 'reading_shared_image_match', '第一部分：读句子，选择对应的图片。', { sharedOptions: hsk2ImageOptions(imageBank), items: second ? matching(['E', 'C', 'F', 'A', 'B'], ['你怎么了？可以跟我说说吗？', '你看，这里是不是写错了？我没看懂。', '她喜欢听着歌做运动。', '我的游泳是妈妈教的。', '别睡那么晚，对身体不好。'], 26) : matching(['C', 'F', 'A', 'E', 'B'], ['请让一让好吗？我要下车。', '你想好买哪条裤子了吗？', '我们可以坐地铁去机场。', '天一冷，我就想喝杯热茶。', '做这个菜太花时间了，我们还是出去吃吧。'], 26) }),
