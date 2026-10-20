@@ -2,6 +2,10 @@
  * Utility functions for handling audio URLs, Base64 audio, and Google Drive audio links.
  */
 
+const DEFAULT_MEDIA_BASE_URL = 'https://raw.githubusercontent.com/btbinh1306-web/phattrienwweb/main/public';
+const configuredMediaBaseUrl = import.meta.env.VITE_MEDIA_BASE_URL as string | undefined;
+const mediaBaseUrl = (configuredMediaBaseUrl || DEFAULT_MEDIA_BASE_URL).replace(/\/+$/, '');
+
 const getActualUrl = (rawLink: string): string => {
   if (!rawLink) return '';
   const trimmed = rawLink.trim();
@@ -14,6 +18,16 @@ const getActualUrl = (rawLink: string): string => {
   // Extract URL from string if embedded in text like "Câu 1: https://..."
   const urlMatch = trimmed.match(/https?:\/\/[^\s"']+/);
   return urlMatch ? urlMatch[0] : trimmed;
+};
+
+const isHostedMediaPath = (value: string): boolean => /^\/(?:audio(?:\/|_[^/]+\.(?:mp3|wav|ogg|m4a|webm)$)|images\/|assets\/)/i.test(value);
+
+/** Maps bundled public media to the public GitHub repository while keeping external/data URLs unchanged. */
+export const getHostedMediaUrl = (rawLink: string): string => {
+  if (!rawLink) return '';
+  const trimmed = rawLink.trim();
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || /^https?:\/\//i.test(trimmed)) return trimmed;
+  return isHostedMediaPath(trimmed) ? `${mediaBaseUrl}${trimmed}` : trimmed;
 };
 
 /** Keeps labels such as "Câu 22: ..." intact when a Sheet stores "label: URL". */
@@ -57,7 +71,7 @@ export const getDriveMediaPlayerUrl = (rawLink: string): string => {
     return getDriveProxyUrl(fileId, resourceKey, 'image');
   }
 
-  return actualUrl;
+  return getHostedMediaUrl(actualUrl);
 };
 
 /** Returns a same-origin media URL used by HTML5 audio players. */
@@ -72,7 +86,7 @@ export const getDriveAudioPlayerUrl = (rawLink: string): string => {
     return getDriveProxyUrl(fileId, resourceKey, 'audio');
   }
 
-  return actualUrl;
+  return getHostedMediaUrl(actualUrl);
 };
 
 /**

@@ -528,7 +528,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
         {data.exampleImages.map((value, index) => {
           const example = value as { image: string; text: string };
           return <figure key={index} className="min-w-0 rounded-lg border p-2 sm:p-3">
-            <img src={example.image} alt={`Ví dụ câu ${index + 1}`} className="h-24 w-full object-contain sm:h-28" />
+            <img src={getDriveMediaPlayerUrl(example.image)} alt={`Ví dụ câu ${index + 1}`} className="h-24 w-full object-contain sm:h-28" />
             <figcaption className="mt-2 flex items-center justify-center gap-1 text-center text-sm font-semibold text-slate-800">
               <span>Ví dụ: Câu {index + 1}</span>
               <span aria-label={`Đáp án ví dụ ${example.text}`}>{example.text}</span>
