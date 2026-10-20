@@ -785,6 +785,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     });
   };
 
+  const handleArrangeChoice = (qId: string, chip: string) => {
+    setArrangeAnswers((prev) => ({ ...prev, [qId]: [chip] }));
+  };
+
   const handleResetArrange = (qId: string) => {
     setArrangeAnswers((prev) => ({ ...prev, [qId]: [] }));
   };
@@ -1862,13 +1866,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 3: INTERACTIVE SENTENCE ARRANGEMENT */}
             {currentExam.arrangeQuestions && currentExam.arrangeQuestions.length > 0 && (
+              (() => {
+                const isParagraphArrange = currentExam.level === 'HSK 5';
+                return (
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-sm">
                       3
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">Sắp Xếp Thẻ Từ Thành Câu</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isParagraphArrange ? 'Sắp Xếp Đoạn Văn' : 'Sắp Xếp Thẻ Từ Thành Câu'}</h3>
                   </div>
                   <span className="text-xs font-medium bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full">
                     {Object.keys(arrangeAnswers).length}/{currentExam.arrangeQuestions.length} đã xếp
@@ -1891,13 +1898,29 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                     return (
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                        <div>
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800">
-                              Câu {idx + 1}: Sắp xếp
-                            </p>
+                        <p className="text-sm font-semibold leading-6 text-slate-800 whitespace-pre-line">{q.prompt}</p>
+
+                        {isParagraphArrange ? (
+                          <div className="grid grid-cols-5 gap-2">
+                            {chips.map((chip, cIdx) => {
+                              const selected = userOrdered[0] === chip;
+                              return (
+                                <button
+                                  type="button"
+                                  key={cIdx}
+                                  onClick={() => handleArrangeChoice(q.id, chip)}
+                                  className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${selected
+                                    ? 'border-blue-600 bg-blue-600 text-white'
+                                    : 'border-slate-300 bg-white text-slate-800 hover:border-blue-500 hover:bg-blue-50'
+                                  }`}
+                                >
+                                  {chip}
+                                </button>
+                              );
+                            })}
                           </div>
-                        </div>
+                        ) : (
+                          <>
 
                         {/* Order display area */}
                         <div className="min-h-[52px] bg-white border-2 border-dashed border-blue-200 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
@@ -1947,11 +1970,15 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                             </button>
                           )}
                         </div>
+                          </>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </div>
+                );
+              })()
             )}
 
             {/* SECTION: LISTENING EXERCISES */}
