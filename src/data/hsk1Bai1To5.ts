@@ -522,7 +522,10 @@ const bai4SpeakingTranslations: Question[] = [
 
 const bai5FillQuestions: Question[] = [
   fillQuestion('hsk1_bai5_fill_01', '________是8月12号。', '今天', bai5WordBank),
-  fillQuestion('hsk1_bai5_fill_02', '今天是几________？', '号', bai5WordBank),
+  {
+    ...fillQuestion('hsk1_bai5_fill_02', '今天是几________？', '号', bai5WordBank),
+    acceptableAnswers: '号|月几号'
+  },
   fillQuestion('hsk1_bai5_fill_03', '八________', '月', bai5WordBank),
   fillQuestion('hsk1_bai5_fill_04', '2026________', '年', bai5WordBank),
   fillQuestion('hsk1_bai5_fill_05', '今天是________三。', '星期', bai5WordBank),
