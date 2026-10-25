@@ -111,7 +111,6 @@ const fillQuestions: Question[] = [
   fill('hsk3_b2_fill_16', '他点了一 ______ 面条儿。', '碗', 'hsk3-b2-part2', 'Phần II · Lượng từ', part2WordBank),
   fill('hsk3_b2_fill_17', '我想吃一 ______ 蛋糕。', '块', 'hsk3-b2-part2', 'Phần II · Lượng từ', part2WordBank),
   fill('hsk3_b2_fill_18', '我想喝一 ______ 咖啡。', '杯', 'hsk3-b2-part2', 'Phần II · Lượng từ', part2WordBank),
-  fill('hsk3_b2_fill_19', '快要考试了，她 ______ 忙 ______ 累，没时间吃饭。', '又又', 'hsk3-b2-part3', 'Phần III · 又……又……', ['又'], '又 又|又， 又|又……又'),
   fill('hsk3_b2_fill_20', '这些菜我 ______ 都爱吃。', '什么', 'hsk3-b2-part4', 'Phần IV · Đại từ nghi vấn dùng chung', part4WordBank),
   fill('hsk3_b2_fill_21', '这个周末我 ______ 都不想去，只想在家休息。', '哪儿', 'hsk3-b2-part4', 'Phần IV · Đại từ nghi vấn dùng chung', part4WordBank),
   fill('hsk3_b2_fill_22', '这家饭馆的菜，______ 都说好吃。', '谁', 'hsk3-b2-part4', 'Phần IV · Đại từ nghi vấn dùng chung', part4WordBank),
