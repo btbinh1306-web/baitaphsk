@@ -15,6 +15,7 @@ import { HSK3_BAI1_AIRPORT_EXAM } from './hsk3Bai1Airport';
 import { HSK3_BAI2_FOOD_EXAM } from './hsk3Bai2Food';
 import { HSK6_YUBING_EXAMS } from './hsk6Yubing';
 import { HSK6_READING_WORD_FILL_EXAMS } from './hsk6ReadingWordFill';
+import { HSK6_MOCK_EXAMS } from './hsk6MockExams';
 import { PINYIN_PRACTICE_EXAM } from './pinyinPractice';
 import {
   HSK1_PDF_TRIAL_01_EXAM,
@@ -159,6 +160,7 @@ const SAMPLE_EXAMS_WITH_LOCAL_AUDIO: ExamLesson[] = [
   HSK3_BAI2_FOOD_EXAM,
   ...HSK6_YUBING_EXAMS,
   ...HSK6_READING_WORD_FILL_EXAMS,
+  ...HSK6_MOCK_EXAMS,
   PINYIN_PRACTICE_EXAM,
   {
     id: 'hsk1-b1-ai-xiaoyu',
