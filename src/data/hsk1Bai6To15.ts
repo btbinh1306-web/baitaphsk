@@ -225,7 +225,7 @@ const b6Listening = [
   listeningQuestion('hsk1_b6_listen_02', 'Nghe và chọn hoạt động của người nói.', ['在家', '去学校', '买东西'], 2, '我下午去超市买东西。'),
   listeningQuestion('hsk1_b6_listen_03', 'Nghe và chọn đồ uống.', ['米饭', '牛奶', '包子'], 1, '我想喝牛奶。'),
   listeningQuestion('hsk1_b6_listen_04', 'Nghe và chọn phương tiện.', ['坐出租车', '坐飞机', '坐车去学校'], 0, '我坐出租车去店里。'),
-  listeningFill('hsk1_b6_listen_05', 'Nghe và điền món ăn.', '包子', '晚饭我想吃包子。')
+  { ...listeningFill('hsk1_b6_listen_05', 'Nghe và điền món ăn.', '包子', '晚饭我想吃包子。'), answerContains: '包子' }
 ];
 const b6Essay = [
   essayQuestion('hsk1_b6_essay_01', 'Viết một câu dùng 在, nói em đang làm gì ở đâu.', '我在家看书。'),

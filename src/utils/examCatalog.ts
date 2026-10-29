@@ -193,6 +193,28 @@ const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson
     return changed ? { ...exam, fillQuestions } : exam;
   }
 
+  if (exam.id === 'hsk1-bai6-5-ky-nang') {
+    const bundledQuestion = bundledExam.listeningQuestions?.find((question) => question.id === 'hsk1_b6_listen_05');
+    const savedQuestion = exam.listeningQuestions?.find((question) => question.id === 'hsk1_b6_listen_05');
+    if (!bundledQuestion || !savedQuestion) return exam;
+    if (savedQuestion.answerContains === bundledQuestion.answerContains) return exam;
+    return {
+      ...exam,
+      listeningQuestions: exam.listeningQuestions?.map((question) => (
+        question.id === savedQuestion.id
+          ? {
+              ...question,
+              answer: bundledQuestion.answer,
+              acceptableAnswers: bundledQuestion.acceptableAnswers,
+              answerContains: bundledQuestion.answerContains,
+              audioText: bundledQuestion.audioText,
+              explanation: bundledQuestion.explanation
+            }
+          : question
+      ))
+    };
+  }
+
   if (exam.id === 'hsk1-bai7-5-ky-nang') {
     const bundledQuestion = bundledExam.listeningQuestions?.find((question) => question.id === 'hsk1_b7_listen_05');
     const savedQuestion = exam.listeningQuestions?.find((question) => question.id === 'hsk1_b7_listen_05');
