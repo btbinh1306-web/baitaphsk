@@ -416,7 +416,7 @@ const bai3Listening: Question[] = [
 
 const bai3ArrangeQuestions: Question[] = [
   arrangeQuestion('hsk1_bai3_arrange_01', 'Sắp xếp câu: 是 / 哪 / 你 / 国 / 人', ['是', '哪', '你', '国', '人', '？'], '你是哪国人？|你是哪国人'),
-  arrangeQuestion('hsk1_bai3_arrange_02', 'Sắp xếp câu: 老师 / 我的 / 她 / 中文 / 是', ['老师', '我的', '她', '中文', '是', '。'], '她是我的中文老师。|她是我的中文老师')
+  arrangeQuestion('hsk1_bai3_arrange_02', 'Sắp xếp câu: 老师 / 我的 / 她 / 中文 / 是', ['老师', '我的', '她', '中文', '是', '。'], '她是我的中文老师。|她是我的中文老师|我的中文老师是她。|我的中文老师是她')
 ];
 
 const bai3EssayQuestions: Question[] = [

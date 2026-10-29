@@ -122,6 +122,20 @@ const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson
     return changed ? { ...exam, arrangeQuestions } : exam;
   }
 
+  if (exam.id === 'hsk1-bai3-5-ky-nang') {
+    const bundledQuestion = bundledExam.arrangeQuestions?.find((question) => question.id === 'hsk1_bai3_arrange_02');
+    const savedQuestion = exam.arrangeQuestions?.find((question) => question.id === 'hsk1_bai3_arrange_02');
+    if (!bundledQuestion || !savedQuestion || savedQuestion.acceptableAnswers === bundledQuestion.acceptableAnswers) return exam;
+    return {
+      ...exam,
+      arrangeQuestions: exam.arrangeQuestions?.map((question) => (
+        question.id === savedQuestion.id
+          ? { ...question, acceptableAnswers: bundledQuestion.acceptableAnswers }
+          : question
+      ))
+    };
+  }
+
   if (exam.id === 'hsk1-bai4-5-ky-nang') {
     const bundledFillQuestion = bundledExam.fillQuestions?.find((question) => question.id === 'hsk1_bai4_fill_02');
     const savedFillQuestion = exam.fillQuestions?.find((question) => question.id === 'hsk1_bai4_fill_02');
