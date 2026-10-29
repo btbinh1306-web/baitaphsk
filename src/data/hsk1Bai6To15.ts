@@ -669,7 +669,7 @@ const b12Listening = [
   listeningQuestion('hsk1_b12_listen_02', 'Nghe và chọn cảm giác.', ['很热', '有点儿冷', '非常漂亮'], 1, '我觉得有点儿冷。'),
   listeningQuestion('hsk1_b12_listen_03', 'Nghe và chọn việc cần làm.', ['去看病', '去买衣服', '去看电影'], 0, '我生病了，要去看病。'),
   listeningQuestion('hsk1_b12_listen_04', 'Nghe và chọn thứ tự hành động.', ['吃饭再回家', '回家再吃饭', '再吃药看病'], 0, '吃了饭再回家吧。'),
-  listeningFill('hsk1_b12_listen_05', 'Nghe và điền danh từ.', '药', '弟弟病了，我去买药。')
+  { ...listeningFill('hsk1_b12_listen_05', 'Nghe và điền danh từ.', '药', '弟弟病了，我去买药。'), answerContains: '药' }
 ];
 const b12Essay = [
   essayQuestion('hsk1_b12_essay_01', 'Viết 2 câu mô tả thời tiết hôm nay và cảm giác của em.', '今天天气很热。我觉得很好。'),
