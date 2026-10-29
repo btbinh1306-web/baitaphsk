@@ -595,7 +595,7 @@ const b11Listening = [
   listeningQuestion('hsk1_b11_listen_02', 'Nghe và chọn người đang ngủ.', ['弟弟', '爸爸', '妈妈'], 0, '弟弟还在睡觉。'),
   listeningQuestion('hsk1_b11_listen_03', 'Nghe và chọn phương tiện.', ['骑车', '坐飞机', '开车'], 2, '爸爸正在开车。'),
   listeningQuestion('hsk1_b11_listen_04', 'Nghe và chọn ý nghĩa của 要 trong câu.', ['Muốn về nhà', 'Biết về nhà', 'Đang về nhà'], 0, '我要回家。'),
-  listeningFill('hsk1_b11_listen_05', 'Nghe và điền phó từ.', '还', '我还在上班。')
+  { ...listeningFill('hsk1_b11_listen_05', 'Nghe và điền phó từ.', '还', '我还在上班。'), answerContains: '还' }
 ];
 const b11Essay = [
   essayQuestion('hsk1_b11_essay_01', 'Viết 2 câu nói em đang làm gì và người thân đang làm gì.', '我正在学习中文。弟弟正在睡觉。'),

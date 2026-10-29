@@ -1032,9 +1032,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               .map((s) => s.trim())
               .filter(Boolean);
             const cleanUser = userText.toLowerCase().replace(/\s+/g, '');
-            const isCorrect = Boolean(userText) && acceptableList.some((answer) => (
-              answer.toLowerCase().replace(/\s+/g, '') === cleanUser
-            ));
+            const requiredText = q.answerContains?.toLowerCase().replace(/\s+/g, '');
+            const isCorrect = Boolean(userText) && (requiredText
+              ? cleanUser.includes(requiredText)
+              : acceptableList.some((answer) => answer.toLowerCase().replace(/\s+/g, '') === cleanUser));
             addAnswerSnapshot({
               id: q.id,
               section: 'Bài nghe',
@@ -1052,7 +1053,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 .map((s) => s.trim().toLowerCase().replace(/\s+/g, ''))
                 .filter(Boolean);
               const cleanUser = userText.toLowerCase().replace(/\s+/g, '');
-              if (acceptableList.length > 0 && acceptableList.includes(cleanUser)) {
+              if (requiredText ? cleanUser.includes(requiredText) : acceptableList.includes(cleanUser)) {
                 correctCount++;
               } else if (acceptableList.length > 0) {
                 wrongCount++;

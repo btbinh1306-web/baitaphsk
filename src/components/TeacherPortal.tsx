@@ -257,6 +257,8 @@ const getCurrentAnswerCandidates = (question: Question): string[] => {
 
 const matchesCurrentAnswer = (question: Question, userAnswer: unknown): boolean => {
   const normalizedUserAnswer = normalizeAnswerForRegrade(userAnswer);
+  const requiredText = normalizeAnswerForRegrade(question.answerContains);
+  if (requiredText) return Boolean(normalizedUserAnswer && normalizedUserAnswer.includes(requiredText));
   return Boolean(normalizedUserAnswer) && getCurrentAnswerCandidates(question)
     .some((answer) => normalizeAnswerForRegrade(answer) === normalizedUserAnswer);
 };
