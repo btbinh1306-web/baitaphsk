@@ -335,8 +335,11 @@ const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson
 export const buildExamCatalog = (customExams: ExamLesson[], bundledExams: ExamLesson[]): ExamLesson[] => {
   const bundledMock02 = bundledExams.find((exam) => exam.id === 'hsk1-mock-02');
   const bundledById = new Map(bundledExams.map((exam) => [exam.id, normalizeBundledExamIdentity(exam)]));
+  // HSK2 Bài 1 was replaced by the bundled five-skill version; ignore the old saved snapshot.
+  const bundledReplacements = new Set(['hsk2-bai1-word']);
   const usableCustomExams = Array.from(new Map(
     customExams
+      .filter((exam) => !bundledReplacements.has(exam.id))
       .filter((exam) => !isStaleHsk1Mock02Snapshot(exam, bundledMock02))
       .map(normalizeBundledExamIdentity)
       .map((exam) => migrateKnownAnswerCorrections(exam, bundledById.get(exam.id)))

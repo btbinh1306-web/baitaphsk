@@ -104,12 +104,25 @@ interface ExamNavigationGroup {
 }
 
 interface EssayQuestionGroup {
-  key: 'error-correction' | 'writing';
+  key: string;
   title: string;
   questions: Question[];
 }
 
 const getEssayQuestionGroups = (questions: Question[]): EssayQuestionGroup[] => {
+  const taskGroups = new Map<string, EssayQuestionGroup>();
+  questions.forEach((question) => {
+    if (!question.taskGroup) return;
+    const group = taskGroups.get(question.taskGroup) || {
+      key: question.taskGroup,
+      title: question.taskGroupTitle || 'Bài viết',
+      questions: []
+    };
+    group.questions.push(question);
+    taskGroups.set(question.taskGroup, group);
+  });
+  if (taskGroups.size > 0) return Array.from(taskGroups.values());
+
   const errorCorrectionQuestions = questions.filter((question) => question.type === 'error_correction');
   const writingQuestions = questions.filter((question) => question.type !== 'error_correction');
   const groups: EssayQuestionGroup[] = [];
@@ -362,6 +375,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     }
     return exam;
   }, [rawCurrentExam]);
+  const isHsk2Bai1 = currentExam.id === 'hsk2-bai1-word';
 
   const hasExamPinyin = useMemo(() => hasPinyinContent(currentExam), [currentExam]);
 
@@ -445,7 +459,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       group.questions.push(question);
       fillNavigationGroups.set(key, group);
     });
-    addGroup('fill', 'Điền từ', Array.from(fillNavigationGroups.values()).map((group, groupIndex) => ({
+    addGroup('fill', isHsk2Bai1 ? 'IV. 写作 · Bài 1' : 'Điền từ', Array.from(fillNavigationGroups.values()).map((group, groupIndex) => ({
       id: `fill-${group.key}`,
       title: `Bài ${groupIndex + 1}${group.title ? ` · ${group.title}` : ''}`,
       items: group.questions.map((question, index) => ({
@@ -456,7 +470,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     })));
 
-    addGroup('arrange', 'Sắp xếp câu', [{
+    addGroup('arrange', isHsk2Bai1 ? 'IV. 写作 · Bài 2' : 'Sắp xếp câu', [{
       id: 'arrange-items',
       title: 'Sắp xếp câu',
       items: (currentExam.arrangeQuestions || []).map((question, index) => ({
@@ -467,7 +481,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     }]);
 
-    addGroup('listening', 'Luyện nghe', [{
+    addGroup('listening', isHsk2Bai1 ? 'I. 听力 · Nghe' : 'Luyện nghe', [{
       id: 'listening-items',
       title: 'Bài nghe',
       items: listeningQuestionItems.map((question, index) => ({
@@ -488,12 +502,16 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           id: question.id,
           label: String(index + 1),
           target: getQuestionAnchor(question.id),
-          answered: question.options ? mcAnswers[question.id] !== undefined : Boolean(essayAnswers[question.id]?.trim())
+          answered: question.options
+            ? mcAnswers[question.id] !== undefined
+            : question.type === 'fill'
+              ? Boolean(fillAnswers[question.id]?.trim())
+              : Boolean(essayAnswers[question.id]?.trim())
         }))
       }]);
     });
 
-    addGroup('essay', 'Viết & tự luận', getEssayQuestionGroups(currentExam.essayQuestions).map((group) => ({
+    addGroup('essay', isHsk2Bai1 ? 'IV. 写作 · Bài 3–5' : 'Viết & tự luận', getEssayQuestionGroups(currentExam.essayQuestions).map((group) => ({
       id: `essay-${group.key}`,
       title: group.title,
       items: group.questions.map((question, index) => ({
@@ -506,7 +524,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     })));
 
-    addGroup('speaking', 'Kỹ năng nói', [{
+    addGroup('speaking', isHsk2Bai1 ? 'II. 口语 · Nói' : 'Kỹ năng nói', [{
       id: 'speaking-items',
       title: 'Bài nói',
       items: currentExam.speakingQuestions.map((question, index) => ({
@@ -517,7 +535,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     }]);
 
-    addGroup('translation', 'Kỹ năng dịch', [{
+    addGroup('translation', isHsk2Bai1 ? 'V. 翻译 · Dịch' : 'Kỹ năng dịch', [{
       id: 'translation-items',
       title: 'Bài dịch',
       items: (currentExam.translationQuestions || []).map((question, index) => ({
@@ -528,6 +546,18 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     }]);
 
+    if (isHsk2Bai1) {
+      const sectionOrder = (id: string) => id.startsWith('reading-') ? 30 : ({
+        listening: 10,
+        speaking: 40,
+        fill: 20,
+        arrange: 21,
+        essay: 22,
+        translation: 50
+      }[id] ?? 0);
+      groups.sort((a, b) => sectionOrder(a.id) - sectionOrder(b.id));
+    }
+
     return groups;
   }, [
     arrangeAnswers,
@@ -535,6 +565,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     currentExam,
     essayAnswers,
     fillAnswers,
+    isHsk2Bai1,
     listeningQuestionItems,
     mcAnswers,
     structuredAnswers
@@ -911,6 +942,32 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       if (currentExam.readingPassages) {
         currentExam.readingPassages.forEach((passage, pIdx) => {
           passage.questions.forEach((q, qIdx) => {
+            if (q.type === 'fill' && !q.options) {
+              const userAns = (fillAnswers[q.id] || '').trim().replace(/\s+/g, '');
+              const validOptions = (q.acceptableAnswers || q.answer?.toString() || '')
+                .split('|')
+                .map((s) => s.trim().replace(/\s+/g, ''))
+                .filter(Boolean);
+              const isCorrect = Boolean(userAns) && validOptions.includes(userAns);
+              addAnswerSnapshot({
+                id: q.id,
+                section: `Đọc hiểu · ${passage.title}`,
+                number: qIdx + 1,
+                prompt: q.prompt,
+                userAnswer: userAns,
+                correctAnswer: validOptions[0] || q.answer?.toString() || '',
+                status: !userAns ? 'unanswered' : (isCorrect ? 'correct' : 'wrong')
+              });
+              if (!userAns) {
+                notDoneCount++;
+              } else if (isCorrect) {
+                correctCount++;
+              } else {
+                wrongCount++;
+                wrongDetails.push(`[Đọc hiểu ${passage.title} - C${qIdx + 1}: "${q.prompt}"]: Bạn nhập [${userAns}] — Đáp án đúng [${validOptions[0] || q.answer}]`);
+              }
+              return;
+            }
             if (!q.options || q.options.length === 0) {
               const ans = essayAnswers[q.id] || '(Chưa làm)';
               readingEssayParts.push(`【${q.prompt}】\nBài làm: ${ans}`);
@@ -1108,7 +1165,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
       if (currentExam.readingPassages) {
         currentExam.readingPassages.forEach(p => {
-          totalMc += p.questions.filter((q) => q.options && q.options.length > 0).length;
+          totalMc += p.questions.filter((q) => (q.options && q.options.length > 0) || q.type === 'fill').length;
         });
       }
 
@@ -1190,7 +1247,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
       if (currentExam.translationQuestions) {
         currentExam.translationQuestions.forEach((q, idx) => {
-          if (q.translationType === 'vi_to_zh_audio') {
+          if (q.translationType === 'vi_to_zh_audio' || q.translationType === 'zh_to_vi_audio') {
             const rec = audioRecords[q.id];
             answerSnapshot.push({
               id: q.id,
@@ -1330,7 +1387,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     if (!question.options) return null;
 
     return (
-      <div className="grid grid-cols-1 gap-2 pt-1">
+      <div className={question.options.length === 2 ? 'grid grid-cols-2 gap-2 pt-1' : 'grid grid-cols-1 gap-2 pt-1'}>
         {(shuffledChoiceOptions.get(question.id) || question.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: option, originalIndex }) => {
           const isSelected = mcAnswers[question.id] === originalIndex;
           return (
@@ -1643,7 +1700,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             />
           </div>
         ) : (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className={isHsk2Bai1 ? 'flex flex-col gap-6 animate-in fade-in duration-300' : 'space-y-6 animate-in fade-in duration-300'}>
             {hasExamPinyin && (
               <div className={`sticky z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/95 px-4 py-3 shadow-md backdrop-blur ${
                 isTimedExam && !submittedId ? 'top-48 sm:top-40' : 'top-28 sm:top-20'
@@ -1760,7 +1817,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       </div>
 
                       {q.options && (
-                        <div className="grid grid-cols-1 gap-2 pt-1">
+                        <div className={q.options.length === 2 ? 'grid grid-cols-2 gap-2 pt-1' : 'grid grid-cols-1 gap-2 pt-1'}>
                           {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
                             const isSelected = mcAnswers[q.id] === originalIndex;
                             return (
@@ -1795,13 +1852,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 2: FILL IN BLANKS */}
             {currentExam.fillQuestions && currentExam.fillQuestions.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-6">
+              <div style={{ order: isHsk2Bai1 ? 20 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm">
-                      2
+                      {isHsk2Bai1 ? 'IV' : '2'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">Điền Từ Vào Chỗ Trống & Ngữ Pháp</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 1: Hoàn thành câu' : 'Điền Từ Vào Chỗ Trống & Ngữ Pháp'}</h3>
                   </div>
                   <span className="text-xs font-medium bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-full">
                     {Object.keys(fillAnswers).length}/{currentExam.fillQuestions.length} đã làm
@@ -1870,13 +1927,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               (() => {
                 const isParagraphArrange = currentExam.level === 'HSK 5';
                 return (
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 21 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-sm">
-                      3
+                      {isHsk2Bai1 ? 'IV' : '3'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isParagraphArrange ? 'Sắp Xếp Đoạn Văn' : 'Sắp Xếp Thẻ Từ Thành Câu'}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 2: 把词语排成句子' : (isParagraphArrange ? 'Sắp Xếp Đoạn Văn' : 'Sắp Xếp Thẻ Từ Thành Câu')}</h3>
                   </div>
                   <span className="text-xs font-medium bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full">
                     {Object.keys(arrangeAnswers).length}/{currentExam.arrangeQuestions.length} đã xếp
@@ -1984,13 +2041,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION: LISTENING EXERCISES */}
             {currentExam.listeningQuestions && currentExam.listeningQuestions.length > 0 && (
-              <div className="bg-white rounded-xl border border-indigo-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 10 : undefined }} className="bg-white rounded-xl border border-indigo-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-900 font-bold flex items-center justify-center text-sm">
-                      🎧
+                      {isHsk2Bai1 ? 'I' : '🎧'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">Phần Luyện Nghe</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'I. 听力 · Nghe' : 'Phần Luyện Nghe'}</h3>
                   </div>
                   <span className="text-xs font-medium bg-indigo-50 text-indigo-900 px-2.5 py-1 rounded-full border border-indigo-200">
                     {listeningQuestionItems.filter(q => (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') ? !!fillAnswers[q.id]?.trim() : mcAnswers[q.id] !== undefined).length}/{listeningQuestionItems.length} đã làm
@@ -2094,13 +2151,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 4: READING PASSAGES */}
             {currentExam.readingPassages && currentExam.readingPassages.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 30 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-sky-100 text-sky-800 font-bold flex items-center justify-center text-sm">
-                      4
+                      {isHsk2Bai1 ? 'III' : '4'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">Phần Đọc Hiểu Đoạn Văn</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'III. 阅读 · Đọc' : 'Phần Đọc Hiểu Đoạn Văn'}</h3>
                   </div>
                 </div>
 
@@ -2111,18 +2168,28 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         <h4 className="font-bold text-sky-900 text-sm flex items-center gap-2">
                           <FileText className="w-4 h-4 text-sky-700" /> {passage.title}
                         </h4>
-                        <button
-                          type="button"
-                          onClick={() => speakText(passage.content)}
-                          className="inline-flex items-center gap-1 text-xs text-sky-700 hover:text-sky-900 font-semibold cursor-pointer"
-                        >
-                          <Volume2 className="w-3.5 h-3.5" /> Nghe đọc đoạn văn
-                        </button>
+                        {passage.content.trim() && (
+                          <button
+                            type="button"
+                            onClick={() => speakText(passage.content)}
+                            className="inline-flex items-center gap-1 text-xs text-sky-700 hover:text-sky-900 font-semibold cursor-pointer"
+                          >
+                            <Volume2 className="w-3.5 h-3.5" /> Nghe đọc đoạn văn
+                          </button>
+                        )}
                       </div>
 
-                      <div className="p-3.5 bg-white border border-sky-100 rounded-lg text-sm text-slate-800 leading-relaxed font-sans">
-                        {passage.content}
-                      </div>
+                      {passage.content.trim() && (
+                        <div className="p-3.5 bg-white border border-sky-100 rounded-lg text-sm text-slate-800 leading-relaxed font-sans">
+                          {passage.content}
+                        </div>
+                      )}
+
+                      {passage.wordBank && passage.wordBank.length > 0 && (
+                        <div className="rounded-lg border border-sky-200 bg-white px-3.5 py-3 text-sm text-sky-900">
+                          <span className="font-bold">Ngân hàng từ: </span>{passage.wordBank.join('　')}
+                        </div>
+                      )}
 
                       <div className="space-y-4 pt-1">
                         {passage.questions.map((q, qIdx) => (
@@ -2131,7 +2198,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                               Câu {qIdx + 1}: {q.prompt}
                             </p>
                             {q.options && q.options.length > 0 ? (
-                              <div className="grid grid-cols-1 gap-2 pt-1">
+                              <div className={q.options.length === 2 ? 'grid grid-cols-2 gap-2 pt-1' : 'grid grid-cols-1 gap-2 pt-1'}>
                                 {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
                                   const isSelected = mcAnswers[q.id] === originalIndex;
                                   return (
@@ -2157,6 +2224,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                                   );
                                 })}
                               </div>
+                            ) : q.type === 'fill' ? (
+                              <input
+                                type="text"
+                                value={fillAnswers[q.id] || ''}
+                                onChange={(e) => handleFillChange(q.id, e.target.value)}
+                                placeholder="Nhập từ thích hợp bằng chữ Hán..."
+                                className="w-full p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
+                              />
                             ) : (
                               <textarea
                                 rows={2}
@@ -2177,13 +2252,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 5: ESSAY QUESTIONS */}
             {currentExam.essayQuestions.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 22 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm">
-                      5
+                      {isHsk2Bai1 ? 'IV' : '5'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">Phần Viết & Tự Luận</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 3–5' : 'Phần Viết & Tự Luận'}</h3>
                   </div>
                 </div>
 
@@ -2253,9 +2328,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           return (
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-800">
-                            {group.questions.length === 1 ? 'Bài làm:' : `Câu ${idx + 1}: ${q.prompt}`}
-                          </p>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">
+                              {group.questions.length === 1 ? 'Đề bài: ' : `Câu ${idx + 1}: `}{q.prompt}
+                            </p>
+                            {group.questions.length === 1 && (
+                              <p className="mt-2 text-xs font-semibold text-slate-500">Bài làm:</p>
+                            )}
+                          </div>
                         </div>
 
                         {q.imageUrl && (
@@ -2287,14 +2367,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 6: PRODUCTION SKILLS */}
             {speakingTaskGroups.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 40 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">
-                      6
+                      {isHsk2Bai1 ? 'II' : '6'}
                     </span>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">Kỹ năng nói</h3>
+                      <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'II. 口语 · Nói' : 'Kỹ năng nói'}</h3>
                       <p className="text-xs text-slate-500">Mỗi bài có ghi âm, dừng, nghe lại, ghi âm lại và tải file lên.</p>
                     </div>
                   </div>
@@ -2372,14 +2452,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 7: TRANSLATION PRACTICE (3 TYPES, NO EMOJIS, NO PINYIN, NO HINTS) */}
             {currentExam.translationQuestions && currentExam.translationQuestions.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div style={{ order: isHsk2Bai1 ? 50 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-800 font-bold flex items-center justify-center text-sm">
-                      7
+                      {isHsk2Bai1 ? 'V' : '7'}
                     </span>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">Kỹ năng dịch</h3>
+                      <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'V. 翻译 · Dịch' : 'Kỹ năng dịch'}</h3>
                       <p className="text-xs text-slate-500">
                         Bao gồm dịch ghi âm phát âm, dịch câu viết Hán tự và dịch Trung - Việt
                       </p>
@@ -2404,11 +2484,21 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     </p>
                   </div>
                 )}
+                {currentExam.translationQuestions.some((question) => question.translationType === 'zh_to_vi_audio') && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <p className="text-sm font-bold text-emerald-900">Dịch ghi âm Trung → Việt</p>
+                    <p className="mt-1 text-xs text-slate-700">
+                      <span className="font-semibold text-emerald-900">Nghe câu tiếng Trung</span>, sau đó{' '}
+                      <span className="font-semibold text-rose-700">ghi âm bản dịch tiếng Việt</span>.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   {currentExam.translationQuestions.map((q, idx) => {
-                    // Dạng 1: Cho câu tiếng Việt -> Ghi âm câu tiếng Trung
-                    if (q.translationType === 'vi_to_zh_audio') {
+                    // Dạng ghi âm: Việt → Trung hoặc Trung → Việt
+                    if (q.translationType === 'vi_to_zh_audio' || q.translationType === 'zh_to_vi_audio') {
+                      const isZhToViAudio = q.translationType === 'zh_to_vi_audio';
                       return (
                         <div
                           id={getQuestionAnchor(q.id)}
@@ -2426,7 +2516,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                               {getTranslationPromptText(q.prompt)}
                             </p>
                             <span className="mt-2 inline-flex rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-800">
-                              Dịch sang tiếng Trung
+                              {isZhToViAudio ? 'Dịch sang tiếng Việt' : 'Dịch sang tiếng Trung'}
                             </span>
                             {q.preparationSeconds && (
                               <span className="ml-2 mt-2 inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
@@ -2518,7 +2608,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
             )}
 
             {/* ADDITIONAL AUDIO FILES */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div style={{ order: isHsk2Bai1 ? 60 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h3 className="font-bold text-slate-800 text-lg">File ghi âm bổ sung</h3>

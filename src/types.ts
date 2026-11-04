@@ -26,7 +26,7 @@ export interface Question {
     | 'listening_fill'
     | 'listening_fill_in_blank'
     | 'handwriting_submission';
-  translationType?: 'vi_to_zh_audio' | 'vi_to_zh_text' | 'zh_to_vi_text';
+  translationType?: 'vi_to_zh_audio' | 'vi_to_zh_text' | 'zh_to_vi_text' | 'zh_to_vi_audio';
   tier?: 'tier1' | 'tier2' | 'tier3'; // Cấp 1: Tri thức | Cấp 2: Bán giao tiếp | Cấp 3: Giao tiếp tự do
   prompt: string;
   instruction?: string; // for handwriting_submission
@@ -80,6 +80,7 @@ export interface ReadingPassage {
   id: string;
   title: string;
   content: string;
+  wordBank?: string[];
   questions: Question[];
 }
 

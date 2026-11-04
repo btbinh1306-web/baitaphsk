@@ -1898,6 +1898,22 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         {question.grammarTargets && (
           <p><span className="font-semibold">Ngữ pháp mục tiêu:</span> {question.grammarTargets.join(' · ')}</p>
         )}
+        {question.explanation && (
+          <p><span className="font-semibold">Hướng dẫn:</span> {question.explanation}</p>
+        )}
+        {question.rubric && question.rubric.length > 0 && (
+          <div>
+            <p className="font-semibold">Thang chấm:</p>
+            <ul className="mt-1 list-disc pl-5 space-y-0.5">
+              {question.rubric.map((item) => (
+                <li key={item.id}>{item.label}: {item.maxScore} điểm</li>
+              ))}
+            </ul>
+            <p className="mt-1 font-semibold">
+              Tổng: {question.rubric.reduce((total, item) => total + item.maxScore, 0)} điểm
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_140px] gap-2 items-center pt-1 border-t border-amber-200">
           <label className="font-semibold text-amber-950">Đánh giá câu</label>
           <select

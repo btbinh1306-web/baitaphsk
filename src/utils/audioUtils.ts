@@ -27,6 +27,7 @@ export const getHostedMediaUrl = (rawLink: string): string => {
   if (!rawLink) return '';
   const trimmed = rawLink.trim();
   if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || /^https?:\/\//i.test(trimmed)) return trimmed;
+  if (import.meta.env.DEV && isHostedMediaPath(trimmed)) return trimmed;
   return isHostedMediaPath(trimmed) ? `${mediaBaseUrl}${trimmed}` : trimmed;
 };
 
