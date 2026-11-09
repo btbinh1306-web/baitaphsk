@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AnswerSnapshotItem, AudioRecordItem, SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage, StudentAccount } from '../types';
+import { AnswerSnapshotItem, AudioRecordItem, SubmissionData, ExamLesson, VocabItem, Question, ReadingPassage } from '../types';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import {
   deleteSubmissionsInGas,
@@ -39,8 +39,6 @@ import { LessonDataEditor } from './LessonDataEditor';
 import { AudioRecorder } from './AudioRecorder';
 import { HandwritingExerciseEditor } from './exercises/HandwritingExerciseEditor';
 import { HandwritingGradingPanel } from './exercises/HandwritingGradingPanel';
-import { StudentAccountManager } from './StudentAccountManager';
-import { fetchStudentAccounts } from '../services/studentAccountService';
 import { HandwritingExercise, HandwritingSubmission } from '../types/handwriting';
 import {
   getHandwritingExercises,
@@ -82,8 +80,7 @@ import {
   Upload,
   Image as ImageIcon,
   Undo2,
-  Redo2,
-  UserPlus
+  Redo2
 } from 'lucide-react';
 
 type HistoryState<T> = {
@@ -109,33 +106,6 @@ const normalizeLessonFilterValue = (value: string): string =>
     .replace(/\s*\/\s*/g, '/')
     .trim()
     .toLocaleLowerCase('vi');
-
-const normalizeStudentIdentity = (value: string): string =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/gi, 'd')
-    .replace(/[^a-z0-9]/gi, '')
-    .toLocaleLowerCase('vi')
-    .replace(/^lephuonglinh$/i, 'phuonglinh');
-
-const resolveSubmissionStudentName = (
-  submissionName: string,
-  accounts: StudentAccount[]
-): string => {
-  const normalizedSubmissionName = normalizeStudentIdentity(submissionName);
-  if (!normalizedSubmissionName) return submissionName;
-
-  const account = accounts.find((candidate) => {
-    const identities = [candidate.username, candidate.name].map(normalizeStudentIdentity).filter(Boolean);
-    return identities.some((identity) => (
-      identity === normalizedSubmissionName ||
-      normalizedSubmissionName.startsWith(identity)
-    ));
-  });
-
-  return account?.name || submissionName;
-};
 
 const removeAnswerSnapshot = (value?: string): string =>
   String(value || '').replace(/\n?\[ANSWER_SNAPSHOT\]:\s*\[[\s\S]*\]\s*$/, '').trim();
@@ -498,7 +468,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'submissions' | 'accounts' | 'handwriting' | 'editor' | 'import_json'>('submissions');
+  const [activeTab, setActiveTab] = useState<'submissions' | 'handwriting' | 'editor' | 'import_json'>('submissions');
 
   // Handwriting exercises state
   const [hwExercises, setHwExercises] = useState<HandwritingExercise[]>(() => getHandwritingExercises());
@@ -534,7 +504,6 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   }, []);
 
   const [submissions, setSubmissions] = useState<SubmissionData[]>([]);
-  const [studentAccounts, setStudentAccounts] = useState<StudentAccount[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -581,11 +550,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
   const studentFilterOptions = useMemo(
     () => Array.from(new Set<string>([
-      ...studentAccounts.map((account) => account.name.trim()),
       ...submissions.map((submission) => submission.name.trim())
     ].filter(Boolean)))
       .sort((nameA, nameB) => nameA.localeCompare(nameB, 'vi')),
-    [studentAccounts, submissions]
+    [submissions]
   );
 
   useEffect(() => {
@@ -1072,16 +1040,9 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     setIsLoading(true);
     setErrorMsg(null);
     setDeleteNotice(null);
-    const [res, accounts] = await Promise.all([
-      fetchTeacherSubmissions(pass),
-      fetchStudentAccounts(pass).catch(() => [])
-    ]);
-    setStudentAccounts(accounts);
+    const res = await fetchTeacherSubmissions(pass);
     if (res.ok && res.rows) {
-      setSubmissions(res.rows.map((submission) => ({
-        ...submission,
-        name: resolveSubmissionStudentName(submission.name, accounts)
-      })));
+      setSubmissions(res.rows);
     } else {
       setSubmissions([]);
       setErrorMsg(res.error || 'Không thể lấy dữ liệu bài nộp');
@@ -2429,18 +2390,6 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
 
           <button
             type="button"
-            onClick={() => setActiveTab('accounts')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-              activeTab === 'accounts'
-                ? 'bg-red-700 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <UserPlus className="w-4 h-4" /> Tài khoản học sinh
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('import_json')}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === 'import_json'
@@ -2464,10 +2413,6 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
           </button>
         </div>
       </div>
-
-      {activeTab === 'accounts' && (
-        <StudentAccountManager exams={allExams} teacherPassword={passwordInput} />
-      )}
 
       {/* TAB 1: SUBMISSIONS & GRADING */}
       {activeTab === 'submissions' && (

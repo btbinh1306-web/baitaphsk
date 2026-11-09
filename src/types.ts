@@ -124,8 +124,6 @@ export interface AudioRecordItem {
 
 export interface SubmissionData {
   id: string;
-  studentId?: string;
-  assignmentId?: string;
   duplicateIds?: string[]; // IDs of older duplicate records merged into this row
   time: string;
   name: string;
@@ -154,23 +152,6 @@ export interface SubmissionData {
   handwritingStatus?: 'not_submitted' | 'submitted' | 'graded';
   submittedAt?: string;
   gradedAt?: string;
-}
-
-export interface StudentAssignment {
-  id: string;
-  examId: string;
-  assignedAt: string;
-  dueAt?: string;
-}
-
-export interface StudentAccount {
-  id: string;
-  username: string;
-  name: string;
-  className: string;
-  active: boolean;
-  linkedAccountIds?: string[];
-  assignments: StudentAssignment[];
 }
 
 export type AnswerSnapshotStatus = 'correct' | 'wrong' | 'unanswered' | 'manual';

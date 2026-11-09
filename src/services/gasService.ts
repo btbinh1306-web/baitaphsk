@@ -396,8 +396,6 @@ export const submitToGas = async (
   // Prepare full local record first
   const newSubRecord: SubmissionData = {
     id: localId,
-    studentId: payload.studentId,
-    assignmentId: payload.assignmentId,
     time: payload.time || fullTime,
     name: payload.name,
     class: payload.class,
@@ -434,8 +432,6 @@ export const submitToGas = async (
   try {
     const bodyData = {
       action: payload.action || 'submit',
-      studentId: payload.studentId,
-      assignmentId: payload.assignmentId,
       time: payload.time || fullTime,
       name: payload.name,
       class: payload.class,

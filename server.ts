@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createServer as createViteServer } from 'vite';
 
@@ -29,22 +28,6 @@ const DELETED_EXAMS_FILE = path.join(DATA_DIR, 'deleted_exam_ids.json');
 const HANDWRITING_EXERCISES_FILE = path.join(DATA_DIR, 'handwriting_exercises.json');
 const SUBMISSIONS_FILE = path.join(DATA_DIR, 'submissions.json');
 const DELETED_SUBMISSIONS_FILE = path.join(DATA_DIR, 'deleted_submission_ids.json');
-const STUDENT_ACCOUNTS_FILE = path.join(DATA_DIR, 'student_accounts.json');
-const STUDENT_AUTH_SECRET = process.env.STUDENT_AUTH_SECRET || 'change-this-local-student-secret';
-const TEACHER_PASSWORD = process.env.TEACHER_PASS || 'tbtt123';
-
-type StudentAccountRecord = {
-  id: string;
-  username: string;
-  name: string;
-  className: string;
-  active: boolean;
-  linkedAccountIds?: string[];
-  passwordSalt: string;
-  passwordHash: string;
-  assignments: Array<{ id: string; examId: string; assignedAt: string; dueAt?: string }>;
-};
-
 // Helper functions for reading/writing JSON files
 function readJsonFile<T>(filePath: string, fallback: T): T {
   try {
@@ -66,58 +49,6 @@ function writeJsonFile<T>(filePath: string, data: T): boolean {
     console.error(`Error writing ${filePath}:`, err);
     return false;
   }
-}
-
-function publicStudentAccount(account: StudentAccountRecord) {
-  const { passwordSalt, passwordHash, ...safeAccount } = account;
-  return safeAccount;
-}
-
-function hashStudentPassword(password: string, salt: string): string {
-  return crypto.scryptSync(password, salt, 64).toString('hex');
-}
-
-function passwordsMatch(password: string, salt: string, expectedHash: string): boolean {
-  const actual = Buffer.from(hashStudentPassword(password, salt), 'hex');
-  const expected = Buffer.from(expectedHash, 'hex');
-  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
-}
-
-function isTeacherPassword(value: unknown): boolean {
-  return typeof value === 'string' && value.trim() === TEACHER_PASSWORD;
-}
-
-function requireTeacher(req: express.Request, res: express.Response): boolean {
-  const pass = req.headers['x-teacher-password'] || req.body?.teacherPass || req.query.pass;
-  if (isTeacherPassword(pass)) return true;
-  res.status(401).json({ ok: false, error: 'Mật khẩu giáo viên không đúng' });
-  return false;
-}
-
-function issueStudentToken(studentId: string): string {
-  const issuedAt = String(Date.now());
-  const payload = `${studentId}.${issuedAt}`;
-  const signature = crypto.createHmac('sha256', STUDENT_AUTH_SECRET).update(payload).digest('hex');
-  return `${payload}.${signature}`;
-}
-
-function getStudentIdFromRequest(req: express.Request): string | null {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) return null;
-  const parts = header.slice(7).split('.');
-  if (parts.length !== 3) return null;
-  const [studentId, issuedAt, signature] = parts;
-  const payload = `${studentId}.${issuedAt}`;
-  const expected = crypto.createHmac('sha256', STUDENT_AUTH_SECRET).update(payload).digest('hex');
-  const actualBuffer = Buffer.from(signature, 'hex');
-  const expectedBuffer = Buffer.from(expected, 'hex');
-  const isValidSignature = actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
-  const isFresh = Number.isFinite(Number(issuedAt)) && Date.now() - Number(issuedAt) < 1000 * 60 * 60 * 24 * 30;
-  return isValidSignature && isFresh ? studentId : null;
-}
-
-function getStudentAccounts(): StudentAccountRecord[] {
-  return readJsonFile<StudentAccountRecord[]>(STUDENT_ACCOUNTS_FILE, []);
 }
 
 function normalizeSubmissionId(id: unknown): string {
@@ -395,106 +326,6 @@ app.delete('/api/handwriting-exercises/:id', (req, res) => {
   }
 });
 
-// --- STUDENT ACCOUNTS & ASSIGNMENTS ---
-app.get('/api/student-accounts', (req, res) => {
-  if (!requireTeacher(req, res)) return;
-  res.json({ ok: true, accounts: getStudentAccounts().map(publicStudentAccount) });
-});
-
-app.post('/api/student-accounts', (req, res) => {
-  if (!requireTeacher(req, res)) return;
-
-  const input = req.body?.account || req.body;
-  const id = String(input?.id || `student-${crypto.randomBytes(6).toString('hex')}`).trim();
-  const username = String(input?.username || '').trim().toLowerCase();
-  const name = String(input?.name || '').trim();
-  const className = String(input?.className || '').trim();
-  const password = String(input?.password || '');
-  const assignmentExamIds: string[] = Array.isArray(input?.assignmentExamIds)
-    ? Array.from(new Set(input.assignmentExamIds.map((value: unknown) => String(value).trim()).filter(Boolean)))
-    : [];
-
-  if (!username || !name || !className || (!password && !input?.id)) {
-    res.status(400).json({ ok: false, error: 'Cần username, họ tên, lớp và mật khẩu cho tài khoản mới' });
-    return;
-  }
-
-  const accounts = getStudentAccounts();
-  const existing = accounts.find((account) => account.id === id);
-  const duplicateUsername = accounts.find((account) => account.username === username && account.id !== id);
-  if (duplicateUsername) {
-    res.status(409).json({ ok: false, error: 'Tên đăng nhập đã tồn tại' });
-    return;
-  }
-
-  const assignedAt = new Date().toISOString();
-  const previousAssignments = new Map<string, StudentAccountRecord['assignments'][number]>(
-    (existing?.assignments || []).map((assignment) => [assignment.examId, assignment])
-  );
-  const assignments = assignmentExamIds.map((examId) => ({
-    id: previousAssignments.get(examId)?.id || `assignment-${id}-${examId}`,
-    examId,
-    assignedAt: previousAssignments.get(examId)?.assignedAt || assignedAt,
-    ...(previousAssignments.get(examId)?.dueAt ? { dueAt: previousAssignments.get(examId)?.dueAt } : {})
-  }));
-  const passwordSalt = existing?.passwordSalt || crypto.randomBytes(16).toString('hex');
-  const linkedAccountIds: string[] = Array.isArray(input?.linkedAccountIds)
-    ? Array.from(new Set(input.linkedAccountIds.map((value: unknown) => String(value).trim()).filter(Boolean)))
-    : (existing?.linkedAccountIds || []);
-  const account: StudentAccountRecord = {
-    id,
-    username,
-    name,
-    className,
-    active: input?.active !== false,
-    linkedAccountIds,
-    passwordSalt,
-    passwordHash: password ? hashStudentPassword(password, passwordSalt) : (existing?.passwordHash || ''),
-    assignments
-  };
-
-  const nextAccounts = existing
-    ? accounts.map((item) => item.id === id ? account : item)
-    : [account, ...accounts];
-  if (!writeJsonFile(STUDENT_ACCOUNTS_FILE, nextAccounts)) {
-    res.status(500).json({ ok: false, error: 'Không thể lưu tài khoản học sinh' });
-    return;
-  }
-
-  res.json({ ok: true, account: publicStudentAccount(account) });
-});
-
-app.post('/api/student-login', (req, res) => {
-  const username = String(req.body?.username || '').trim().toLowerCase();
-  const password = String(req.body?.password || '');
-  const account = getStudentAccounts().find((item) => item.username === username && item.active);
-
-  if (!account || !passwordsMatch(password, account.passwordSalt, account.passwordHash)) {
-    res.status(401).json({ ok: false, error: 'Tên đăng nhập hoặc mật khẩu không đúng' });
-    return;
-  }
-
-  res.json({ ok: true, token: issueStudentToken(account.id), account: publicStudentAccount(account) });
-});
-
-app.get('/api/student-dashboard', (req, res) => {
-  const studentId = getStudentIdFromRequest(req);
-  if (!studentId) {
-    res.status(401).json({ ok: false, error: 'Phiên học sinh đã hết hạn' });
-    return;
-  }
-
-  const account = getStudentAccounts().find((item) => item.id === studentId && item.active);
-  if (!account) {
-    res.status(404).json({ ok: false, error: 'Không tìm thấy tài khoản học sinh' });
-    return;
-  }
-
-  const linkedStudentIds = new Set([studentId, ...(account.linkedAccountIds || [])]);
-  const submissions = readJsonFile<any[]>(SUBMISSIONS_FILE, []).filter((submission) => linkedStudentIds.has(submission.studentId));
-  res.json({ ok: true, account: publicStudentAccount(account), submissions });
-});
-
 // --- API ENDPOINTS FOR SUBMISSIONS ---
 app.get('/api/deleted-submission-ids', (req, res) => {
   res.json({ ok: true, deletedIds: getDeletedSubmissionIds() });
@@ -538,11 +369,9 @@ app.post('/api/submissions', (req, res) => {
       res.status(410).json({ ok: false, error: 'Submission was deleted' });
       return;
     }
-    const authenticatedStudentId = getStudentIdFromRequest(req);
     const updatedSub = {
       ...subData,
-      id: subId,
-      ...(authenticatedStudentId ? { studentId: authenticatedStudentId } : {})
+      id: subId
     };
 
     const idx = currentSubs.findIndex((s) => String(s.id) === String(subId));
