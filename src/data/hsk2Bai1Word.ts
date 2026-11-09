@@ -77,6 +77,15 @@ const speaking = (id: string, prompt: string, pinyin: string, extra: Partial<Que
   prompt,
   pinyin,
   teacherReviewRequired: true,
+  referenceAnswers: [prompt.replace(/^Đọc và ghi âm:\s*/u, '')],
+  requiredElements: ['Đọc đủ câu', 'Phát âm và thanh điệu rõ'],
+  explanation: 'Chấm theo nội dung, thanh điệu, phát âm và độ trôi chảy; chấp nhận ngữ điệu tự nhiên nếu không làm đổi nghĩa.',
+  rubric: [
+    { id: 'content', label: 'Đọc đúng và đủ câu', maxScore: 4 },
+    { id: 'pronunciation', label: 'Phát âm và thanh điệu', maxScore: 3 },
+    { id: 'fluency', label: 'Ngữ điệu và độ trôi chảy', maxScore: 3 }
+  ],
+  maxScore: 10,
   ...extra
 });
 
@@ -86,12 +95,16 @@ const errorCorrection = (id: string, prompt: string, suggestedAnswer: string, ex
   tier: 'tier3',
   prompt,
   suggestedAnswer,
+  referenceAnswers: [suggestedAnswer],
   teacherReviewRequired: true,
   errorCorrection: { sentenceIsCorrect: false },
+  requiredElements: ['Phán đoán đúng/sai', 'Sửa câu hoàn chỉnh'],
+  explanation: 'Chấm 4 điểm cho phán đoán đúng/sai và 6 điểm cho câu sửa đúng; chấp nhận cách viết tương đương nếu đúng ngữ pháp.',
   rubric: [
     { id: 'judgement', label: 'Phán đoán đúng/sai', maxScore: 4 },
     { id: 'correction', label: 'Sửa câu đúng', maxScore: 6 }
   ],
+  maxScore: 10,
   ...extra
 });
 
@@ -101,7 +114,16 @@ const essay = (id: string, prompt: string, suggestedAnswer: string, extra: Parti
   tier: 'tier3',
   prompt,
   suggestedAnswer,
+  referenceAnswers: [suggestedAnswer],
   teacherReviewRequired: true,
+  requiredElements: ['Trả lời đủ yêu cầu đề bài'],
+  explanation: 'Chấp nhận cách diễn đạt khác nếu đúng nội dung, ngữ pháp và từ vựng theo yêu cầu.',
+  rubric: [
+    { id: 'content', label: 'Nội dung đúng ý', maxScore: 4 },
+    { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 3 },
+    { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 3 }
+  ],
+  maxScore: 10,
   ...extra
 });
 
@@ -120,6 +142,10 @@ const translation = (
   suggestedAnswer,
   referenceAnswers: [suggestedAnswer],
   teacherReviewRequired: true,
+  requiredElements: ['Dịch đủ nghĩa', 'Đúng ngữ pháp và từ vựng mục tiêu'],
+  explanation: 'Chấp nhận cách dịch tương đương nếu đúng nghĩa và đúng ngữ pháp; bài ghi âm chấm thêm thanh điệu và độ trôi chảy.',
+  rubric: translationRubric,
+  maxScore: 10,
   ...extra
 });
 

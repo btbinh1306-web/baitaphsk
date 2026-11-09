@@ -206,6 +206,11 @@ export const buildOrderedQuestionList = (exam: ExamLesson | undefined): OrderedT
 
   const ordered: OrderedTeacherQuestion[] = [];
   const seen = new Set<string>();
+  const isHsk2Bai2 = exam.id === 'hsk2-bai2-word';
+  const isHsk2Bai3 = exam.id === 'hsk2-bai3-word';
+  const isHsk2Bai5 = exam.id === 'hsk2-bai5-diyici-qu-zhongguo-pengyou-jia';
+  const isHsk2Bai6 = exam.id === 'hsk2-bai6-xiaoxue-shengri-kuaile';
+  const isOrderedHsk2Lesson = isHsk2Bai2 || isHsk2Bai3 || isHsk2Bai5 || isHsk2Bai6;
 
   // This is the same top-to-bottom order used by StudentExamForm. The source
   // exam remains authoritative; no submission array is used to create order.
@@ -224,22 +229,30 @@ export const buildOrderedQuestionList = (exam: ExamLesson | undefined): OrderedT
     });
   };
 
-  appendArray(exam.mcQuestions, 'Trắc nghiệm', 100, 'mc');
-  appendArray(exam.fillQuestions, 'Điền từ', 110, 'fill');
-  appendArray(exam.arrangeQuestions, 'Sắp xếp câu', 120, 'arrange');
+  appendArray(exam.mcQuestions, 'Trắc nghiệm', isOrderedHsk2Lesson ? 1 : 100, 'mc');
+  appendArray(exam.fillQuestions, 'Điền từ', isOrderedHsk2Lesson ? 21 : 110, 'fill');
+  appendArray(exam.arrangeQuestions, 'Sắp xếp câu', isOrderedHsk2Lesson ? 30 : 120, 'arrange');
 
   const listeningQuestions = (exam.listeningQuestions || []).flatMap((question) => (
     question.subQuestions?.length ? question.subQuestions : [question]
   ));
-  appendArray(listeningQuestions, 'Bài nghe', 130, 'listening');
+  appendArray(listeningQuestions, 'Bài nghe', isOrderedHsk2Lesson ? 10 : 130, 'listening');
 
   (exam.readingPassages || []).forEach((passage, passageIndex) => {
-    appendArray(passage.questions, `Đọc hiểu · ${passage.title}`, 140 + passageIndex, passage.id);
+    appendArray(passage.questions, `Đọc hiểu · ${passage.title}`, isOrderedHsk2Lesson ? 20 + passageIndex : 140 + passageIndex, passage.id);
   });
 
-  appendArray(exam.essayQuestions, 'Tự luận / Viết', 160, 'essay');
-  appendArray(exam.speakingQuestions, 'Nói / Ghi âm', 170, 'speaking');
-  appendArray(exam.translationQuestions, 'Dịch', 180, 'translation');
+  appendArray(exam.essayQuestions, 'Tự luận / Viết', isOrderedHsk2Lesson ? 31 : 160, 'essay');
+  appendArray(exam.speakingQuestions, 'Nói / Ghi âm', isOrderedHsk2Lesson ? 40 : 170, 'speaking');
+  appendArray(exam.translationQuestions, 'Dịch', isOrderedHsk2Lesson ? 50 : 180, 'translation');
+
+  if (isOrderedHsk2Lesson) {
+    ordered.sort((a, b) => (
+      a.sectionOrder - b.sectionOrder ||
+      a.exerciseOrder - b.exerciseOrder ||
+      a.itemOrder - b.itemOrder
+    ));
+  }
 
   return ordered;
 };

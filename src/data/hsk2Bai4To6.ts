@@ -9,14 +9,23 @@ const vocab = (hanzi: string, pinyin: string, meaning: string, type = 'Từ vự
 
 type FillMeta = Pick<Question, 'wordBank' | 'fillGroup' | 'fillGroupTitle'>;
 
-const fill = (id: string, prompt: string, answer: string, meta: FillMeta = {}): Question => ({
+const fill = (
+  id: string,
+  prompt: string,
+  answer: string,
+  wordBankOrMeta: string[] | FillMeta = {},
+  tier: Question['tier'] = 'tier1',
+  extra: Partial<Question> = {}
+): Question => ({
   id,
   type: 'fill',
-  tier: 'tier1',
+  tier,
   prompt,
+  answer,
   acceptableAnswers: answer,
   suggestedAnswer: answer,
-  ...meta
+  ...(Array.isArray(wordBankOrMeta) ? { wordBank: wordBankOrMeta } : wordBankOrMeta),
+  ...extra
 });
 
 const arrange = (id: string, prompt: string, chips: string[], answer: string): Question => ({
@@ -41,390 +50,598 @@ const errorCorrection = (
   id: string,
   sentence: string,
   sentenceIsCorrect: boolean,
-  correctedAnswer?: string
+  correctedAnswer?: string,
+  extra: Partial<Question> = {}
 ): Question => ({
   id,
   type: 'error_correction',
   tier: 'tier3',
   prompt: sentence,
   suggestedAnswer: correctedAnswer || sentence,
+  referenceAnswers: [correctedAnswer || sentence],
+  teacherReviewRequired: true,
   errorCorrection: { sentenceIsCorrect },
-  maxScore: 10
+  requiredElements: ['Phán đoán đúng/sai', 'Sửa câu hoàn chỉnh'],
+  explanation: 'Chấm 4 điểm cho phán đoán đúng/sai và 6 điểm cho câu sửa đúng; nếu câu gốc đúng thì ghi rõ câu đúng và không sửa sai.',
+  rubric: [
+    { id: 'judgement', label: 'Phán đoán đúng/sai', maxScore: 4 },
+    { id: 'correction', label: 'Sửa câu đúng', maxScore: 6 }
+  ],
+  maxScore: 10,
+  ...extra
 });
 
-const essay = (id: string, prompt: string, suggestedAnswer?: string): Question => ({
+const essay = (id: string, prompt: string, suggestedAnswer?: string, extra: Partial<Question> = {}): Question => ({
   id,
   type: 'essay',
   tier: 'tier3',
   prompt,
   suggestedAnswer,
-  maxScore: 10
+  referenceAnswers: suggestedAnswer ? [suggestedAnswer] : undefined,
+  teacherReviewRequired: true,
+  requiredElements: ['Trả lời đủ yêu cầu đề bài'],
+  explanation: 'Chấp nhận cách diễn đạt khác nếu đúng nội dung, ngữ pháp và từ vựng theo yêu cầu.',
+  rubric: [
+    { id: 'content', label: 'Nội dung đúng ý', maxScore: 4 },
+    { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 3 },
+    { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 3 }
+  ],
+  ...extra,
+  maxScore: extra.maxScore ?? 10
 });
 
-const speaking = (id: string, prompt: string): Question => ({
+const speaking = (id: string, prompt: string, extra: Partial<Question> = {}): Question => ({
   id,
   type: 'speaking_record',
   tier: 'tier3',
   prompt,
   taskGroup: 'reading_aloud',
   taskGroupTitle: 'Luyện nói và ghi âm',
-  teacherReviewRequired: true
+  teacherReviewRequired: true,
+  referenceAnswers: [prompt],
+  requiredElements: ['Đọc đủ câu', 'Phát âm và thanh điệu rõ'],
+  explanation: 'Chấm theo nội dung, phát âm, thanh điệu và độ trôi chảy; chấp nhận ngữ điệu tự nhiên nếu không làm đổi nghĩa.',
+  rubric: [
+    { id: 'content', label: 'Đọc đúng và đủ câu', maxScore: 4 },
+    { id: 'pronunciation', label: 'Phát âm và thanh điệu', maxScore: 3 },
+    { id: 'fluency', label: 'Ngữ điệu và độ trôi chảy', maxScore: 3 }
+  ],
+  maxScore: 10,
+  ...extra
 });
 
-const translation = (id: string, prompt: string, suggestedAnswer: string): Question => ({
+const translation = (
+  id: string,
+  prompt: string,
+  suggestedAnswer: string,
+  translationType: Question['translationType'] = 'vi_to_zh_text',
+  extra: Partial<Question> = {}
+): Question => ({
   id,
   type: 'translation',
-  translationType: 'vi_to_zh_text',
+  translationType,
   tier: 'tier3',
   prompt,
   suggestedAnswer,
-  teacherReviewRequired: true
+  referenceAnswers: [suggestedAnswer],
+  teacherReviewRequired: true,
+  requiredElements: ['Dịch đủ nghĩa', 'Đúng ngữ pháp và từ vựng mục tiêu'],
+  explanation: 'Chấp nhận cách dịch khác nếu đúng nghĩa và đúng ngữ pháp; bài ghi âm chấm thêm thanh điệu và độ trôi chảy.',
+  rubric: [
+    { id: 'meaning', label: 'Đúng nghĩa', maxScore: 6 },
+    { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 4 }
+  ],
+  maxScore: 10,
+  ...extra
 });
+
+const listeningGroup = (
+  id: string,
+  prompt: string,
+  audioText: string,
+  type: 'listening_tf' | 'listening_mc',
+  subQuestions: Question[]
+): Question => ({
+  id,
+  type,
+  tier: 'tier2',
+  prompt,
+  audioText,
+  explanation: `Kịch bản nghe: ${audioText}`,
+  maxAudioPlayCount: 2,
+  subQuestions
+});
+
+const listeningTf = (id: string, prompt: string, isTrue: boolean): Question => ({
+  id,
+  type: 'listening_tf',
+  tier: 'tier2',
+  prompt,
+  options: ['✓', '✗'],
+  answer: isTrue ? 0 : 1
+});
+
+const listeningMc = (id: string, prompt: string, options: string[], answer: number): Question => ({
+  id,
+  type: 'listening_mc',
+  tier: 'tier2',
+  prompt,
+  options,
+  answer
+});
+
+const bai4ReadingWordBank = ['过', '商场', '进去', '条', '裤子', '因为', '试', '所以', '书包', '过去', '更', '颜色'];
+const bai4WritingRubric = [
+  { id: 'content', label: 'Nội dung đủ ý', maxScore: 3 },
+  { id: 'targets', label: 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', maxScore: 3 },
+  { id: 'grammar', label: 'Ngữ pháp đúng', maxScore: 2 },
+  { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
+];
+const bai4SpeakingRubric = [
+  { id: 'meaning', label: 'Đúng nội dung', maxScore: 4 },
+  { id: 'tones', label: 'Thanh điệu và phát âm', maxScore: 3 },
+  { id: 'fluency', label: 'Ngữ điệu và độ trôi chảy', maxScore: 3 }
+];
+const bai4GuidedSpeakingRubric = [
+  { id: 'target', label: 'Dùng đúng từ/cấu trúc gợi ý', maxScore: 4 },
+  { id: 'grammar', label: 'Câu đúng ngữ pháp', maxScore: 3 },
+  { id: 'pronunciation', label: 'Phát âm và thanh điệu', maxScore: 3 }
+];
+const bai4TextTranslationRubric = [
+  { id: 'meaning', label: 'Đúng nghĩa', maxScore: 6 },
+  { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 4 }
+];
+const bai4AudioTranslationRubric = [
+  { id: 'meaning', label: 'Đúng nghĩa', maxScore: 5 },
+  { id: 'tones', label: 'Thanh điệu và phát âm', maxScore: 3 },
+  { id: 'fluency', label: 'Nói trôi chảy, đúng ngữ pháp', maxScore: 2 }
+];
 
 const reading = (
   id: string,
   title: string,
   content: string,
-  questions: Question[]
-): ReadingPassage => ({ id, title, content, questions });
+  questions: Question[],
+  wordBank?: string[]
+): ReadingPassage => ({ id, title, content, questions, ...(wordBank ? { wordBank } : {}) });
 
 export const HSK2_BAI4_EXAM: ExamLesson = {
   id: 'hsk2-bai4-ni-chuan-hongse-de-hen-haokan',
   title: 'HSK 2 - Bài 4: 你穿红色的很好看',
   level: 'HSK 2',
-  description: 'Luyện từ vựng màu sắc, 过, 因为……所以……, 的 làm đại từ và sửa lỗi câu.',
+  description: 'Bài tập 5 kỹ năng HSK2 Bài 4: 你穿红色的很好看.',
+  instruction: 'Làm theo thứ tự: từ vựng → nghe → đọc → viết → nói → dịch. Phần nghe dùng đúng kịch bản trong tài liệu; phần tự luận, nói và dịch có hướng dẫn chấm cho giáo viên.',
   mcQuestions: [],
   vocabList: [
-    vocab('过', 'guo', 'đã từng', 'Trợ từ'), vocab('商场', 'shāngchǎng', 'trung tâm thương mại', 'Danh từ'),
-    vocab('进去', 'jìnqù', 'đi vào', 'Động từ'), vocab('条', 'tiáo', 'lượng từ cho vật dài hẹp', 'Lượng từ'),
-    vocab('书包', 'shūbāo', 'cặp sách', 'Danh từ'), vocab('颜色', 'yánsè', 'màu sắc', 'Danh từ'),
-    vocab('裤子', 'kùzi', 'quần', 'Danh từ'), vocab('试', 'shì', 'thử', 'Động từ'),
-    vocab('因为', 'yīnwèi', 'vì', 'Liên từ'), vocab('所以', 'suǒyǐ', 'cho nên', 'Liên từ'),
-    vocab('过去', 'guòqù', 'qua đó', 'Động từ'), vocab('更', 'gèng', 'càng, hơn', 'Phó từ')
+    vocab('过', 'guo', 'đã từng', 'Trợ từ động thái'), vocab('商场', 'shāngchǎng', 'trung tâm thương mại', 'Danh từ'),
+    vocab('进去', 'jìnqù', 'đi vào', 'Động từ'), vocab('条', 'tiáo', 'cái/con (vật dài, hẹp hoặc mảnh)', 'Lượng từ'),
+    vocab('裤子', 'kùzi', 'quần', 'Danh từ'), vocab('白色', 'báisè', 'màu trắng', 'Danh từ'),
+    vocab('因为', 'yīnwèi', 'bởi vì, vì', 'Liên từ'), vocab('试', 'shì', 'thử', 'Động từ'),
+    vocab('红色', 'hóngsè', 'màu đỏ', 'Danh từ'), vocab('所以', 'suǒyǐ', 'cho nên, vì vậy', 'Liên từ'),
+    vocab('书包', 'shūbāo', 'cặp sách, ba lô học sinh', 'Danh từ'), vocab('过去', 'guòqù', 'đi qua đó, đi tới đó', 'Động từ'),
+    vocab('绿色', 'lǜsè', 'màu xanh lá', 'Danh từ'), vocab('黑色', 'hēisè', 'màu đen', 'Danh từ'),
+    vocab('更', 'gèng', 'hơn, càng hơn', 'Phó từ'), vocab('颜色', 'yánsè', 'màu sắc', 'Danh từ')
   ],
-  fillQuestions: [
-    fill('hsk2_b4_fill_01', '我看见老师在里面，我们____找她吧。', '进去', {
-      fillGroup: 'hsk2-b4-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['进去', '条', '商场', '书包', '颜色']
-    }),
-    fill('hsk2_b4_fill_02', '我想买一____新裤子。', '条', {
-      fillGroup: 'hsk2-b4-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['进去', '条', '商场', '书包', '颜色']
-    }),
-    fill('hsk2_b4_fill_03', '这家____是新开的，东西很便宜。', '商场', {
-      fillGroup: 'hsk2-b4-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['进去', '条', '商场', '书包', '颜色']
-    }),
-    fill('hsk2_b4_fill_04', '我的____不见了，我需要买一个新的。', '书包', {
-      fillGroup: 'hsk2-b4-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['进去', '条', '商场', '书包', '颜色']
-    }),
-    fill('hsk2_b4_fill_05', '这件衣服什么____？我喜欢绿色。', '颜色', {
-      fillGroup: 'hsk2-b4-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['进去', '条', '商场', '书包', '颜色']
-    }),
-    fill('hsk2_b4_fill_06a', '我没吃____这种水果。', '过', {
-      fillGroup: 'hsk2-b4-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['过', '因为', '所以', '试', '过去', '更']
-    }),
-    fill('hsk2_b4_fill_06b', '我想____一下。', '试', {
-      fillGroup: 'hsk2-b4-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['过', '因为', '所以', '试', '过去', '更']
-    }),
-    fill('hsk2_b4_fill_07a', '____今天天气不好。', '因为', {
-      fillGroup: 'hsk2-b4-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['过', '因为', '所以', '试', '过去', '更']
-    }),
-    fill('hsk2_b4_fill_07b', '____我们不去商场了。', '所以', {
-      fillGroup: 'hsk2-b4-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['过', '因为', '所以', '试', '过去', '更']
-    }),
-    fill('hsk2_b4_fill_08', '那边卖裤子，我们____看看吧。', '过去', {
-      fillGroup: 'hsk2-b4-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['过', '因为', '所以', '试', '过去', '更']
-    }),
-    fill('hsk2_b4_fill_09', '绿色的很好看，我觉得黑色的____好看。', '更', {
-      fillGroup: 'hsk2-b4-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['过', '因为', '所以', '试', '过去', '更']
-    })
-  ],
+  fillQuestions: [],
   arrangeQuestions: [
-    arrange('hsk2_b4_arr_01', '来过 / 这家 / 我们 / 商场', ['来过', '这家', '我们', '商场', '。'], '我们来过这家商场。'),
-    arrange('hsk2_b4_arr_02', '想买 / 我 / 裤子 / 条 / 白色的', ['想买', '我', '裤子', '条', '白色的', '。'], '我想买条白色的裤子。'),
-    arrange('hsk2_b4_arr_03', '没穿过 / 红色的 / 我', ['没穿过', '红色的', '我', '。'], '我没穿过红色的。'),
-    arrange('hsk2_b4_arr_04', '因为 / 没穿过 / 所以 / 要 / 试试', ['因为', '没穿过', '所以', '要', '试试', '。'], '因为没穿过，所以要试试。'),
-    arrange('hsk2_b4_arr_05', '看看 / 过去 / 我们 / 吧 / 书包', ['看看', '过去', '我们', '吧', '书包', '。'], '我们过去看看书包吧。'),
-    arrange('hsk2_b4_arr_06', '好看 / 穿 / 你 / 红色的 / 很', ['好看', '穿', '你', '红色的', '很', '。'], '你穿红色的很好看。'),
-    arrange('hsk2_b4_arr_07', '很多 / 衣服 / 商场 / 的 / 颜色 / 里', ['很多', '衣服', '商场', '的', '颜色', '里', '。'], '商场里的衣服颜色很多。'),
-    arrange('hsk2_b4_arr_08', '更喜欢 / 我 / 绿色的', ['更喜欢', '我', '绿色的', '。'], '我更喜欢绿色的。')
+    arrange('hsk2_b4_arr_01', '过 / 北京 / 我 / 去', ['过', '北京', '我', '去', '。'], '我去过北京。'),
+    arrange('hsk2_b4_arr_02', '穿 / 裤子 / 过 / 红色的 / 她 / 没', ['穿', '裤子', '过', '红色的', '她', '没', '。'], '她没穿过红色的裤子。'),
+    arrange('hsk2_b4_arr_03', '所以 / 今天 / 下雨 / 因为 / 商场 / 我 / 不 / 去', ['所以', '今天', '下雨', '因为', '商场', '我', '不', '去', '。'], '因为今天下雨，所以我不去商场。'),
+    arrange('hsk2_b4_arr_04', '买 / 的 / 书包 / 我 / 绿色 / 想', ['买', '的', '书包', '我', '绿色', '想', '。'], '我想买绿色的书包。'),
+    arrange('hsk2_b4_arr_05', '好看 / 红色的 / 觉得 / 我 / 更', ['好看', '红色的', '觉得', '我', '更', '。'], '我觉得红色的更好看。')
   ],
   readingPassages: [reading(
     'hsk2_b4_reading',
-    'Đọc hiểu: Đi mua quần áo',
-    '我和妈妈去了一家商场。因为是新开的，所以这几天东西很便宜。商场里的衣服颜色很多。我没穿过红色的裤子，妈妈让我试了试，我觉得我穿红色的也很好看。',
+    'II. 阅读 · Bài 1–3: Đọc hiểu',
+    '今天我和朋友去了一家商场。这家商场我没去过，所以我们进去看了看。商场里的书包颜色很多，有红色的、绿色的和黑色的。我想买一个新书包，朋友说绿色的更好看，所以我买了绿色的。',
     [
-      mc('hsk2_b4_read_01', '我和妈妈去了哪里？', ['超市', '商场', '学校'], 1),
-      mc('hsk2_b4_read_02', '这家商场东西为什么很便宜？', ['因为很大', '因为新开的', '因为衣服很多'], 1),
-      mc('hsk2_b4_read_03', '商场的衣服怎么样？', ['颜色很多', '都很贵', '都是红色'], 0),
-      mc('hsk2_b4_read_04', '“我”有没有穿过红色的裤子？', ['穿过', '没穿过', '每天穿'], 1),
-      mc('hsk2_b4_read_05', '“我”觉得穿红色的裤子怎么样？', ['不好看', '很好看', '太贵'], 1),
-      essay('hsk2_b4_read_06', '这家商场是新开的吗？', '是的，是新开的。'),
-      essay('hsk2_b4_read_07', '妈妈让“我”做什么？', '妈妈让我试红色的裤子。')
-    ]
+      mc('hsk2_b4_read_01', '他们以前去过这家商场。', ['✓', '✗'], 1),
+      mc('hsk2_b4_read_02', '商场里的书包颜色很多。', ['✓', '✗'], 0),
+      mc('hsk2_b4_read_03', '他买了绿色的书包。', ['✓', '✗'], 0),
+      mc('hsk2_b4_read_04', '他们为什么进去看了看？', ['因为没去过', '因为下雨', '因为要买裤子'], 0),
+      mc('hsk2_b4_read_05', '朋友觉得哪个颜色更好看？', ['红色', '绿色', '黑色'], 1),
+      mc('hsk2_b4_read_06', '他买了什么？', ['裤子', '衣服', '书包'], 2),
+      fill('hsk2_b4_read_fill_01', '我去（　）北京，但是没去过西安。', '过', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_02', '这个（　）很大，里面有很多衣服。', '商场', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_03', '外面很冷，我们（　）吧。', '进去', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_04', '这（　）裤子很好看。', '条', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_05', '你穿这条（　）很好看。', '裤子', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_06', '（　）今天下雨，所以我不出去。', '因为', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_07', '这件衣服很好看，你（　）一下吧。', '试', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_08', '今天很累，（　）我不想出去。', '所以', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_09', '我想买一个新（　）。', '书包', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_10', '那边有很多书包，我们（　）看看吧。', '过去', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_11', '我觉得红色的（　）好看。', '更', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b4_read_fill_12', '你喜欢什么（　）？', '颜色', bai4ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b4-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' })
+    ],
+    bai4ReadingWordBank
   )],
+  listeningQuestions: [
+    listeningGroup('hsk2_b4_listen_01', 'Bài 1 · 听短文，判断对错', '我叫小雪，今天和妈妈去了一家新商场。我没来过这家商场，所以很想进去看看。我想买一条裤子。我有很多白色的衣服，但是没穿过红色的。妈妈让我试试红色的裤子，我觉得很好看。', 'listening_tf', [
+      listeningTf('hsk2_b4_listen_01_01', '小雪来过这家商场。', false),
+      listeningTf('hsk2_b4_listen_01_02', '小雪想买一条裤子。', true),
+      listeningTf('hsk2_b4_listen_01_03', '小雪没有白色的衣服。', false),
+      listeningTf('hsk2_b4_listen_01_04', '小雪穿过红色的裤子。', false),
+      listeningTf('hsk2_b4_listen_01_05', '小雪觉得红色的裤子很好看。', true)
+    ]),
+    listeningGroup('hsk2_b4_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：我们来过这家商场吗？男：没来过，这是新开的。', 'listening_mc', [
+      listeningMc('hsk2_b4_listen_02_01', '他们来过这家商场吗？', ['来过', '没来过', '不知道'], 1)
+    ]),
+    listeningGroup('hsk2_b4_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '男：你想买点儿什么？女：我想买条裤子。', 'listening_mc', [
+      listeningMc('hsk2_b4_listen_02_02', '女的想买什么？', ['书包', '裤子', '衣服'], 1)
+    ]),
+    listeningGroup('hsk2_b4_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：你有很多白色的衣服，为什么还买白色的？男：因为我喜欢白色的。', 'listening_mc', [
+      listeningMc('hsk2_b4_listen_02_03', '男的为什么买白色的？', ['因为他喜欢', '因为便宜', '因为妈妈买'], 0)
+    ]),
+    listeningGroup('hsk2_b4_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：你吃过北京烤鸭吗？女：吃过，很好吃。', 'listening_mc', [
+      listeningMc('hsk2_b4_listen_02_04', '女的吃过北京烤鸭吗？', ['吃过', '没吃过', '想吃'], 0)
+    ]),
+    listeningGroup('hsk2_b4_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：红色的、绿色的、黑色的，你想买哪个？男：绿色的吧。', 'listening_mc', [
+      listeningMc('hsk2_b4_listen_02_05', '男的想买什么颜色的？', ['红色', '绿色', '黑色'], 1)
+    ])
+  ],
   essayQuestions: [
-    errorCorrection('hsk2_b4_error_01', '我没穿红色裤子过。', false, '我没穿过红色裤子。'),
-    errorCorrection('hsk2_b4_error_02', '因为我喜欢白色，所以想买条白色裤子的。', false, '因为我喜欢白色，所以想买条白色的裤子。'),
-    errorCorrection('hsk2_b4_error_03', '这个书包是黑色，那个是绿色。', false, '这个书包是黑色的，那个是绿色的。'),
-    errorCorrection('hsk2_b4_error_04', '我去过这家商场没有？', true),
-    errorCorrection('hsk2_b4_error_05', '我觉得红色的好看，绿色的好看更。', false, '我觉得红色的好看，绿色的更好看。'),
-    essay('hsk2_b4_writing', 'Dùng 过、商场、因为……所以……、颜色、更 viết đoạn văn khoảng 40–50 chữ.')
+    errorCorrection('hsk2_b4_error_01', '我去了过北京。', false, '我去过北京。', { taskGroup: 'bai4-error-correction', taskGroupTitle: 'Bài 2: 改错句' }),
+    errorCorrection('hsk2_b4_error_02', '我没去过了北京。', false, '我没去过北京。', { taskGroup: 'bai4-error-correction', taskGroupTitle: 'Bài 2: 改错句' }),
+    errorCorrection('hsk2_b4_error_03', '因为今天下雨，但是我不出去。', false, '因为今天下雨，所以我不出去。', { taskGroup: 'bai4-error-correction', taskGroupTitle: 'Bài 2: 改错句' }),
+    errorCorrection('hsk2_b4_error_04', '一条书包。', false, '一个书包。', { taskGroup: 'bai4-error-correction', taskGroupTitle: 'Bài 2: 改错句' }),
+    errorCorrection('hsk2_b4_error_05', '我喜欢红色衣服。', false, '我喜欢红色的衣服。', { taskGroup: 'bai4-error-correction', taskGroupTitle: 'Bài 2: 改错句' }),
+    essay('hsk2_b4_writing', '写一写你去商场买东西的一次经历。请写一篇60–80字的短文。至少使用下面5个词语/结构：过、商场、进去、条、因为、所以、试、颜色、更、书包、裤子。', '今天我和妈妈去了一家新商场，我以前没去过。因为我想买书包，所以我们进去看了看。商场里的书包颜色很多，我试了试红色的和绿色的。我觉得绿色的更好看，所以买了绿色的。', {
+      teacherReviewRequired: true,
+      referenceAnswers: ['今天我和妈妈去了一家新商场，我以前没去过。因为我想买书包，所以我们进去看了看。商场里的书包颜色很多，我试了试红色的和绿色的。我觉得绿色的更好看，所以买了绿色的。'],
+      taskGroup: 'bai4-writing',
+      taskGroupTitle: 'Bài 3: 写短文',
+      requiredElements: ['Đủ 60–80 chữ', 'Dùng ít nhất 5 từ/cấu trúc yêu cầu'],
+      explanation: 'Chấp nhận cách diễn đạt khác nếu đủ ý, đúng ngữ pháp và dùng đúng tối thiểu 5 từ/cấu trúc yêu cầu.',
+      rubric: bai4WritingRubric,
+      maxScore: 10
+    })
   ],
   speakingQuestions: [
-    speaking('hsk2_b4_speaking_01', '我们来过这家商场吗？'), speaking('hsk2_b4_speaking_02', '我想买条裤子。'),
-    speaking('hsk2_b4_speaking_03', '就是因为没穿过，所以要试试啊！'), speaking('hsk2_b4_speaking_04', '你穿红色的很好看。'),
-    speaking('hsk2_b4_speaking_05', '我觉得绿色的更好看。')
+    { ...speaking('hsk2_b4_speaking_01', '我们来过这家商场吗？'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['我们来过这家商场吗？'], rubric: bai4SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_02', '没来过，这是新开的。'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['没来过，这是新开的。'], rubric: bai4SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_03', '我们进去看看吧。'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['我们进去看看吧。'], rubric: bai4SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_04', '你有很多白色的衣服，为什么还买白色的？'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['你有很多白色的衣服，为什么还买白色的？'], rubric: bai4SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_05', '正是因为没穿过，所以要试试啊！'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['正是因为没穿过，所以要试试啊！'], rubric: bai4SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_06', '红色的、绿色的、黑色的，你想买哪个？'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['红色的、绿色的、黑色的，你想买哪个？'], rubric: bai4SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_07', '过 → 我去过______。'), taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我去过北京。', referenceAnswers: ['我去过北京。'], requiredElements: ['过'], rubric: bai4GuidedSpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_08', '因为……所以…… → 因为今天下雨，______。'), taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '因为今天下雨，所以我不去商场。', referenceAnswers: ['因为今天下雨，所以我不去商场。'], requiredElements: ['因为……所以……'], rubric: bai4GuidedSpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_09', '试 → 这件衣服很好看，你______。'), taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '这件衣服很好看，你试试吧。', referenceAnswers: ['这件衣服很好看，你试试吧。'], requiredElements: ['试'], rubric: bai4GuidedSpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_10', '更 → 我觉得______。'), taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我觉得红色的更好看。', referenceAnswers: ['我觉得红色的更好看。'], requiredElements: ['更'], rubric: bai4GuidedSpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b4_speaking_11', '颜色 → 你______？'), taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '你喜欢什么颜色？', referenceAnswers: ['你喜欢什么颜色？'], requiredElements: ['颜色'], rubric: bai4GuidedSpeakingRubric, maxScore: 10 }
   ],
   translationQuestions: [
-    translation('hsk2_b4_translation_01', 'Tôi chưa từng đến trung tâm thương mại này.', '我没来过这家商场。'),
-    translation('hsk2_b4_translation_02', 'Vì tôi thích màu xanh lá nên tôi muốn mua cái cặp sách màu xanh lá.', '因为我喜欢绿色，所以我想买绿色的书包。'),
-    translation('hsk2_b4_translation_03', 'Chúng ta qua đó xem thử quần áo đi.', '我们过去看看衣服吧。'),
-    translation('hsk2_b4_translation_04', 'Bạn đã thử quần màu đỏ chưa?', '你试过红色的裤子吗？'),
-    translation('hsk2_b4_translation_05', 'Quần áo ở đây có rất nhiều màu sắc.', '这里的衣服颜色很多。')
+    translation('hsk2_b4_translation_01', '我们来过这家商场吗？', 'Chúng ta đã từng đến trung tâm thương mại này chưa?', 'zh_to_vi_text', { rubric: bai4TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_02', '你有很多白色的衣服，为什么还买白色的？', 'Bạn có rất nhiều quần áo màu trắng, sao còn mua màu trắng?', 'zh_to_vi_text', { rubric: bai4TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_03', '正是因为没穿过，所以要试试啊！', 'Chính vì chưa từng mặc, nên mới phải thử chứ!', 'zh_to_vi_text', { rubric: bai4TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_04', 'Tôi chưa từng đi Tây An.', '我没去过西安。', 'vi_to_zh_text', { rubric: bai4TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_05', 'Vì hôm nay trời mưa nên tôi không đi trung tâm thương mại.', '因为今天下雨，所以我不去商场。', 'vi_to_zh_text', { rubric: bai4TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_06', 'Bạn thích màu gì?', '你喜欢什么颜色？', 'vi_to_zh_text', { rubric: bai4TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_07', 'Tôi muốn mua một cái quần màu đỏ.', '我想买一条红色的裤子。', 'vi_to_zh_audio', { taskGroup: 'oral_translation', taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung', rubric: bai4AudioTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_08', 'Chúng ta qua đó xem cặp sách đi.', '我们过去看看书包吧。', 'vi_to_zh_audio', { taskGroup: 'oral_translation', taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung', rubric: bai4AudioTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b4_translation_09', 'Tôi thấy màu xanh lá đẹp hơn.', '我觉得绿色的更好看。', 'vi_to_zh_audio', { taskGroup: 'oral_translation', taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung', rubric: bai4AudioTranslationRubric, maxScore: 10 })
   ]
 };
+
+const bai5ReadingWordBank = ['快', '慢', '下来', '上去', '下面', '等', '一会儿', '进来', '爷爷', '礼物', '准备', '酒店', '奶茶', '跟', '走'];
+const bai5WritingRubric = [
+  { id: 'content', label: 'Nội dung đủ ý', maxScore: 3 },
+  { id: 'targets', label: 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', maxScore: 3 },
+  { id: 'grammar', label: 'Ngữ pháp đúng', maxScore: 2 },
+  { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
+];
+const bai5SpeakingRubric = [
+  { id: 'meaning', label: 'Đúng nội dung', maxScore: 4 },
+  { id: 'tones', label: 'Thanh điệu và phát âm', maxScore: 3 },
+  { id: 'fluency', label: 'Ngữ điệu và độ trôi chảy', maxScore: 3 }
+];
+const bai5GuidedSpeakingRubric = [
+  { id: 'target', label: 'Dùng đúng từ/cấu trúc gợi ý', maxScore: 4 },
+  { id: 'grammar', label: 'Câu đúng ngữ pháp', maxScore: 3 },
+  { id: 'pronunciation', label: 'Phát âm và thanh điệu', maxScore: 3 }
+];
+const bai5TextTranslationRubric = [
+  { id: 'meaning', label: 'Đúng nghĩa', maxScore: 6 },
+  { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 4 }
+];
+const bai5AudioTranslationRubric = [
+  { id: 'meaning', label: 'Đúng nghĩa', maxScore: 5 },
+  { id: 'tones', label: 'Thanh điệu và phát âm', maxScore: 3 },
+  { id: 'fluency', label: 'Nói trôi chảy, đúng ngữ pháp', maxScore: 2 }
+];
 
 export const HSK2_BAI5_EXAM: ExamLesson = {
   id: 'hsk2-bai5-diyici-qu-zhongguo-pengyou-jia',
   title: 'HSK 2 - Bài 5: 第一次去中国朋友家',
   level: 'HSK 2',
-  description: 'Luyện bổ ngữ xu hướng 上来、下来、进去、跟 và cấu trúc 都……了.',
+  description: 'Bài tập 5 kỹ năng HSK2 Bài 5: 第一次去中国朋友家.',
+  instruction: 'Làm theo đúng thứ tự: từ vựng → nghe → đọc → viết → nói → dịch. Phần tự luận, nói và dịch có đáp án tham khảo, ý bắt buộc, giải thích và thang điểm cho giáo viên.',
   mcQuestions: [],
   vocabList: [
-    vocab('快', 'kuài', 'nhanh, nhanh lên', 'Tính từ/Phó từ'), vocab('下来', 'xiàlái', 'xuống về phía người nói', 'Động từ'),
-    vocab('上来', 'shànglái', 'lên về phía người nói', 'Động từ'), vocab('上去', 'shàngqù', 'lên rời xa người nói', 'Động từ'),
-    vocab('下面', 'xiàmiàn', 'phía dưới', 'Danh từ'), vocab('等', 'děng', 'đợi', 'Động từ'),
-    vocab('一会儿', 'yíhuìr', 'một lát', 'Danh từ'), vocab('礼物', 'lǐwù', 'quà', 'Danh từ'),
-    vocab('进来', 'jìnlái', 'vào về phía người nói', 'Động từ'), vocab('跟', 'gēn', 'cùng, với', 'Giới từ'),
-    vocab('酒店', 'jiǔdiàn', 'khách sạn', 'Danh từ')
+    vocab('快', 'kuài', 'mau, nhanh', 'Phó từ / tính từ'), vocab('慢', 'màn', 'chậm, chậm rãi', 'Tính từ / phó từ'),
+    vocab('下来', 'xiàlái', 'đi xuống đây, xuống', 'Động từ'), vocab('上来', 'shànglái', 'đi lên đây, lên', 'Động từ'),
+    vocab('上去', 'shàngqù', 'đi lên đó, lên', 'Động từ'), vocab('下面', 'xiàmiàn', 'phía dưới, bên dưới, tầng dưới', 'Danh từ'),
+    vocab('面', 'miàn', 'hậu tố dùng tạo từ chỉ nơi chốn', 'Hậu tố'), vocab('等', 'děng', 'đợi, chờ', 'Động từ'),
+    vocab('一会儿', 'yíhuìr', 'một lát, lát nữa', 'Danh từ chỉ thời gian'), vocab('下去', 'xiàqù', 'đi xuống đó, xuống', 'Động từ'),
+    vocab('进来', 'jìnlái', 'đi vào đây, vào', 'Động từ'), vocab('爷爷', 'yéye', 'ông nội', 'Danh từ'),
+    vocab('奶奶', 'nǎinai', 'bà nội', 'Danh từ'), vocab('礼物', 'lǐwù', 'quà, lễ vật', 'Danh từ'),
+    vocab('准备', 'zhǔnbèi', 'chuẩn bị', 'Động từ'), vocab('酒店', 'jiǔdiàn', 'khách sạn', 'Danh từ'),
+    vocab('奶茶', 'nǎichá', 'trà sữa', 'Danh từ'), vocab('跟', 'gēn', 'với, cùng, và', 'Giới từ / liên từ'),
+    vocab('走', 'zǒu', 'đi, bước đi', 'Động từ')
   ],
-  fillQuestions: [
-    fill('hsk2_b5_fill_01', '你____一点儿，我们要迟到了。', '快', {
-      fillGroup: 'hsk2-b5-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['快', '下面', '等', '一会儿', '礼物']
-    }),
-    fill('hsk2_b5_fill_02a', '我不上去，我在____。', '下面', {
-      fillGroup: 'hsk2-b5-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['快', '下面', '等', '一会儿', '礼物']
-    }),
-    fill('hsk2_b5_fill_02b', '我在下面____你。', '等', {
-      fillGroup: 'hsk2-b5-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['快', '下面', '等', '一会儿', '礼物']
-    }),
-    fill('hsk2_b5_fill_03', '请你坐____，他马上就到。', '一会儿', {
-      fillGroup: 'hsk2-b5-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['快', '下面', '等', '一会儿', '礼物']
-    }),
-    fill('hsk2_b5_fill_04', '这是我给朋友准备的____。', '礼物', {
-      fillGroup: 'hsk2-b5-fill-group-1',
-      fillGroupTitle: 'Nhóm 1',
-      wordBank: ['快', '下面', '等', '一会儿', '礼物']
-    }),
-    fill('hsk2_b5_fill_05', '外边很冷，你们快____吧。', '进来', {
-      fillGroup: 'hsk2-b5-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
-    }),
-    fill('hsk2_b5_fill_06', '我在楼上，你____找我吧。', '上来', {
-      fillGroup: 'hsk2-b5-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
-    }),
-    fill('hsk2_b5_fill_07a', '我在楼下，你____吧。', '下来', {
-      fillGroup: 'hsk2-b5-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
-    }),
-    fill('hsk2_b5_fill_07b', '我不____了。', '上去', {
-      fillGroup: 'hsk2-b5-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
-    }),
-    fill('hsk2_b5_fill_08a', '吃完饭，我____朋友回酒店。', '跟', {
-      fillGroup: 'hsk2-b5-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
-    }),
-    fill('hsk2_b5_fill_08b', '吃完饭，我跟朋友回____。', '酒店', {
-      fillGroup: 'hsk2-b5-fill-group-2',
-      fillGroupTitle: 'Nhóm 2',
-      wordBank: ['上来', '上去', '下来', '下去', '进来', '跟', '酒店']
-    }),
-    fill('hsk2_b5_fill_09a', '____九点了，我们快走吧。', '都', {
-      fillGroup: 'hsk2-b5-fill-group-3',
-      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
-      wordBank: ['都', '了']
-    }),
-    fill('hsk2_b5_fill_09b', '都九点____，我们快走吧。', '了', {
-      fillGroup: 'hsk2-b5-fill-group-3',
-      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
-      wordBank: ['都', '了']
-    }),
-    fill('hsk2_b5_fill_10a', '我____去过中国了，我不想再去。', '都', {
-      fillGroup: 'hsk2-b5-fill-group-3',
-      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
-      wordBank: ['都', '了']
-    }),
-    fill('hsk2_b5_fill_10b', '我都去过中国____，我不想再去。', '了', {
-      fillGroup: 'hsk2-b5-fill-group-3',
-      fillGroupTitle: 'Nhóm 3 · Cấu trúc “都……了”',
-      wordBank: ['都', '了']
-    })
-  ],
+  fillQuestions: [],
   arrangeQuestions: [
-    arrange('hsk2_b5_arr_01', '快 / 吧 / 下来', ['快', '吧', '下来', '。'], '快下来吧。'),
-    arrange('hsk2_b5_arr_02', '在 / 我 / 等 / 下面 / 你', ['在', '我', '等', '下面', '你', '。'], '我在下面等你。'),
-    arrange('hsk2_b5_arr_03', '一会儿 / 就 / 我 / 下去', ['一会儿', '就', '我', '下去', '。'], '我一会儿就下去。'),
-    arrange('hsk2_b5_arr_04', '快 / 吧 / 进来', ['快', '吧', '进来', '。'], '快进来吧。'),
-    arrange('hsk2_b5_arr_05', '礼物 / 拿 / 来 / 这么多', ['礼物', '拿', '来', '这么多', '。'], '拿这么多礼物来。'),
-    arrange('hsk2_b5_arr_06', '都 / 12 点 / 了 / 我们 / 吃饭 / 吧', ['都', '12点', '了', '我们', '吃饭', '吧', '。'], '都12点了，我们吃饭吧。'),
-    arrange('hsk2_b5_arr_07', '跟 / 我 / 商场 / 去 / 看看', ['跟', '我', '商场', '去', '看看', '。'], '跟我去商场看看。'),
-    arrange('hsk2_b5_arr_08', '走回 / 我们 / 酒店', ['走回', '我们', '酒店', '。'], '我们走回酒店。')
+    arrange('hsk2_b5_arr_01', '吧　下来　快　你', ['吧', '下来', '快', '你'], '你快下来吧。'),
+    arrange('hsk2_b5_arr_02', '你　我　在　等　下面', ['你', '我', '在', '等', '下面'], '我在下面等你。'),
+    arrange('hsk2_b5_arr_03', '就　下去　一会儿　我', ['就', '下去', '一会儿', '我'], '我一会儿就下去。'),
+    arrange('hsk2_b5_arr_04', '吃饭　十二点　吧　了　我们　都', ['吃饭', '十二点', '吧', '了', '我们', '都'], '都十二点了，我们吃饭吧。'),
+    arrange('hsk2_b5_arr_05', '了　礼物　爷爷　准备　给　我', ['了', '礼物', '爷爷', '准备', '给', '我'], '我给爷爷准备了礼物。')
   ],
   readingPassages: [reading(
     'hsk2_b5_reading',
-    'Đọc hiểu: Lần đầu đến nhà bạn Trung Quốc',
-    '回国前一天，我们去一雪姐家了。到她家的时候，饭菜都做好了。刘爷爷还准备了奶茶。因为吃了太多东西，我们吃完饭是走回酒店的。',
+    'II. 阅读 · Bài 1–3: Đọc hiểu',
+    '我和朋友第一次去中国朋友家。我们给爷爷奶奶准备了礼物。因为酒店离她家不远，所以我们走去。到了以后，朋友在门口等我们，说：“快进来！”奶奶准备了很多菜，我们吃得很开心。',
     [
-      mc('hsk2_b5_read_01', '什么时候，她们去一雪姐家？', ['回国前一天', '今天早上', '明天'], 0),
-      mc('hsk2_b5_read_02', '到她家的时候，饭菜怎么样？', ['还没做', '都做好了', '正在做'], 1),
-      mc('hsk2_b5_read_03', '谁准备奶茶？', ['奶奶', '刘爷爷', '一雪姐'], 1),
-      mc('hsk2_b5_read_04', '她们为什么走回酒店？', ['没有车', '吃太多东西', '想逛街'], 1),
-      essay('hsk2_b5_read_05', '她们吃完饭去哪里？', '她们走回酒店。'),
-      essay('hsk2_b5_read_06', '刘爷爷准备了什么？', '刘爷爷准备了奶茶。')
-    ]
+      mc('hsk2_b5_read_tf_01', '他们给爷爷奶奶准备了礼物。', ['✓', '✗'], 0),
+      mc('hsk2_b5_read_tf_02', '他们打车去朋友家。', ['✓', '✗'], 1),
+      mc('hsk2_b5_read_tf_03', '奶奶准备了很多菜。', ['✓', '✗'], 0),
+      mc('hsk2_b5_read_mc_01', '他们怎么去朋友家？', ['走去', '打车', '坐公交车'], 0),
+      mc('hsk2_b5_read_mc_02', '他们为什么走去？', ['因为酒店离她家不远', '因为没有车', '因为下雨了'], 0),
+      mc('hsk2_b5_read_mc_03', '朋友在门口说了什么？', ['快进来', '快回去', '慢点儿'], 0),
+      fill('hsk2_b5_read_fill_01', '时间不早了，我们（　）回去吧。', '快', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_02', '你走（　）一点儿，我跟不上你。', '慢', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_03', '你快（　）吧，我在楼下等你。', '下来', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_04', '你先（　）吧，我一会儿就来。', '上去', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_05', '我在（　）等你，你快下来吧。', '下面', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_06', '我在门口（　）你，你快来吧。', '等', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_07', '我（　）就回来，你先在这里等我。', '一会儿', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_08', '外面下雨了，你快（　）吧。', '进来', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_09', '我（　）住在北京，奶奶住在上海。', '爷爷', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_10', '这是送给奶奶的（　）。', '礼物', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_11', '你（　）好了吗？我们要走了。', '准备', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_12', '我们住的（　）离车站很近。', '酒店', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_13', '我喜欢喝（　），不喜欢喝咖啡。', '奶茶', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_14', '你（　）我一起去吧。', '跟', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b5_read_fill_15', '酒店很近，我们（　）回去吧。', '走', bai5ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b5-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' })
+    ],
+    bai5ReadingWordBank
   )],
+  listeningQuestions: [
+    listeningGroup('hsk2_b5_listen_01', 'Bài 1 · 听短文，判断对错', '今天我第一次去中国朋友家。我给朋友的爷爷奶奶准备了礼物。我在酒店下面等朋友，朋友说一会儿就下来。我们一起走去他家。到他家的时候，奶奶已经做好了菜，爷爷还买了奶茶。我们吃得很开心。', 'listening_tf', [
+      listeningTf('hsk2_b5_listen_01_01', '这是他第一次去中国朋友家。', true),
+      listeningTf('hsk2_b5_listen_01_02', '他没有给爷爷奶奶准备礼物。', false),
+      listeningTf('hsk2_b5_listen_01_03', '朋友在酒店下面等他。', false),
+      listeningTf('hsk2_b5_listen_01_04', '奶奶已经做好了菜。', true),
+      listeningTf('hsk2_b5_listen_01_05', '奶奶买了奶茶。', false)
+    ]),
+    listeningGroup('hsk2_b5_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：你快下来吧，我在下面等你。男：我一会儿就下去。', 'listening_mc', [
+      listeningMc('hsk2_b5_listen_02_01', '女的在哪儿？', ['上面', '下面', '酒店里'], 1)
+    ]),
+    listeningGroup('hsk2_b5_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '男：快进来！我给你们介绍一下，这是爷爷、奶奶。', 'listening_mc', [
+      listeningMc('hsk2_b5_listen_02_02', '男的给她们介绍了谁？', ['爷爷奶奶', '老师', '同学'], 0)
+    ]),
+    listeningGroup('hsk2_b5_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：这是送你们的礼物。男：你们太客气了！', 'listening_mc', [
+      listeningMc('hsk2_b5_listen_02_03', '女的做了什么？', ['送礼物', '买奶茶', '做饭'], 0)
+    ]),
+    listeningGroup('hsk2_b5_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：都十二点了，我们吃饭吧。女：好的。', 'listening_mc', [
+      listeningMc('hsk2_b5_listen_02_04', '现在几点？', ['十一点', '十二点', '一点'], 1)
+    ]),
+    listeningGroup('hsk2_b5_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：奶茶是你自己做的吗？男：不是，是爷爷买的。', 'listening_mc', [
+      listeningMc('hsk2_b5_listen_02_05', '奶茶是谁买的？', ['爷爷', '奶奶', '男的'], 0)
+    ])
+  ],
   essayQuestions: [
-    errorCorrection('hsk2_b5_error_01', '我在楼上，你下去找我吧。', false, '我在楼上，你上来找我吧。'),
-    errorCorrection('hsk2_b5_error_02', '都九点，我们快走吧。', false, '都九点了，我们快走吧。'),
-    errorCorrection('hsk2_b5_error_03', '外边冷，你们快进去吧。', false, '外边冷，你们快进来吧。'),
-    errorCorrection('hsk2_b5_error_04', '我跟朋友回酒店去了。', true),
-    errorCorrection('hsk2_b5_error_05', '我等一会儿你在下面。', false, '我在下面等你一会儿。'),
-    essay('hsk2_b5_writing', 'Dùng 下来、等、一会儿、都……了、跟、走回 viết đoạn văn khoảng 40–50 chữ。')
+    errorCorrection('hsk2_b5_error_01', '你来进去吧。', false, '你进来吧。', { taskGroup: 'bai5-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句' }),
+    errorCorrection('hsk2_b5_error_02', '我去上面。', false, '我上去。', { taskGroup: 'bai5-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句' }),
+    errorCorrection('hsk2_b5_error_03', '我送来礼物给你。', false, '我给你送来礼物。', { taskGroup: 'bai5-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', acceptedVariants: ['我送礼物来给你。'] }),
+    errorCorrection('hsk2_b5_error_04', '都十二点，所以我们睡觉。', false, '都十二点了，我们睡觉吧。', { taskGroup: 'bai5-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句' }),
+    errorCorrection('hsk2_b5_error_05', '我跟一起朋友去。', false, '我跟朋友一起去。', { taskGroup: 'bai5-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句' }),
+    essay('hsk2_b5_writing', '写一写你第一次去朋友家的经历。请写一篇60–80字的短文。至少使用下面5个词语/结构：准备、礼物、等、一会儿、进来、跟、走、快、都……了、爷爷、奶奶。', '上个星期，我第一次去中国朋友家。我给他的爷爷奶奶准备了礼物。朋友在下面等我，说：“快进来！”奶奶做了很多菜，爷爷还买了奶茶。吃完饭，我跟朋友一起走回酒店。', {
+      taskGroup: 'bai5-writing',
+      taskGroupTitle: 'III. 写作 · Bài 3: 写短文',
+      requiredElements: ['Đủ 60–80 chữ', 'Dùng ít nhất 5 từ/cấu trúc yêu cầu', 'Kể được trải nghiệm lần đầu đi nhà bạn'],
+      explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.',
+      rubric: bai5WritingRubric,
+      maxScore: 10
+    })
   ],
   speakingQuestions: [
-    speaking('hsk2_b5_speaking_01', '快下来吧，别晚了。'), speaking('hsk2_b5_speaking_02', '我不上去，就在下面等你。'),
-    speaking('hsk2_b5_speaking_03', '那我一会儿就下去。'), speaking('hsk2_b5_speaking_04', '家月、安妮，快进来！'),
-    speaking('hsk2_b5_speaking_05', '都12点了，我们吃饭吧。'), speaking('hsk2_b5_speaking_06', '吃完饭我们走回酒店。')
+    { ...speaking('hsk2_b5_speaking_01', '快下来吧，第一次去中国朋友家，别晚了。'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['快下来吧，第一次去中国朋友家，别晚了。'], requiredElements: ['快下来吧', '别晚了'], rubric: bai5SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b5_speaking_02', '我不上去了，在下面等你。'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['我不上去了，在下面等你。'], requiredElements: ['不上去了', '在下面等你'], rubric: bai5SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b5_speaking_03', '那我一会儿就下去。'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['那我一会儿就下去。'], requiredElements: ['一会儿', '下去'], rubric: bai5SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b5_speaking_04', '家月，安妮，快进来！'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['家月，安妮，快进来！'], requiredElements: ['快进来'], rubric: bai5SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b5_speaking_05', '都十二点了，我们吃饭吧。'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['都十二点了，我们吃饭吧。'], requiredElements: ['都……了', '吃饭吧'], rubric: bai5SpeakingRubric, maxScore: 10 },
+    { ...speaking('hsk2_b5_speaking_06', '吃完饭你们可以跟我去看看。'), taskGroupTitle: 'IV. 口语 · Bài 1: 录音', referenceAnswers: ['吃完饭你们可以跟我去看看。'], requiredElements: ['跟我', '去看看'], rubric: bai5SpeakingRubric, maxScore: 10 },
+    speaking('hsk2_b5_speaking_07', '快 → 时间不早了，我们______。', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '时间不早了，我们快回去吧。', referenceAnswers: ['时间不早了，我们快回去吧。'], requiredElements: ['快'], rubric: bai5GuidedSpeakingRubric, maxScore: 10 }),
+    speaking('hsk2_b5_speaking_08', '等 → 我在酒店门口______。', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我在酒店门口等你。', referenceAnswers: ['我在酒店门口等你。'], requiredElements: ['等'], rubric: bai5GuidedSpeakingRubric, maxScore: 10 }),
+    speaking('hsk2_b5_speaking_09', '准备 → 我给爷爷奶奶______。', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我给爷爷奶奶准备了礼物。', referenceAnswers: ['我给爷爷奶奶准备了礼物。'], requiredElements: ['准备'], rubric: bai5GuidedSpeakingRubric, maxScore: 10 }),
+    speaking('hsk2_b5_speaking_10', '都……了 → ______，我们吃饭吧。', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '都十二点了，我们吃饭吧。', referenceAnswers: ['都十二点了，我们吃饭吧。'], requiredElements: ['都……了'], rubric: bai5GuidedSpeakingRubric, maxScore: 10 }),
+    speaking('hsk2_b5_speaking_11', '跟 → 我______一起去。', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我跟朋友一起去。', referenceAnswers: ['我跟朋友一起去。'], requiredElements: ['跟 + người + 一起'], rubric: bai5GuidedSpeakingRubric, maxScore: 10 })
   ],
   translationQuestions: [
-    translation('hsk2_b5_translation_01', 'Nhanh xuống đi, chúng ta sắp muộn rồi.', '快下来吧，我们要晚了。'),
-    translation('hsk2_b5_translation_02', 'Tôi không lên nữa, tôi đợi bạn ở phía dưới.', '我不上去，我在下面等你。'),
-    translation('hsk2_b5_translation_03', 'Đã 11 giờ rồi, chúng ta phải đi thôi.', '都11点了，我们得走了。'),
-    translation('hsk2_b5_translation_04', 'Các bạn mau vào trong nhà đi, bên ngoài lạnh lắm.', '你们快进来吧，外边很冷。'),
-    translation('hsk2_b5_translation_05', 'Sau bữa ăn tôi cùng bạn tôi đi bộ về khách sạn.', '吃完饭我跟我的朋友走回酒店。')
+    translation('hsk2_b5_translation_01', 'Gia Nguyệt, mau xuống đi, đừng để muộn.', '家月，快下来吧，别晚了。', 'zh_to_vi_text', { rubric: bai5TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_02', 'Mình không lên nữa, mình đợi bạn ở dưới.', '我不上去了，在下面等你。', 'zh_to_vi_text', { rubric: bai5TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_03', 'Đã mười hai giờ rồi, chúng ta ăn cơm đi.', '都十二点了，我们吃饭吧。', 'zh_to_vi_text', { rubric: bai5TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_04', 'Bạn mau vào đi!', '你快进来！', 'vi_to_zh_text', { rubric: bai5TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_05', 'Tôi đợi bạn ở dưới.', '我在下面等你。', 'vi_to_zh_text', { rubric: bai5TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_06', 'Đây là quà tặng ông bà.', '这是送爷爷奶奶的礼物。', 'vi_to_zh_text', { rubric: bai5TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_07', 'Lát nữa tôi sẽ xuống ngay.', '我一会儿就下去。', 'vi_to_zh_audio', { taskGroup: 'oral_translation', taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung', requiredElements: ['一会儿', '下去'], explanation: 'Giáo viên chấm theo 3 tiêu chí: đúng nghĩa, đúng thanh điệu và nói trôi chảy.', rubric: bai5AudioTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_08', 'Bạn đi cùng tôi nhé.', '你跟我一起去吧。', 'vi_to_zh_audio', { taskGroup: 'oral_translation', taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung', requiredElements: ['跟 + người + 一起'], explanation: 'Giáo viên chấm theo 3 tiêu chí: đúng nghĩa, đúng thanh điệu và nói trôi chảy.', rubric: bai5AudioTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b5_translation_09', 'Trà sữa là ông mua.', '奶茶是爷爷买的。', 'vi_to_zh_audio', { taskGroup: 'oral_translation', taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung', requiredElements: ['是……的', '爷爷买'], explanation: 'Giáo viên chấm theo 3 tiêu chí: đúng nghĩa, đúng thanh điệu và nói trôi chảy.', rubric: bai5AudioTranslationRubric, maxScore: 10 })
   ]
 };
 
-const hsk2Bai6FillGroup1: FillMeta = {
-  fillGroup: 'hsk2-b6-fill-group-1',
-  fillGroupTitle: 'Nhóm 1',
-  wordBank: ['忘', '画笔', '蛋糕', '打开', '床']
-};
-
-const hsk2Bai6FillGroup2: FillMeta = {
-  fillGroup: 'hsk2-b6-fill-group-2',
-  fillGroupTitle: 'Nhóm 2 · Điền từ, dùng dạng trùng điệp tính từ AA / AABB',
-  wordBank: ['长', '快乐', '舒服', '地']
-};
-
-const hsk2Bai6FillGroup3: FillMeta = {
-  fillGroup: 'hsk2-b6-fill-group-3'
-};
+const bai6ReadingWordBank = ['生日', '忘', '画', '画笔', '蛋糕', '快乐', '打开', '长', '鱼', '肉', '过', '地', '床', '舒服'];
+const bai6WritingRubric = [
+  { id: 'content', label: 'Nội dung đủ ý về một ngày sinh nhật', maxScore: 3 },
+  { id: 'targets', label: 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', maxScore: 3 },
+  { id: 'grammar', label: 'Ngữ pháp và cách dùng 地 / 什么的 đúng', maxScore: 2 },
+  { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
+];
+const bai6SpeakingRubric = [
+  { id: 'content', label: 'Đọc đúng và đủ câu', maxScore: 4 },
+  { id: 'tones', label: 'Thanh điệu, biến điệu và âm nhẹ', maxScore: 3 },
+  { id: 'fluency', label: 'Ngữ điệu và độ trôi chảy', maxScore: 3 }
+];
+const bai6GuidedSpeakingRubric = [
+  { id: 'target', label: 'Dùng đúng từ/cấu trúc gợi ý', maxScore: 4 },
+  { id: 'grammar', label: 'Câu đúng ngữ pháp', maxScore: 3 },
+  { id: 'pronunciation', label: 'Phát âm và thanh điệu', maxScore: 3 }
+];
+const bai6TextTranslationRubric = [
+  { id: 'meaning', label: 'Đúng nghĩa', maxScore: 6 },
+  { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 4 }
+];
+const bai6AudioTranslationRubric = [
+  { id: 'meaning', label: 'Đúng nghĩa', maxScore: 5 },
+  { id: 'tones', label: 'Thanh điệu và phát âm', maxScore: 3 },
+  { id: 'fluency', label: 'Nói trôi chảy, đúng ngữ pháp', maxScore: 2 }
+];
 
 export const HSK2_BAI6_EXAM: ExamLesson = {
   id: 'hsk2-bai6-xiaoxue-shengri-kuaile',
   title: 'HSK 2 - Bài 6: 小雪，生日快乐！',
   level: 'HSK 2',
-  description: 'Luyện từ vựng sinh nhật, trùng điệp tính từ, 地 và cụm 什么的.',
+  description: 'Bài tập 5 kỹ năng HSK2 Bài 6: 小雪，生日快乐！',
+  instruction: 'Làm theo đúng thứ tự: từ vựng → nghe → đọc → viết → nói → dịch. Phần nghe dùng kịch bản trong đáp án để gắn audio; phần tự luận, nói và dịch có đáp án tham khảo, ý bắt buộc, giải thích và thang điểm cho giáo viên.',
   mcQuestions: [],
   vocabList: [
     vocab('生日', 'shēngrì', 'sinh nhật', 'Danh từ'), vocab('忘', 'wàng', 'quên', 'Động từ'),
     vocab('画', 'huà', 'vẽ; bức tranh', 'Động từ/Danh từ'), vocab('画笔', 'huàbǐ', 'bút vẽ, bút màu', 'Danh từ'),
-    vocab('蛋糕', 'dàngāo', 'bánh ngọt, bánh sinh nhật', 'Danh từ'), vocab('打开', 'dǎkāi', 'mở ra', 'Động từ'),
-    vocab('床', 'chuáng', 'giường', 'Danh từ'), vocab('长长的', 'chángcháng de', 'dài dài', 'Tính từ'),
-    vocab('快乐', 'kuàilè', 'vui vẻ', 'Tính từ'), vocab('舒服', 'shūfu', 'thoải mái', 'Tính từ'),
-    vocab('地', 'de', 'trợ từ kết cấu trạng ngữ', 'Trợ từ'), vocab('什么的', 'shénme de', 'vân vân, các thứ', 'Cụm từ')
+    vocab('蛋糕', 'dàngāo', 'bánh ngọt, bánh sinh nhật', 'Danh từ'), vocab('快乐', 'kuàilè', 'vui vẻ, hạnh phúc', 'Tính từ'),
+    vocab('打开', 'dǎkāi', 'mở ra', 'Động từ'), vocab('长', 'cháng', 'dài', 'Tính từ'),
+    vocab('鱼', 'yú', 'cá', 'Danh từ'), vocab('肉', 'ròu', 'thịt', 'Danh từ'),
+    vocab('过', 'guò', 'trải qua, đón (sinh nhật/lễ/tết)', 'Động từ'), vocab('地', 'de', 'trợ từ kết cấu, đứng trước động từ', 'Trợ từ'),
+    vocab('床', 'chuáng', 'giường', 'Danh từ'), vocab('舒服', 'shūfu', 'thoải mái, dễ chịu', 'Tính từ')
   ],
-  fillQuestions: [
-    fill('hsk2_b6_fill_01', '明天是朋友的生日，你别____。', '忘', hsk2Bai6FillGroup1),
-    fill('hsk2_b6_fill_02', '妹妹喜欢画画，我送她一支____。', '画笔', hsk2Bai6FillGroup1),
-    fill('hsk2_b6_fill_03', '过生日我们要买一个大大的____。', '蛋糕', hsk2Bai6FillGroup1),
-    fill('hsk2_b6_fill_04', '这是你的礼物，请你____看看。', '打开', hsk2Bai6FillGroup1),
-    fill('hsk2_b6_fill_05', '很累的时候，我想在____上休息。', '床', hsk2Bai6FillGroup1),
-    fill('hsk2_b6_fill_06', '中国人过生日要吃____的面条儿。', '长长', hsk2Bai6FillGroup2),
-    fill('hsk2_b6_fill_07', '生日那天，大家____地唱歌。', '快快乐乐', hsk2Bai6FillGroup2),
-    fill('hsk2_b6_fill_08', '下班以后，我想____地睡一觉。', '舒舒服服', hsk2Bai6FillGroup2),
-    fill('hsk2_b6_fill_09', '桌子上有苹果、香蕉____。', '什么的', hsk2Bai6FillGroup3),
-    fill('hsk2_b6_fill_10', '我喜欢吃鱼、肉____。', '什么的', hsk2Bai6FillGroup3)
+  fillQuestions: [],
+  listeningQuestions: [
+    listeningGroup('hsk2_b6_listen_01', 'Bài 1 · 听短文，判断对错', '明天是我妹妹的生日。我给她准备了一个礼物，是一支画笔，因为她喜欢画画。我还买了一个大大的生日蛋糕。我忘了买鱼，所以一会儿还要出去一下。', 'listening_tf', [
+      listeningTf('hsk2_b6_listen_01_01', '明天是妹妹的生日。', true),
+      listeningTf('hsk2_b6_listen_01_02', '他给妹妹准备了画笔。', true),
+      listeningTf('hsk2_b6_listen_01_03', '妹妹不喜欢画画。', false),
+      listeningTf('hsk2_b6_listen_01_04', '他买了一个很小的蛋糕。', false),
+      listeningTf('hsk2_b6_listen_01_05', '他没有忘了买鱼。', false)
+    ]),
+    listeningGroup('hsk2_b6_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：明天就是女儿的生日了。男：你不说，我还真忘了。', 'listening_mc', [
+      listeningMc('hsk2_b6_listen_02_01', '男的怎么了？', ['忘了明天是女儿的生日', '买了礼物', '不想过生日'], 0)
+    ]),
+    listeningGroup('hsk2_b6_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '女：她喜欢画画，你觉得画笔怎么样？男：就送画笔吧！', 'listening_mc', [
+      listeningMc('hsk2_b6_listen_02_02', '他们想送什么礼物？', ['蛋糕', '画笔', '书包'], 1)
+    ]),
+    listeningGroup('hsk2_b6_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '男：你打开看看喜欢不喜欢。女：画笔！我很喜欢！', 'listening_mc', [
+      listeningMc('hsk2_b6_listen_02_03', '女的喜欢礼物吗？', ['喜欢', '不喜欢', '不知道'], 0)
+    ]),
+    listeningGroup('hsk2_b6_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：桌子上有鱼啊肉啊什么的，都是你喜欢吃的。女：谢谢！', 'listening_mc', [
+      listeningMc('hsk2_b6_listen_02_04', '桌子上有什么？', ['鱼和肉', '蛋糕和水果', '画笔'], 0)
+    ]),
+    listeningGroup('hsk2_b6_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：过生日真好啊！男：是的，过生日就要吃好吃的，还要高高兴兴地玩。', 'listening_mc', [
+      listeningMc('hsk2_b6_listen_02_05', '过生日要做什么？', ['吃好吃的，高高兴兴地玩', '去上班', '早早睡觉'], 0)
+    ])
   ],
   arrangeQuestions: [
-    arrange('hsk2_b6_arr_01', '生日快乐 / 小雪', ['生日快乐', '小雪', '！'], '小雪，生日快乐！'),
-    arrange('hsk2_b6_arr_02', '礼物 / 打开 / 看看 / 你', ['礼物', '打开', '看看', '你', '。'], '你打开礼物看看。'),
-    arrange('hsk2_b6_arr_03', '大大的 / 买个 / 我 / 蛋糕', ['大大的', '买个', '我', '蛋糕', '。'], '我买个大大的蛋糕。'),
-    arrange('hsk2_b6_arr_04', '高高兴兴地 / 玩 / 我们', ['高高兴兴地', '玩', '我们', '。'], '我们高高兴兴地玩。'),
-    arrange('hsk2_b6_arr_05', '鱼啊 / 肉啊 / 什么的 / 有', ['鱼啊', '肉啊', '什么的', '有', '。'], '有鱼啊肉啊什么的。'),
-    arrange('hsk2_b6_arr_06', '早早地 / 孩子们 / 上床', ['早早地', '孩子们', '上床', '。'], '孩子们早早地上床。'),
-    arrange('hsk2_b6_arr_07', '画画 / 喜欢 / 她', ['画画', '喜欢', '她', '。'], '她喜欢画画。'),
-    arrange('hsk2_b6_arr_08', '舒舒服服地 / 想 / 我 / 睡一觉', ['舒舒服服地', '想', '我', '睡一觉', '。'], '我想舒舒服服地睡一觉。')
+    arrange('hsk2_b6_arr_01', '蛋糕 / 我 / 大大的 / 一个 / 买了', ['蛋糕', '我', '大大的', '一个', '买了', '。'], '我买了一个大大的蛋糕。'),
+    arrange('hsk2_b6_arr_02', '高高兴兴 / 孩子们 / 蛋糕 / 地 / 吃', ['高高兴兴', '孩子们', '蛋糕', '地', '吃', '。'], '孩子们高高兴兴地吃蛋糕。'),
+    arrange('hsk2_b6_arr_03', '生日 / 小雪 / 明天 / 是 / 的', ['生日', '小雪', '明天', '是', '的', '。'], '明天是小雪的生日。'),
+    arrange('hsk2_b6_arr_04', '肉 / 桌子上 / 鱼 / 有 / 什么的 / 啊 / 啊', ['肉', '桌子上', '鱼', '有', '什么的', '啊', '啊', '。'], '桌子上有鱼啊肉啊什么的。'),
+    arrange('hsk2_b6_arr_05', '画笔 / 画画 / 她 / 用 / 喜欢', ['画笔', '画画', '她', '用', '喜欢', '。'], '她喜欢用画笔画画。')
   ],
   readingPassages: [reading(
     'hsk2_b6_reading',
-    'Đọc hiểu: Sinh nhật của con gái',
-    '今天是女儿的生日。我们买了蛋糕，做了面条儿，还做了鱼啊肉啊什么的。吃完晚饭，一家人去看了个电影。回家后，孩子们早早地就上床了。明天不上学，他们说要舒舒服服地睡一觉，让我们晚点儿叫他们起床。这是很忙、很累，但是很快乐的一天。',
+    'II. 阅读 · Bài 1–3: Đọc hiểu',
+    '小雪今天过生日。爸爸妈妈送她一支画笔，她很喜欢，说想画一个家。晚上，一家人高高兴兴地吃了蛋糕，桌子上还有鱼啊肉啊什么的。吃完饭，孩子们很累，早早地就上床了。',
     [
-      mc('hsk2_b6_read_01', '今天是谁的生日？', ['儿子', '女儿', '妈妈'], 1),
-      mc('hsk2_b6_read_02', '过生日他们没有做什么？', ['买蛋糕', '看电影', '去商场买衣服'], 2),
-      mc('hsk2_b6_read_03', '晚饭以后一家人做什么？', ['看电影', '睡觉', '画画'], 0),
-      mc('hsk2_b6_read_04', '孩子们为什么想舒舒服服睡一觉？', ['明天不上学', '想吃面条', '想看电影'], 0),
-      essay('hsk2_b6_read_05', '他们晚饭吃什么？', '他们吃面条、蛋糕，还有鱼啊肉啊什么的。'),
-      essay('hsk2_b6_read_06', '这一天怎么样？', '很忙、很累，但是很快乐。')
-    ]
+      mc('hsk2_b6_read_tf_01', '小雪今天过生日。', ['✓', '✗'], 0),
+      mc('hsk2_b6_read_tf_02', '爸爸妈妈送了小雪一个书包。', ['✓', '✗'], 1),
+      mc('hsk2_b6_read_tf_03', '孩子们很晚才上床。', ['✓', '✗'], 1),
+      mc('hsk2_b6_read_mc_01', '小雪想画什么？', ['一个家', '一条鱼', '一只猫'], 0),
+      mc('hsk2_b6_read_mc_02', '晚上桌子上有什么？', ['鱼啊肉啊什么的', '面条和水果', '只有蛋糕'], 0),
+      mc('hsk2_b6_read_mc_03', '孩子们为什么早早地上床？', ['因为他们很累', '因为明天上学', '因为要出去玩'], 0),
+      fill('hsk2_b6_read_fill_01', '明天是我的（　），我想请朋友来家里。', '生日', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_02', '你别（　）了给妈妈打电话。', '忘', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_03', '她喜欢（　）画，也喜欢看书。', '画', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_04', '我想买几支（　），送给爱画画的朋友。', '画笔', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_05', '桌子上有一个大大的生日（　）。', '蛋糕', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_06', '小雪，生日（　）！', '快乐', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_07', '你（　）礼物看看，喜欢不喜欢。', '打开', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_08', '这条裤子太（　）了，有点儿不好看。', '长', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_09', '妈妈买了一条（　），晚上做饭。', '鱼', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_10', '我不太喜欢吃（　），但是爸爸很喜欢。', '肉', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_11', '你什么时候（　）生日？', '过', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_12', '孩子们高高兴兴（　）吃蛋糕。', '地', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_13', '弟弟在（　）上睡觉。', '床', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' }),
+      fill('hsk2_b6_read_fill_14', '这张床很（　），我想睡一觉。', '舒服', bai6ReadingWordBank, 'tier1', { fillGroup: 'hsk2-b6-read-fill', fillGroupTitle: 'Bài 3 · 选词填空' })
+    ],
+    bai6ReadingWordBank
   )],
   essayQuestions: [
-    errorCorrection('hsk2_b6_error_01', '今天是生日，我们高兴地高高兴兴玩。', false, '今天是生日，我们高高兴兴地玩。'),
-    errorCorrection('hsk2_b6_error_02', '桌子上有书、笔什么。', false, '桌子上有书、笔什么的。'),
-    errorCorrection('hsk2_b6_error_03', '孩子们早早上床了。', false, '孩子们早早地上床了。'),
-    errorCorrection('hsk2_b6_error_04', '我想舒服舒服睡一觉。', false, '我想舒舒服服地睡一觉。'),
-    errorCorrection('hsk2_b6_error_05', '他高兴说：“生日快乐！”', false, '他高兴地说：“生日快乐！”'),
-    essay('hsk2_b6_writing', 'Dùng 生日、蛋糕、高高兴兴地、什么的、舒服 viết đoạn văn khoảng 40–50 chữ。')
+    ...[
+      ['hsk2_b6_error_01', '我高兴的吃蛋糕。', '我高高兴兴地吃蛋糕。', 'Dùng 地 trước động từ để nói cách thức thực hiện hành động.'],
+      ['hsk2_b6_error_02', '桌子上有什么的？', '桌子上有什么？', '什么的 đứng cuối danh sách với nghĩa “vân vân”, không dùng thay cho 什么 để hỏi.'],
+      ['hsk2_b6_error_03', '我过了生日。', '我过生日了。', '过生日 là cụm động-tân; 了 đặt ở cuối câu.'],
+      ['hsk2_b6_error_04', '我喜欢画笔画画。', '我喜欢用画笔画画。', 'Dùng 用 để nói “dùng bút vẽ để vẽ”.'],
+      ['hsk2_b6_error_05', '我买了一块床。', '我买了一张床。', '床 dùng lượng từ 张; 块 dùng cho miếng bánh hoặc miếng thịt.']
+    ].map(([id, sentence, answer, explanation]) => errorCorrection(id, sentence, false, answer, {
+      taskGroup: 'bai6-error-correction',
+      taskGroupTitle: 'III. 写作 · Bài 2: 改错句',
+      explanation
+    })),
+    essay('hsk2_b6_writing', '写一写你（或家人）过生日的一天。Dùng ít nhất 5 trong các từ/cấu trúc sau: 生日、忘、画笔、蛋糕、快乐、打开、过、什么的、地、舒服。', '昨天是我的生日，朋友们都来了。妈妈买了一个大大的蛋糕，还做了鱼啊肉啊什么的。朋友送我一支画笔，我打开看了看，很喜欢。大家高高兴兴地吃饭、玩，我过了很快乐的一天。', {
+      taskGroup: 'bai6-writing',
+      taskGroupTitle: 'III. 写作 · Bài 3: 写短文',
+      requiredElements: ['Đủ khoảng 60–80 chữ', 'Dùng ít nhất 5 từ/cấu trúc yêu cầu', 'Kể được một ngày sinh nhật của bản thân hoặc người nhà'],
+      explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.',
+      rubric: bai6WritingRubric,
+      maxScore: 10
+    })
   ],
   speakingQuestions: [
-    speaking('hsk2_b6_speaking_01', '小雪，生日快乐！'), speaking('hsk2_b6_speaking_02', '你打开礼物看看。'),
-    speaking('hsk2_b6_speaking_03', '长长的面条儿，大大的蛋糕。'), speaking('hsk2_b6_speaking_04', '还有鱼啊肉啊什么的。'),
-    speaking('hsk2_b6_speaking_05', '孩子们早早地上床了。'), speaking('hsk2_b6_speaking_06', '我想舒舒服服地睡一觉。')
+    ...[
+      '明天就是女儿的生日了。',
+      '你不说，我还真忘了。',
+      '你打开看看喜欢不喜欢。',
+      '还有鱼啊肉啊什么的，都是你喜欢吃的。',
+      '过生日真好啊！',
+      '过生日就要吃好吃的，还要高高兴兴地玩。'
+    ].map((prompt, index) => ({
+      ...speaking(`hsk2_b6_speaking_${String(index + 1).padStart(2, '0')}`, prompt),
+      taskGroupTitle: 'IV. 口语 · Bài 1: 录音',
+      requiredElements: ['Đọc đủ câu', 'Thanh điệu và ngữ điệu rõ'],
+      explanation: 'Chấm thanh điệu và ngữ điệu. Lưu ý: 你打开 đọc ní dǎkāi; 鱼啊 đọc yú ya; 肉啊 đọc ròu wa; âm tiết sau của 舒服 đọc nhẹ; câu có 啊 kết thúc tự nhiên.',
+      rubric: bai6SpeakingRubric,
+      maxScore: 10
+    })),
+    speaking('hsk2_b6_speaking_07', '过 → 明天我______。', {
+      taskGroup: 'bai6-guided-speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子',
+      suggestedAnswer: '明天我过生日。', referenceAnswers: ['明天我过生日。'], requiredElements: ['过生日'], rubric: bai6GuidedSpeakingRubric, maxScore: 10
+    }),
+    speaking('hsk2_b6_speaking_08', '忘 → 你别______。', {
+      taskGroup: 'bai6-guided-speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子',
+      suggestedAnswer: '你别忘了给妈妈打电话。', referenceAnswers: ['你别忘了给妈妈打电话。'], requiredElements: ['别忘了'], rubric: bai6GuidedSpeakingRubric, maxScore: 10
+    }),
+    speaking('hsk2_b6_speaking_09', '什么的 → 桌子上有______。', {
+      taskGroup: 'bai6-guided-speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子',
+      suggestedAnswer: '桌子上有鱼、肉、水果什么的。', referenceAnswers: ['桌子上有鱼、肉、水果什么的。'], requiredElements: ['什么的 đứng cuối danh sách'], rubric: bai6GuidedSpeakingRubric, maxScore: 10
+    }),
+    speaking('hsk2_b6_speaking_10', '地 → 孩子们______吃蛋糕。', {
+      taskGroup: 'bai6-guided-speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子',
+      suggestedAnswer: '孩子们高高兴兴地吃蛋糕。', referenceAnswers: ['孩子们高高兴兴地吃蛋糕。'], requiredElements: ['高高兴兴地'], rubric: bai6GuidedSpeakingRubric, maxScore: 10
+    }),
+    speaking('hsk2_b6_speaking_11', '舒服 → 这张床______。', {
+      taskGroup: 'bai6-guided-speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子',
+      suggestedAnswer: '这张床很舒服。', referenceAnswers: ['这张床很舒服。'], requiredElements: ['很舒服'], rubric: bai6GuidedSpeakingRubric, maxScore: 10
+    })
   ],
   translationQuestions: [
-    translation('hsk2_b6_translation_01', 'Chúc mừng sinh nhật, Tiểu Tuyết!', '小雪，生日快乐！'),
-    translation('hsk2_b6_translation_02', 'Mở quà ra xem đi.', '打开礼物看看。'),
-    translation('hsk2_b6_translation_03', 'Tôi muốn ngủ một giấc thật thoải mái.', '我想舒舒服服地睡一觉。'),
-    translation('hsk2_b6_translation_04', 'Trên bàn có sách, bút các thứ.', '桌子上有书、笔什么的。'),
-    translation('hsk2_b6_translation_05', 'Chúng tôi vui vẻ chơi cùng nhau.', '我们高高兴兴地一起玩。')
+    translation('hsk2_b6_translation_01', '明天就是女儿的生日了。', 'Ngày mai đã là sinh nhật con gái rồi.', 'zh_to_vi_text', { taskGroup: 'bai6-translation-text-zh-vi', taskGroupTitle: 'V. 翻译 · Bài 1: 中文 → 越南语', rubric: bai6TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_02', '你不说，我还真忘了。', 'Bạn không nói thì tôi thật sự đã quên mất rồi.', 'zh_to_vi_text', { taskGroup: 'bai6-translation-text-zh-vi', taskGroupTitle: 'V. 翻译 · Bài 1: 中文 → 越南语', rubric: bai6TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_03', '过生日就要吃好吃的，还要高高兴兴地玩。', 'Đón sinh nhật thì phải ăn đồ ngon, còn phải vui vẻ vui chơi.', 'zh_to_vi_text', { taskGroup: 'bai6-translation-text-zh-vi', taskGroupTitle: 'V. 翻译 · Bài 1: 中文 → 越南语', rubric: bai6TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_04', 'Chúc mừng sinh nhật!', '生日快乐！', 'vi_to_zh_text', { taskGroup: 'bai6-translation-text-vi-zh', taskGroupTitle: 'V. 翻译 · Bài 2A: 越南语 → 中文', rubric: bai6TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_05', 'Bạn mở quà ra xem đi.', '你打开礼物看看吧。', 'vi_to_zh_text', { taskGroup: 'bai6-translation-text-vi-zh', taskGroupTitle: 'V. 翻译 · Bài 2A: 越南语 → 中文', rubric: bai6TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_06', 'Trên bàn có cá, thịt vân vân.', '桌子上有鱼啊肉啊什么的。', 'vi_to_zh_text', { taskGroup: 'bai6-translation-text-vi-zh', taskGroupTitle: 'V. 翻译 · Bài 2A: 越南语 → 中文', referenceAnswers: ['桌子上有鱼啊肉啊什么的。', '桌子上有鱼、肉什么的。'], acceptedVariants: ['桌子上有鱼、肉什么的。'], rubric: bai6TextTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_07', 'Bọn trẻ vui vẻ ăn bánh.', '孩子们高高兴兴地吃蛋糕。', 'vi_to_zh_audio', { taskGroup: 'bai6-translation-audio', taskGroupTitle: 'V. 翻译 · Bài 2B: Ghi âm Việt → Trung', requiredElements: ['高高兴兴地', '吃蛋糕'], explanation: 'Giáo viên chấm đúng nghĩa 5 điểm, thanh điệu và phát âm 3 điểm, nói trôi chảy và đúng ngữ pháp 2 điểm.', rubric: bai6AudioTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_08', 'Cô ấy thích dùng bút vẽ để vẽ.', '她喜欢用画笔画画。', 'vi_to_zh_audio', { taskGroup: 'bai6-translation-audio', taskGroupTitle: 'V. 翻译 · Bài 2B: Ghi âm Việt → Trung', requiredElements: ['用画笔', '画画'], explanation: 'Giáo viên chấm đúng nghĩa 5 điểm, thanh điệu và phát âm 3 điểm, nói trôi chảy và đúng ngữ pháp 2 điểm.', rubric: bai6AudioTranslationRubric, maxScore: 10 }),
+    translation('hsk2_b6_translation_09', 'Chiếc giường này rất thoải mái.', '这张床很舒服。', 'vi_to_zh_audio', { taskGroup: 'bai6-translation-audio', taskGroupTitle: 'V. 翻译 · Bài 2B: Ghi âm Việt → Trung', requiredElements: ['这张床', '很舒服'], explanation: 'Giáo viên chấm đúng nghĩa 5 điểm, thanh điệu và phát âm 3 điểm, nói trôi chảy và đúng ngữ pháp 2 điểm.', rubric: bai6AudioTranslationRubric, maxScore: 10 })
   ]
 };
 
