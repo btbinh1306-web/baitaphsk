@@ -2,7 +2,7 @@
  * Utility functions for handling audio URLs, Base64 audio, and Google Drive audio links.
  */
 
-const DEFAULT_MEDIA_BASE_URL = 'https://raw.githubusercontent.com/btbinh1306-web/phattrienwweb/main/public';
+const DEFAULT_MEDIA_BASE_URL = 'https://raw.githubusercontent.com/btbinh1306-web/baitaphsk/main/public';
 const configuredMediaBaseUrl = import.meta.env.VITE_MEDIA_BASE_URL as string | undefined;
 const mediaBaseUrl = (configuredMediaBaseUrl || DEFAULT_MEDIA_BASE_URL).replace(/\/+$/, '');
 
