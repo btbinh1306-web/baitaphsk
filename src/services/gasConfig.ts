@@ -1,6 +1,7 @@
 export const DEFAULT_GAS_WEB_APP_URL =
-  'https://script.google.com/macros/s/AKfycbzxnRqH-ohgth045nhd-hogJ3JNrEsq2gDjw7TUgOQMh8WDiOVCknKLqDRW7nBUo1ap/exec';
+  'https://script.google.com/macros/s/AKfycbxSo6VoTPGaNaolINc5wPEiV-UJUjKJX9VOcOuBhNqu4V4T8EOw5pRZ2cjt8J8wLt68/exec';
 const LEGACY_GAS_WEB_APP_URLS = new Set([
+  'https://script.google.com/macros/s/AKfycbzxnRqH-ohgth045nhd-hogJ3JNrEsq2gDjw7TUgOQMh8WDiOVCknKLqDRW7nBUo1ap/exec',
   'https://script.google.com/macros/s/AKfycbzRfoyKBfq_s9FZAzCJyb7Fmoqdg2RT0o8op_gHtqowhDXhKIKvGr16XWo2WEa3FNnV/exec',
   'https://script.google.com/macros/s/AKfycbxSo6VoTPGaNaolINc5wPEiV-UJUjKJX9VOcOuBhNqu4V4T8EOw5pRZ2cjt8J8wLt68/exec',
   'https://script.google.com/macros/s/AKfycbwLXgg53v_sOQH_Yhb74aUpTIVx0eOChGrPkuB4OsA-DhkJnm1K0s_uxf4eO6JXl65h/exec',
