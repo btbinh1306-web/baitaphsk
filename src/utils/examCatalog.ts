@@ -336,7 +336,7 @@ export const buildExamCatalog = (customExams: ExamLesson[], bundledExams: ExamLe
   const bundledMock02 = bundledExams.find((exam) => exam.id === 'hsk1-mock-02');
   const bundledById = new Map(bundledExams.map((exam) => [exam.id, normalizeBundledExamIdentity(exam)]));
   // These lessons were replaced by bundled source-faithful versions; ignore old saved snapshots.
-  const bundledReplacements = new Set(['hsk2-bai1-word', 'hsk2-bai3-word']);
+  const bundledReplacements = new Set(['hsk1-bai5-5-ky-nang', 'hsk2-bai1-word', 'hsk2-bai3-word']);
   const usableCustomExams = Array.from(new Map(
     customExams
       .filter((exam) => !bundledReplacements.has(exam.id))
