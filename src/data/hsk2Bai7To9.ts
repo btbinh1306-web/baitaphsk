@@ -43,7 +43,13 @@ const arrange = (id: string, chips: string[], answer: string, alternatives?: str
   acceptableAnswers: alternatives ? `${answer}|${alternatives}` : `${answer}|${answer.replace(/[。？！?!]$/u, '')}`
 });
 
-const essay = (id: string, prompt: string, suggestedAnswer: string, requiredElements: string[] = ['Trả lời đủ ý']): Question => ({
+const essay = (
+  id: string,
+  prompt: string,
+  suggestedAnswer: string,
+  requiredElements: string[] = ['Trả lời đủ ý'],
+  extra: Partial<Question> = {}
+): Question => ({
   id,
   type: 'essay',
   tier: 'tier3',
@@ -58,13 +64,58 @@ const essay = (id: string, prompt: string, suggestedAnswer: string, requiredElem
     { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 3 },
     { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 3 }
   ],
-  maxScore: 10
+  maxScore: extra.maxScore ?? 10,
+  ...extra
 });
 
-const translation = (id: string, prompt: string, answer: string): Question => ({
+const errorCorrection = (id: string, prompt: string, suggestedAnswer: string, extra: Partial<Question> = {}): Question => ({
+  id,
+  type: 'error_correction',
+  tier: 'tier3',
+  prompt,
+  suggestedAnswer,
+  referenceAnswers: [suggestedAnswer],
+  teacherReviewRequired: true,
+  errorCorrection: { sentenceIsCorrect: false },
+  requiredElements: ['Phán đoán đúng/sai', 'Sửa câu hoàn chỉnh'],
+  explanation: 'Chấm 4 điểm cho phán đoán đúng/sai và 6 điểm cho câu sửa đúng; chấp nhận cách viết tương đương nếu đúng ngữ pháp.',
+  rubric: [
+    { id: 'judgement', label: 'Phán đoán đúng/sai', maxScore: 4 },
+    { id: 'correction', label: 'Sửa câu đúng', maxScore: 6 }
+  ],
+  maxScore: extra.maxScore ?? 10,
+  ...extra
+});
+
+const speaking = (id: string, prompt: string, pinyin: string, extra: Partial<Question> = {}): Question => ({
+  id,
+  type: 'speaking',
+  tier: 'tier3',
+  prompt,
+  pinyin,
+  teacherReviewRequired: true,
+  referenceAnswers: [prompt],
+  requiredElements: ['Đọc đủ câu', 'Phát âm và thanh điệu rõ'],
+  explanation: 'Chấm theo đúng nghĩa, thanh điệu, phát âm và độ trôi chảy; chấp nhận ngữ điệu tự nhiên nếu không làm đổi nghĩa.',
+  rubric: [
+    { id: 'meaning', label: 'Đúng nội dung', maxScore: 4 },
+    { id: 'tones', label: 'Thanh điệu và phát âm', maxScore: 3 },
+    { id: 'fluency', label: 'Nói trôi chảy', maxScore: 3 }
+  ],
+  maxScore: extra.maxScore ?? 10,
+  ...extra
+});
+
+const translation = (
+  id: string,
+  prompt: string,
+  answer: string,
+  translationType: Question['translationType'] = 'vi_to_zh_text',
+  extra: Partial<Question> = {}
+): Question => ({
   id,
   type: 'translation',
-  translationType: 'vi_to_zh_text',
+  translationType,
   tier: 'tier3',
   prompt,
   suggestedAnswer: answer,
@@ -76,61 +127,204 @@ const translation = (id: string, prompt: string, answer: string): Question => ({
     { id: 'meaning', label: 'Đúng nghĩa', maxScore: 6 },
     { id: 'grammar', label: 'Ngữ pháp và từ vựng', maxScore: 4 }
   ],
-  maxScore: 10
+  maxScore: extra.maxScore ?? 10,
+  ...extra
 });
 
-const reading = (id: string, title: string, content: string, questions: Question[]): ReadingPassage => ({ id, title, content, questions });
+const listeningGroup = (
+  id: string,
+  prompt: string,
+  audioText: string,
+  type: 'listening_tf' | 'listening_mc',
+  subQuestions: Question[]
+): Question => ({
+  id,
+  type,
+  tier: 'tier2',
+  prompt,
+  audioText,
+  explanation: `Kịch bản nghe: ${audioText}`,
+  maxAudioPlayCount: 2,
+  subQuestions
+});
 
-const b7WordBank = ['从', '往', '跑', '打', '踢', '球', '游', '得', '爱好', '开始'];
+const listeningTf = (id: string, prompt: string, isTrue: boolean): Question => ({
+  id,
+  type: 'listening_tf',
+  tier: 'tier2',
+  prompt,
+  options: ['✓', '✗'],
+  answer: isTrue ? 0 : 1
+});
+
+const listeningMc = (id: string, prompt: string, options: string[], answer: number): Question => ({
+  id,
+  type: 'listening_mc',
+  tier: 'tier2',
+  prompt,
+  options,
+  answer
+});
+
+const reading = (id: string, title: string, content: string, questions: Question[], wordBank?: string[]): ReadingPassage => ({
+  id,
+  title,
+  content,
+  questions,
+  ...(wordBank ? { wordBank } : {})
+});
+
+const b7WordBank = ['从', '往', '跑', '打', '篮球', '运动', '踢', '足球', '球', '得', '跑步', '游泳', '游', '爱好', '开始'];
 const b7Vocab = vocab([
-  ['篮球', 'lánqiú', 'Danh từ', 'bóng rổ', '我喜欢打篮球。'],
-  ['足球', 'zúqiú', 'Danh từ', 'bóng đá', '他足球踢得不错。'],
-  ['游泳', 'yóuyǒng', 'Động từ', 'bơi', '她游泳游得很快。'],
-  ['跑步', 'pǎobù', 'Động từ', 'chạy bộ', '我每天跑步。'],
-  ['爱好', 'àihào', 'Danh từ', 'sở thích', '我的爱好是唱歌。'],
-  ['开始', 'kāishǐ', 'Động từ', 'bắt đầu', '我们九点开始上课。'],
-  ['从', 'cóng', 'Giới từ', 'từ', '从我家到学校很近。'],
-  ['往', 'wǎng', 'Giới từ', 'về phía, hướng tới', '请往前走。'],
+  ['从', 'cóng', 'Giới từ', 'từ; từ… đến…', '我每天从家跑步去学校。'],
+  ['往', 'wǎng', 'Giới từ / động từ', 'hướng về, đi về phía', '请往前走。'],
+  ['跑', 'pǎo', 'Động từ', 'chạy; đi nhanh đến', '一下课，我就往外跑。'],
+  ['打', 'dǎ', 'Động từ', 'chơi môn thể thao dùng tay; đánh', '我喜欢打篮球。'],
+  ['篮球', 'lánqiú', 'Danh từ', 'bóng rổ', '他篮球打得很好。'],
+  ['运动', 'yùndòng', 'Danh từ / động từ', 'thể thao; vận động, tập thể dục', '我的爱好是运动。'],
+  ['踢', 'tī', 'Động từ', 'đá, đá bóng', '我喜欢踢足球。'],
+  ['足球', 'zúqiú', 'Danh từ', 'bóng đá', '他足球踢得不太好。'],
   ['球', 'qiú', 'Danh từ', 'quả bóng', '桌子下面有一个球。'],
-  ['得', 'de', 'Trợ từ', 'trợ từ bổ ngữ trạng thái', '他篮球打得很好。'],
-  ['打', 'dǎ', 'Động từ', 'chơi (bóng rổ)', '我喜欢打篮球。'],
-  ['踢', 'tī', 'Động từ', 'đá', '他喜欢踢足球。'],
-  ['跑', 'pǎo', 'Động từ', 'chạy', '他跑得很快。'],
-  ['运动', 'yùndòng', 'Động từ / danh từ', 'vận động, thể thao', '我有时间就去运动。'],
-  ['唱歌', 'chànggē', 'Động từ', 'hát', '她唱歌唱得很好听。']
+  ['得', 'de', 'Trợ từ kết cấu', 'nối động từ với bổ ngữ trạng thái', '我跑得不快。'],
+  ['跑步', 'pǎobù', 'Động từ ly hợp', 'chạy bộ', '我每天跑步。'],
+  ['游泳', 'yóuyǒng', 'Động từ ly hợp', 'bơi, bơi lội', '我喜欢游泳。'],
+  ['游', 'yóu', 'Động từ', 'bơi', '她游泳游得很快。'],
+  ['爱好', 'àihào', 'Danh từ / động từ', 'sở thích; yêu thích', '我的爱好是运动。'],
+  ['开始', 'kāishǐ', 'Động từ / danh từ', 'bắt đầu; sự khởi đầu', '我从今天开始学游泳。']
 ]);
-const b7Fill: Question[] = [
-  fill('hsk2_b7_fill_01', '我喜欢（　　）篮球，一个星期打三次。', '打', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống'),
-  fill('hsk2_b7_fill_02', '他足球（　　）得不错，是我们班的明星。', '踢', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống'),
-  fill('hsk2_b7_fill_03', '桌子下面有一个（　　）。', '球', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống'),
-  fill('hsk2_b7_fill_04', '你们（　　）这里（　　）前走，那边更漂亮。', '从、往', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống', '从 往|从往|从这里往'),
-  fill('hsk2_b7_fill_05', '我的（　　）是唱歌，一有时间我就去唱歌。', '爱好', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống'),
-  fill('hsk2_b7_fill_06', '我们九点（　　）上课，你别来晚了。', '开始', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống'),
-  fill('hsk2_b7_fill_07', '她（　　）得又快又好。', '跑', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống'),
-  fill('hsk2_b7_fill_08', '他（　　）得很快，是我们班第一名。', '游', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống'),
-  fill('hsk2_b7_fill_09', '她唱歌唱（　　）很好听。', '得', b7WordBank, 'hsk2-b7-fill', 'II. Chọn từ điền vào chỗ trống')
-];
-const b7Mc: Question[] = [
-  mc('hsk2_b7_mc_01', '他一下课（　　）去打篮球。', ['就', '才', '也'], 0),
-  mc('hsk2_b7_mc_02', '她游泳游（　　）很快。', ['的', '得', '地'], 1),
-  mc('hsk2_b7_mc_03', '他跑得（　　）快。', ['没', '不', '别'], 1),
-  mc('hsk2_b7_mc_04', '我（　　）起床就吃早饭。', ['一', '再', '都'], 0),
-  mc('hsk2_b7_mc_05', '你足球踢得（　　）？', ['吗', '怎么样', '什么'], 1)
-];
 const b7Arrange: Question[] = [
-  arrange('hsk2_b7_arrange_01', ['他', '得', '篮球', '打', '很好'], '他篮球打得很好。'),
-  arrange('hsk2_b7_arrange_02', ['一', '就', '回家', '下课', '我'], '我一下课就回家。'),
-  arrange('hsk2_b7_arrange_03', ['游', '她', '得', '游泳', '快', '不'], '她游泳游得不快。'),
-  arrange('hsk2_b7_arrange_04', ['往', '你们', '前', '走', '这里', '从'], '你们从这里往前走。'),
-  arrange('hsk2_b7_arrange_05', ['一', '有时间', '就', '他', '去运动'], '他一有时间就去运动。')
+  arrange('hsk2_b7_arrange_01', ['就', '跑', '一下课', '他', '往外'], '一下课，他就往外跑。'),
+  arrange('hsk2_b7_arrange_02', ['得', '还可以', '我', '踢', '足球'], '我踢足球踢得还可以。', '我足球踢得还可以。'),
+  arrange('hsk2_b7_arrange_03', ['从', '的', '你', '回来', '北京', '什么时候', '是'], '你是什么时候从北京回来的？'),
+  arrange('hsk2_b7_arrange_04', ['得', '快', '她', '跑步', '不', '跑'], '她跑步跑得不快。'),
+  arrange('hsk2_b7_arrange_05', ['我', '开始', '从', '学游泳', '今天'], '我从今天开始学游泳。', '从今天开始，我学游泳。')
 ];
-const b7Reading = reading('hsk2_b7_reading_01', 'VI. 阅读 · Đọc hiểu', '我叫小李，我的爱好是运动。从八岁开始，我每天都跟哥哥去打篮球。我篮球打得不错，足球踢得还可以，可是游泳游得不快。一到星期六，我就跟朋友们去踢足球。', [
-  mc('hsk2_b7_read_01', '小李的爱好是运动。', ['✓ Đúng', '✗ Sai'], 0),
-  mc('hsk2_b7_read_02', '小李从十岁开始运动。', ['✓ Đúng', '✗ Sai'], 1),
-  mc('hsk2_b7_read_03', '小李篮球打得不错。', ['✓ Đúng', '✗ Sai'], 0),
-  mc('hsk2_b7_read_04', '小李游泳游得很快。', ['✓ Đúng', '✗ Sai'], 1),
-  mc('hsk2_b7_read_05', '一到星期六，小李就去踢足球。', ['✓ Đúng', '✗ Sai'], 0)
-]);
+const b7ReadingWordBank = b7WordBank;
+const b7Reading = reading('hsk2_b7_reading_01', 'II. 阅读 · Đọc hiểu', '我的爸爸很喜欢运动。他从二十岁开始踢足球，现在每个星期天还去踢。他足球踢得很好，也喜欢跑步。我一有时间就跟他一起去运动。我篮球打得不错，但是跑步跑得不快。', [
+  mc('hsk2_b7_read_tf_01', '爸爸从二十岁开始踢足球。', ['✓', '✗'], 0),
+  mc('hsk2_b7_read_tf_02', '爸爸不喜欢跑步。', ['✓', '✗'], 1),
+  mc('hsk2_b7_read_tf_03', '我跑步跑得很快。', ['✓', '✗'], 1),
+  mc('hsk2_b7_read_mc_01', '爸爸每个星期天做什么？', ['踢足球', '打篮球', '游泳'], 0),
+  mc('hsk2_b7_read_mc_02', '我篮球打得怎么样？', ['不太好', '不错', '不会打'], 1),
+  mc('hsk2_b7_read_mc_03', '我什么时候跟爸爸去运动？', ['一有时间', '每天早上', '星期六'], 0),
+  fill('hsk2_b7_read_fill_01', '他（　）北京回来了，今天还要去上课。', '从', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_02', '（　）前走，学校就在前面。', '往', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_03', '别往外（　）了，外面正在下雨。', '跑', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_04', '我喜欢（　）羽毛球，也喜欢打篮球。', '打', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_05', '他（　）打得很好，大家都喜欢跟他玩。', '篮球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_06', '你每天（　）多长时间？', '运动', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_07', '我喜欢（　）足球，不喜欢打篮球。', '踢', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_08', '你喜欢踢（　）还是打篮球？', '足球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_09', '桌子下面有一个（　）。', '球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_10', '哥哥跑（　）很快。', '得', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_11', '我每天早上都（　），晚上再做作业。', '跑步', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_12', '今天很热，我想去（　）。', '游泳', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_13', '她游泳（　）得很快，大家都喜欢看。', '游', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_14', '你的（　）是什么？我的爱好是踢足球。', '爱好', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
+  fill('hsk2_b7_read_fill_15', '八点（　）上课，请你不要来晚。', '开始', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空')
+], b7ReadingWordBank);
+
+const b7Listening: Question[] = [
+  listeningGroup('hsk2_b7_listen_01', 'Bài 1 · 听短文，判断对错', '我叫小明，我的爱好是运动。我每天早上从家跑步去学校。一下课，我就往外跑，跟同学一起打篮球。我篮球打得不错，但是足球踢得不太好。星期天我喜欢跟爸爸去游泳。', 'listening_tf', [
+    listeningTf('hsk2_b7_listen_01_01', '小明的爱好是运动。', true),
+    listeningTf('hsk2_b7_listen_01_02', '小明每天从学校跑步回家。', false),
+    listeningTf('hsk2_b7_listen_01_03', '一下课，小明就跟同学一起打篮球。', true),
+    listeningTf('hsk2_b7_listen_01_04', '小明足球踢得很好。', false),
+    listeningTf('hsk2_b7_listen_01_05', '星期天小明跟爸爸去踢足球。', false)
+  ]),
+  listeningGroup('hsk2_b7_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：你是什么时候从北京回来的？男：昨天中午。', 'listening_mc', [
+    listeningMc('hsk2_b7_listen_02_01', '男的是什么时候回来的？', ['昨天中午', '昨天晚上', '今天早上'], 0)
+  ]),
+  listeningGroup('hsk2_b7_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '女：你怎么一下课就往外跑？男：我跟同学说好了，一起去打篮球。', 'listening_mc', [
+    listeningMc('hsk2_b7_listen_02_02', '男的为什么往外跑？', ['要回家', '要去打篮球', '要去游泳'], 1)
+  ]),
+  listeningGroup('hsk2_b7_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：你踢得怎么样？男：我踢得还可以。', 'listening_mc', [
+    listeningMc('hsk2_b7_listen_02_03', '男的踢得怎么样？', ['很好', '还可以', '不好'], 1)
+  ]),
+  listeningGroup('hsk2_b7_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：你跑得快不快？女：我跑得不快，也不太喜欢跑步。', 'listening_mc', [
+    listeningMc('hsk2_b7_listen_02_04', '女的喜欢跑步吗？', ['喜欢', '不太喜欢', '很喜欢'], 1)
+  ]),
+  listeningGroup('hsk2_b7_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：你游泳游得怎么样？男：我游得很快，从小就喜欢游泳。', 'listening_mc', [
+    listeningMc('hsk2_b7_listen_02_05', '男的游泳游得怎么样？', ['不快', '很快', '不会游'], 1)
+  ])
+];
+
+const b7WritingRubric = [
+  { id: 'content', label: 'Nội dung đủ ý', maxScore: 3 },
+  { id: 'targets', label: 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', maxScore: 3 },
+  { id: 'grammar', label: 'Ngữ pháp đúng', maxScore: 2 },
+  { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
+];
+const b7AudioTranslationRubric = [
+  { id: 'meaning', label: 'Đúng nghĩa', maxScore: 5 },
+  { id: 'tones', label: 'Thanh điệu và phát âm', maxScore: 3 },
+  { id: 'fluency', label: 'Nói trôi chảy, đúng ngữ pháp', maxScore: 2 }
+];
+
+const b7Speaking: Question[] = [
+  speaking('hsk2_b7_speak_01', '你是什么时候从北京回来的？', 'Nǐ shì shénme shíhou cóng Běijīng huílái de?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
+  speaking('hsk2_b7_speak_02', '你怎么一下课就往外跑？', 'Nǐ zěnme yí xiàkè jiù wǎng wài pǎo?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
+  speaking('hsk2_b7_speak_03', '我跟同学说好了，一起去打篮球。', 'Wǒ gēn tóngxué shuō hǎo le, yìqǐ qù dǎ lánqiú.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
+  speaking('hsk2_b7_speak_04', '我还喜欢踢足球，一到星期天就跟朋友们一起去踢。', 'Wǒ hái xǐhuan tī zúqiú, yí dào xīngqītiān jiù gēn péngyoumen yìqǐ qù tī.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
+  speaking('hsk2_b7_speak_05', '你踢得怎么样？我踢得还可以。', 'Nǐ tī de zěnmeyàng? Wǒ tī de hái kěyǐ.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
+  speaking('hsk2_b7_speak_06', '我跑得不快，也不太喜欢跑步。', 'Wǒ pǎo de bú kuài, yě bú tài xǐhuan pǎobù.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
+  speaking('hsk2_b7_speak_07', '从 → 我昨天从______回来。', 'Wǒ zuótiān cóng ______ huílái.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我昨天从北京回来。', referenceAnswers: ['我昨天从北京回来。'], requiredElements: ['从'] }),
+  speaking('hsk2_b7_speak_08', '一……就…… → 一到星期天，______。', 'Yí dào xīngqītiān, ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '一到星期天，我就去踢足球。', referenceAnswers: ['一到星期天，我就去踢足球。'], requiredElements: ['一……就……'] }),
+  speaking('hsk2_b7_speak_09', '得 → 我篮球打______。', 'Wǒ lánqiú dǎ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我篮球打得还可以。', referenceAnswers: ['我篮球打得还可以。'], requiredElements: ['得'] }),
+  speaking('hsk2_b7_speak_10', '爱好 → 你的______？', 'Nǐ de ______?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '你的爱好是什么？', referenceAnswers: ['你的爱好是什么？'], requiredElements: ['爱好'] }),
+  speaking('hsk2_b7_speak_11', '开始 → 从今天______。', 'Cóng jīntiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '从今天开始，我每天跑步。', referenceAnswers: ['从今天开始，我每天跑步。'], requiredElements: ['开始'] })
+];
+
+const b7EssayQuestions: Question[] = [
+  errorCorrection('hsk2_b7_error_01', '我跑步得很快。', '我跑步跑得很快。', { explanation: '跑步是动词离合词，需要重复 跑，再接 得 + 补语。' }),
+  errorCorrection('hsk2_b7_error_02', '我篮球很打得好。', '我篮球打得很好。', { explanation: '得要紧跟在动词 打 后面，程度词 很 放在补语位置。' }),
+  errorCorrection('hsk2_b7_error_03', '我喜欢打足球。', '我喜欢踢足球。', { explanation: '篮球用 打，足球用 踢。' }),
+  errorCorrection('hsk2_b7_error_04', '我从家到学校走。', '我从家走到学校。', { explanation: '从 后接起点，方向 到 放在动词后：从家走到学校。' }),
+  errorCorrection('hsk2_b7_error_05', '我一到家，妈妈就电话。', '我一到家，妈妈就打来电话了。', { explanation: '就 后面需要完整的动词短语，电话作名词时要搭配 打。' }),
+  essay(
+    'hsk2_b7_writing',
+    '介绍你的爱好。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 爱好、运动、打、踢、得、开始、从、一……就……、游泳、跑步。',
+    '我的爱好是运动。从上小学开始，我就喜欢踢足球。我足球踢得还可以，篮球打得不太好。一到星期天，我就跟朋友们一起去踢球。我也喜欢游泳，但是游得不快。',
+    ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung giới thiệu rõ sở thích'],
+    {
+      taskGroup: 'bai7-writing',
+      taskGroupTitle: 'III. 写作 · Bài 3: 写短文',
+      explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.',
+      rubric: b7WritingRubric,
+      maxScore: 10
+    }
+  )
+];
+
+const b7TranslationQuestions: Question[] = [
+  translation('hsk2_b7_translate_01', '你是什么时候从北京回来的？', 'Bạn từ Bắc Kinh trở về từ khi nào?', 'zh_to_vi_text'),
+  translation('hsk2_b7_translate_02', '你怎么一下课就往外跑？', 'Sao vừa tan học là bạn chạy ra ngoài ngay vậy?', 'zh_to_vi_text'),
+  translation('hsk2_b7_translate_03', '从上小学开始，我每天都跟爸爸去运动。', 'Từ khi bắt đầu học tiểu học, ngày nào tôi cũng đi tập thể thao cùng bố.', 'zh_to_vi_text'),
+  translation('hsk2_b7_translate_04', 'Sở thích của tôi là thể thao.', '我的爱好是运动。'),
+  translation('hsk2_b7_translate_05', 'Anh ấy chơi bóng rổ rất giỏi.', '他篮球打得很好。'),
+  translation('hsk2_b7_translate_06', 'Tôi chạy không nhanh.', '我跑得不快。'),
+  translation('hsk2_b7_translate_07', 'Vừa đến Chủ nhật là tôi đi đá bóng với bạn.', '一到星期天，我就跟朋友去踢足球。', 'vi_to_zh_audio', {
+    taskGroup: 'oral_translation',
+    taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung',
+    requiredElements: ['Có 一……就……', 'Có 跟朋友', 'Dùng đúng 踢足球'],
+    rubric: b7AudioTranslationRubric,
+    maxScore: 10
+  }),
+  translation('hsk2_b7_translate_08', 'Từ hôm nay tôi bắt đầu học bơi.', '从今天开始，我学游泳。', 'vi_to_zh_audio', {
+    taskGroup: 'oral_translation',
+    taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung',
+    requiredElements: ['Có 从今天开始', 'Dùng 学游泳'],
+    rubric: b7AudioTranslationRubric,
+    maxScore: 10
+  }),
+  translation('hsk2_b7_translate_09', 'Bạn bơi thế nào? Tôi bơi không nhanh.', '你游泳游得怎么样？我游得不快。', 'vi_to_zh_audio', {
+    taskGroup: 'oral_translation',
+    taskGroupTitle: 'V. 翻译 · Bài 2B: Dịch ghi âm Việt → Trung',
+    requiredElements: ['Dùng mẫu 游泳游得怎么样', 'Dùng 游得不快'],
+    rubric: b7AudioTranslationRubric,
+    maxScore: 10
+  })
+];
 
 const b8WordBank = ['点', '花', '饭馆', '比', '虽然', '但是', '记得', '左边', '手表', '有意思'];
 const b8Vocab = vocab([
@@ -241,7 +435,9 @@ const makeLesson = (
   arrangeQuestions: Question[],
   passage: ReadingPassage,
   essayQuestions: Question[],
-  translationQuestions: Question[]
+  translationQuestions: Question[],
+  listeningQuestions: Question[] = [],
+  speakingQuestions: Question[] = []
 ): ExamLesson => ({
   id,
   title,
@@ -253,9 +449,9 @@ const makeLesson = (
   fillQuestions,
   arrangeQuestions,
   readingPassages: [passage],
-  listeningQuestions: [],
+  listeningQuestions,
   essayQuestions,
-  speakingQuestions: [],
+  speakingQuestions,
   translationQuestions,
   handwritingQuestions: []
 });
@@ -266,22 +462,14 @@ export const HSK2_BAI7_TO_9_EXAMS: ExamLesson[] = [
     'HSK 2 - Bài 7: 他篮球打得很好',
     'Phiếu bài tập HSK2 Bài 7: từ vựng thể thao, 一……就…… và bổ ngữ trạng thái 得.',
     b7Vocab,
-    b7Fill,
-    b7Mc,
+    [],
+    [],
     b7Arrange,
     b7Reading,
-    [
-      essay('hsk2_b7_dialogue_01', 'V. Hoàn thành hội thoại: A：你昨天晚上睡得怎么样？ B：', '睡得很好。', sharedDialogueElements),
-      essay('hsk2_b7_dialogue_02', 'V. Hoàn thành hội thoại: A：他跑步跑得快不快？ B：', '他跑得很快。', sharedDialogueElements),
-      essay('hsk2_b7_dialogue_03', 'V. Hoàn thành hội thoại: A：你什么时候去打篮球？ B：我一（　　）就（　　）。', '我一有时间就去打篮球。', ['Dùng đúng mẫu 一……就……', ...sharedDialogueElements]),
-      essay('hsk2_b7_dialogue_04', 'V. Hoàn thành hội thoại: A：你游泳游得怎么样？ B：我＿＿＿＿，但是我很喜欢游泳。', '我游泳游得不快，但是我很喜欢游泳。', ['Dùng đúng bổ ngữ trạng thái 得', ...sharedDialogueElements])
-    ],
-    [
-      translation('hsk2_b7_translate_01', 'Dịch sang tiếng Trung: Mỗi khi có thời gian là tôi đi chạy bộ. (一……就……)', '我一有时间就去跑步。'),
-      translation('hsk2_b7_translate_02', 'Dịch sang tiếng Trung: Bạn chơi bóng rổ thế nào? (得)', '你篮球打得怎么样？'),
-      translation('hsk2_b7_translate_03', 'Dịch sang tiếng Trung: Anh ấy bơi không nhanh. (得)', '他游泳游得不快。'),
-      translation('hsk2_b7_translate_04', 'Dịch sang tiếng Trung: Từ nhà tôi đến trường đi bộ mất hai mươi phút. (从)', '从我家到学校走路要二十分钟。')
-    ]
+    b7EssayQuestions,
+    b7TranslationQuestions,
+    b7Listening,
+    b7Speaking
   ),
   makeLesson(
     'hsk2-bai8-xiaoxue-shengri-kuaile',

@@ -158,7 +158,13 @@ const LOCAL_AUDIO_BY_QUESTION_ID: Record<string, string> = {
   hsk2_b6_listen_03: '/audio/HSK2_B06/hsk2_b6_listen_03.mp3',
   hsk2_b6_listen_04: '/audio/HSK2_B06/hsk2_b6_listen_04.mp3',
   hsk2_b6_listen_05: '/audio/HSK2_B06/hsk2_b6_listen_05.mp3',
-  hsk2_b6_listen_06: '/audio/HSK2_B06/hsk2_b6_listen_06.mp3'
+  hsk2_b6_listen_06: '/audio/HSK2_B06/hsk2_b6_listen_06.mp3',
+  hsk2_b7_listen_01: '/audio/HSK2_B07/hsk2_b7_listen_01.mp3',
+  hsk2_b7_listen_02: '/audio/HSK2_B07/hsk2_b7_listen_02.mp3',
+  hsk2_b7_listen_03: '/audio/HSK2_B07/hsk2_b7_listen_03.mp3',
+  hsk2_b7_listen_04: '/audio/HSK2_B07/hsk2_b7_listen_04.mp3',
+  hsk2_b7_listen_05: '/audio/HSK2_B07/hsk2_b7_listen_05.mp3',
+  hsk2_b7_listen_06: '/audio/HSK2_B07/hsk2_b7_listen_06.mp3'
 };
 
 const attachLocalAudio = (exam: ExamLesson): ExamLesson => ({
