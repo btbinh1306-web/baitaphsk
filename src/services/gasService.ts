@@ -69,11 +69,11 @@ export const normalizePercent = (rawPercent: any, correct: number, total: number
 const normalizeTeacherExerciseScore = (value: unknown, fallback: string | number = ''): string | number => {
   if (typeof value === 'string' || typeof value === 'number') {
     const text = String(value).trim();
-    if (text && !/^(?:undefined|null|\[object object\])$/i.test(text)) return value;
+    if (text && !/^(?:undefined|null|\[object object\])$/i.test(text) && !/^\d{4}-\d{2}-\d{2}(?:T|\s+\d{1,2}:\d{2})/.test(text)) return value;
   }
   if (typeof fallback === 'string' || typeof fallback === 'number') {
     const text = String(fallback).trim();
-    if (text && !/^(?:undefined|null|\[object object\])$/i.test(text)) return fallback;
+    if (text && !/^(?:undefined|null|\[object object\])$/i.test(text) && !/^\d{4}-\d{2}-\d{2}(?:T|\s+\d{1,2}:\d{2})/.test(text)) return fallback;
   }
   return '';
 };

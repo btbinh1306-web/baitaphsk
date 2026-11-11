@@ -94,7 +94,14 @@ const MAX_LESSON_HISTORY = 50;
 const getDisplayTeacherScore = (value: unknown): string => {
   if (typeof value !== 'string' && typeof value !== 'number') return '';
   const text = String(value).trim();
-  return /^(?:undefined|null|\[object object\])$/i.test(text) ? '' : text;
+  return /^(?:undefined|null|\[object object\])$/i.test(text) || /^\d{4}-\d{2}-\d{2}(?:T|\s+\d{1,2}:\d{2})/.test(text)
+    ? ''
+    : text;
+};
+
+const getDisplayStudentClass = (value: unknown): string => {
+  const text = String(value ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}(?:T|\s+\d{1,2}:\d{2})/.test(text) ? '' : text;
 };
 
 const cloneExam = (exam: ExamLesson): ExamLesson => structuredClone(exam);
@@ -1069,16 +1076,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
   const openGradingModal = (sub: SubmissionData) => {
     const hwList = getHandwritingSubmissions();
     const matchedHw = hwList.find(
-      (h) => h.id === sub.id || (h.studentName.toLowerCase() === sub.name.toLowerCase() && h.exerciseTitle === sub.lesson)
+      (h) => h.submissionImages?.length > 0 && (
+        h.id === sub.id || (h.studentName.toLowerCase() === sub.name.toLowerCase() && h.exerciseTitle === sub.lesson)
+      )
     );
 
-    const isHandwritingSub =
-      sub.isHandwriting ||
-      (sub.submissionImages && sub.submissionImages.length > 0) ||
-      (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
-      sub.lesson.toLowerCase().includes('chép') ||
-      sub.lesson.toLowerCase().includes('nộp ảnh') ||
-      !!matchedHw;
+    const isHandwritingSub = getIsHandwritingSubmission(sub) || !!matchedHw;
 
     if (isHandwritingSub) {
       const imagesToUse =
@@ -1752,14 +1755,20 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
     if (onSaveCustomExam) onSaveCustomExam(updatedExam);
   };
 
-  const getIsHandwritingSubmission = (sub: SubmissionData) =>
-    Boolean(
-      sub.isHandwriting ||
-        (sub.submissionImages && sub.submissionImages.length > 0) ||
-        (sub.essays && (sub.essays.includes('[Nộp bài chép tay]') || sub.essays.includes('chép'))) ||
-        sub.lesson.toLowerCase().includes('chép') ||
-        sub.lesson.toLowerCase().includes('nộp ảnh')
+  const getIsHandwritingSubmission = (sub: SubmissionData) => {
+    const lesson = sub.lesson.trim();
+    const matchesKnownExam = allExams.some((exam) => (
+      lesson === exam.id || matchesCatalogLessonTitle(lesson, exam.title)
+    ));
+    const looksLikeRegularExam = /(?:hsk\s*[1-6]|đề\s*(?:kiểm tra|thi)|\bbài\s+\d+)/iu.test(lesson);
+    const hasExplicitHandwritingMarker = Boolean(
+      sub.submissionImages?.length ||
+        /\[Nộp bài chép tay\]/iu.test(sub.essays || '') ||
+        lesson.toLowerCase().includes('chép') ||
+        lesson.toLowerCase().includes('nộp ảnh')
     );
+    return hasExplicitHandwritingMarker || (Boolean(sub.isHandwriting) && !matchesKnownExam && !looksLikeRegularExam);
+  };
 
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStudent = studentFilter === 'ALL' || sub.name.trim() === studentFilter;
@@ -1796,7 +1805,17 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         return groups;
       }, new Map())
       .entries()
-  ).sort(([labelA], [labelB]) => labelA.localeCompare(labelB, 'vi'));
+  ).sort(([labelA, itemsA], [labelB, itemsB]) => {
+    const getRank = (label: string, items: SubmissionData[]) => {
+      if (items.some(getIsHandwritingSubmission)) return Number.MAX_SAFE_INTEGER;
+      const index = studentExamOptions.findIndex((exam) => (
+        label === exam.id || matchesCatalogLessonTitle(label, exam.title)
+      ));
+      return index >= 0 ? index : studentExamOptions.length;
+    };
+    const rankDifference = getRank(labelA, itemsA) - getRank(labelB, itemsB);
+    return rankDifference || labelA.localeCompare(labelB, 'vi');
+  });
   const selectedSubmissionExam = selectedSub
     ? allExams.find((exam) => exam.id === selectedSub.lesson || matchesCatalogLessonTitle(selectedSub.lesson, exam.title))
     : undefined;
@@ -2570,12 +2589,12 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                               <td className="p-3.5 font-mono font-bold text-red-700">{sub.id}</td>
                               <td className="p-3.5">
                                 <div className="font-semibold text-slate-800">{sub.name}</div>
-                                <div className="text-xs text-slate-500">Lớp: {sub.class}</div>
+                                <div className="text-xs text-slate-500">Lớp: {getDisplayStudentClass(sub.class) || 'Chưa cập nhật'}</div>
                               </td>
                               <td className="p-3.5">
                                 {isHw ? (
                                   <span className="font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 inline-flex items-center gap-1.5 text-xs w-fit">
-                                    <ImageIcon className="w-3.5 h-3.5 text-teal-600" /> {sub.submissionImages?.length || 1} ảnh bài nộp
+                                    <ImageIcon className="w-3.5 h-3.5 text-teal-600" /> {sub.submissionImages?.length ?? 0} ảnh bài nộp
                                   </span>
                                 ) : (
                                   <div>

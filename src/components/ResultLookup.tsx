@@ -100,6 +100,11 @@ const safeText = (value: unknown): string => {
   return String(value);
 };
 
+const displayStudentClass = (value: unknown): string => {
+  const text = safeText(value).trim();
+  return /^\d{4}-\d{2}-\d{2}(?:T|\s+\d{1,2}:\d{2})/.test(text) ? 'Chưa cập nhật' : text || 'Chưa cập nhật';
+};
+
 const normalizedText = (value: unknown): string => safeText(value).trim().toLowerCase();
 
 const normalizeAnswerForRegrade = (value: unknown): string => safeText(value)
@@ -607,11 +612,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
       ])
     : [];
 
+  const looksLikeRegularExam = /(?:hsk\s*[1-6]|đề\s*(?:tổng hợp|kiểm tra|thi)|\bbài\s+\d+)/iu.test(result?.lesson || '');
   const isHandwritingType = Boolean(
     result &&
-      (result.isHandwriting ||
-        submissionImgs.length > 0 ||
+      (submissionImgs.length > 0 ||
         correctedImgs.length > 0 ||
+        (result.isHandwriting && !looksLikeRegularExam) ||
         result.type === 'handwriting_submission' ||
         lessonLower.includes('nộp ảnh') ||
         lessonLower.includes('chép từ') ||
@@ -1327,7 +1333,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
                 )}
               </div>
               <h3 className="text-2xl font-bold text-slate-800 mt-2">{result.name}</h3>
-              <p className="text-xs text-slate-500 font-medium">Lớp: {result.class} | Bài: {result.lesson}</p>
+              <p className="text-xs text-slate-500 font-medium">Lớp: {displayStudentClass(result.class)} | Bài: {result.lesson}</p>
             </div>
 
             <div className="flex flex-col items-end gap-2">
@@ -2253,7 +2259,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
           )}
           <header className="print-report-header">
             <h1>Phiếu xem lại bài làm HSK</h1>
-            <p><strong>Học sinh:</strong> {result.name} · <strong>Lớp:</strong> {result.class}</p>
+            <p><strong>Học sinh:</strong> {result.name} · <strong>Lớp:</strong> {displayStudentClass(result.class)}</p>
             <p><strong>Đề:</strong> {result.lesson} · <strong>Mã bài:</strong> {result.id}</p>
             <div className="print-report-score">
               <strong>

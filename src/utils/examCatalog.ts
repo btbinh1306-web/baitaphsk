@@ -1,4 +1,4 @@
-import { ExamLesson } from '../types';
+import { ExamLesson, Question } from '../types';
 
 const TRIAL_03_WAV_QUESTIONS = new Set(['11', '12', '13', '14', '15', '20']);
 
@@ -105,6 +105,54 @@ const migrateMissingBundledAudio = (exam: ExamLesson, bundledExam: ExamLesson | 
 /** Keep saved copies of built-in lessons compatible with bundled answer corrections. */
 const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson | undefined): ExamLesson => {
   if (!bundledExam) return exam;
+
+  if (exam.id === 'hsk1-de-tong-hop-bai1-5-5-ky-nang') {
+    let changed = false;
+    const fixQuestion = (question: Question): Question => {
+      let fixed = question;
+      // Keep the saved answer tied to the option text when an old snapshot reordered choices.
+      const normalizedPrompt = String(question.prompt || '').replace(/^Câu\s*\d+[.:]?\s*/iu, '').trim();
+      if (
+        ['Hôm nay là thứ mấy?', '今天是星期几？'].includes(normalizedPrompt) &&
+        question.options?.includes('星期三')
+      ) {
+        const wednesdayIndex = question.options.indexOf('星期三');
+        if (question.answer !== wednesdayIndex) {
+          fixed = { ...fixed, answer: wednesdayIndex };
+          changed = true;
+        }
+      }
+
+      if (question.id === 'listen_1786509664671' && question.answer === 3 && question.options?.length === 3) {
+        fixed = { ...fixed, answer: 2 };
+        changed = true;
+      }
+      if (question.subQuestions?.length) {
+        const subQuestions = question.subQuestions.map(fixQuestion);
+        if (subQuestions.some((item, index) => item !== question.subQuestions?.[index])) {
+          fixed = { ...fixed, subQuestions };
+        }
+      }
+      if (Array.isArray(question.questions)) {
+        const questions = question.questions.map((raw) => {
+          if (!raw || typeof raw !== 'object') return raw;
+          const item = raw as Record<string, unknown>;
+          if (item.id === 'listen_1786509664671' && item.answer === 3 && Array.isArray(item.options) && item.options.length === 3) {
+            changed = true;
+            return { ...item, answer: 2 };
+          }
+          return raw;
+        });
+        if (questions.some((item, index) => item !== question.questions?.[index])) {
+          fixed = { ...fixed, questions };
+        }
+      }
+      return fixed;
+    };
+
+    const listeningQuestions = (exam.listeningQuestions || []).map(fixQuestion);
+    return changed ? { ...exam, listeningQuestions } : exam;
+  }
 
   if (exam.id === 'hsk2-bai1-word') {
     const correctedIds = new Set(['hsk2_b1_word_arrange_02', 'hsk2_b1_word_arrange_04']);
