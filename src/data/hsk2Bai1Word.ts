@@ -1,4 +1,5 @@
 import { ExamLesson, Question, ReadingPassage, VocabItem } from '../types';
+import { withPunctuationChips } from '../utils/arrangePunctuation';
 
 const mc = (id: string, prompt: string, options: string[], answer: number): Question => ({
   id,
@@ -30,8 +31,7 @@ const arrange = (id: string, prompt: string, wordChips: string[], answer: string
   type: 'arrange',
   tier: 'tier2',
   prompt,
-  wordChips,
-  acceptableAnswers: answer
+  ...withPunctuationChips(wordChips, answer)
 });
 
 const listeningGroup = (
@@ -196,7 +196,7 @@ const arrangeQuestions: Question[] = [
 const listeningQuestions: Question[] = [
   listeningGroup(
     'hsk2_b1_word_listen_01',
-    'Bài 1 · 听短文，判断对错',
+    'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)',
     '我叫白家月，今天早上到北京了。这是我第一次来北京，我是来旅游的，不是来学中文的。王老师的姐姐来接我们，她请我们吃了北京烤鸭。我们的中文不太好，有时不太懂她的意思。',
     'listening_tf',
     [
@@ -210,7 +210,7 @@ const listeningQuestions: Question[] = [
   ),
   listeningGroup(
     'hsk2_b1_word_listen_02',
-    'Bài 2 · 听对话，选择正确答案 (Câu 1)',
+    'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1',
     '请问，您是王老师吗？不是，我是他哥哥。你们是他的学生吧？对。',
     'listening_mc',
     [
@@ -220,7 +220,7 @@ const listeningQuestions: Question[] = [
   ),
   listeningGroup(
     'hsk2_b1_word_listen_03',
-    'Bài 2 · 听对话，选择正确答案 (Câu 2)',
+    'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2',
     '你是第一次来北京吗？是的，我是来旅游的。',
     'listening_mc',
     [
@@ -230,7 +230,7 @@ const listeningQuestions: Question[] = [
   ),
   listeningGroup(
     'hsk2_b1_word_listen_04',
-    'Bài 2 · 听对话，选择正确答案 (Câu 3)',
+    'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3',
     '你是什么时候到的？我是昨天晚上到的。',
     'listening_mc',
     [
@@ -240,7 +240,7 @@ const listeningQuestions: Question[] = [
   ),
   listeningGroup(
     'hsk2_b1_word_listen_05',
-    'Bài 2 · 听对话，选择正确答案 (Câu 4)',
+    'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4',
     '喂，你明天有时间吗？我想请你帮个忙。不好意思，我已经回家了。你可以给李文打个电话。',
     'listening_mc',
     [
@@ -250,7 +250,7 @@ const listeningQuestions: Question[] = [
   ),
   listeningGroup(
     'hsk2_b1_word_listen_06',
-    'Bài 2 · 听对话，选择正确答案 (Câu 5)',
+    'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5',
     '老师，我们的中文不太好。没关系，我让你们多说中文，这样就会越来越好。',
     'listening_mc',
     [
@@ -437,7 +437,7 @@ const essayQuestions: Question[] = [
   }),
   essay(
     'hsk2_b1_word_essay_01',
-    'Viết đoạn văn 60–80 chữ: 介绍你第一次去一个地方旅游的经历。Dùng ít nhất 5 từ/cấu trúc: 第一次、是……的、让、给、已经、有时、介绍、请。',
+    'Viết đoạn văn 60–80 chữ: 介绍你第一次去一个地方旅游的经历。(Giới thiệu chuyến du lịch đầu tiên của em đến một nơi.)Dùng ít nhất 5 từ/cấu trúc: 第一次、是……的、让、给、已经、有时、介绍、请。',
     '这是我第一次来北京，我是来旅游的。我是昨天下午到的，朋友来机场接我。他请我吃了北京烤鸭，还给我介绍了很多好玩的地方。他的中文很好，有时我不太懂他的意思，他就再说一次。我已经喜欢上北京了。',
     {
       taskGroup: 'writing_composition',

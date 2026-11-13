@@ -1,4 +1,5 @@
 import { ExamLesson, Question, ReadingPassage, VocabItem } from '../types';
+import { withPunctuationChips } from '../utils/arrangePunctuation';
 
 const vocab = (items: Array<[string, string, string, string, string]>): VocabItem[] => (
   items.map(([hanzi, pinyin, type, meaning, example]) => ({ hanzi, pinyin, type, meaning, example }))
@@ -39,8 +40,7 @@ const arrange = (id: string, chips: string[], answer: string, alternatives?: str
   type: 'arrange',
   tier: 'tier2',
   prompt: 'Sắp xếp các từ thành câu hoàn chỉnh.',
-  wordChips: chips,
-  acceptableAnswers: alternatives ? `${answer}|${alternatives}` : `${answer}|${answer.replace(/[。？！?!]$/u, '')}`
+  ...withPunctuationChips(chips, alternatives ? `${answer}|${alternatives}` : answer)
 });
 
 const essay = (
@@ -194,7 +194,7 @@ const b7Vocab = vocab([
 ]);
 const b7Arrange: Question[] = [
   arrange('hsk2_b7_arrange_01', ['就', '跑', '一下课', '他', '往外'], '一下课，他就往外跑。'),
-  arrange('hsk2_b7_arrange_02', ['得', '还可以', '我', '踢', '足球'], '我踢足球踢得还可以。', '我足球踢得还可以。'),
+  arrange('hsk2_b7_arrange_02', ['得', '还可以', '我', '踢', '足球'], '我足球踢得还可以。'),
   arrange('hsk2_b7_arrange_03', ['从', '的', '你', '回来', '北京', '什么时候', '是'], '你是什么时候从北京回来的？'),
   arrange('hsk2_b7_arrange_04', ['得', '快', '她', '跑步', '不', '跑'], '她跑步跑得不快。'),
   arrange('hsk2_b7_arrange_05', ['我', '开始', '从', '学游泳', '今天'], '我从今天开始学游泳。', '从今天开始，我学游泳。')
@@ -207,44 +207,44 @@ const b7Reading = reading('hsk2_b7_reading_01', 'II. 阅读 · Đọc hiểu', '
   mc('hsk2_b7_read_mc_01', '爸爸每个星期天做什么？', ['踢足球', '打篮球', '游泳'], 0),
   mc('hsk2_b7_read_mc_02', '我篮球打得怎么样？', ['不太好', '不错', '不会打'], 1),
   mc('hsk2_b7_read_mc_03', '我什么时候跟爸爸去运动？', ['一有时间', '每天早上', '星期六'], 0),
-  fill('hsk2_b7_read_fill_01', '他（　）北京回来了，今天还要去上课。', '从', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_02', '（　）前走，学校就在前面。', '往', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_03', '别往外（　）了，外面正在下雨。', '跑', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_04', '我喜欢（　）羽毛球，也喜欢打篮球。', '打', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_05', '他（　）打得很好，大家都喜欢跟他玩。', '篮球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_06', '你每天（　）多长时间？', '运动', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_07', '我喜欢（　）足球，不喜欢打篮球。', '踢', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_08', '你喜欢踢（　）还是打篮球？', '足球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_09', '桌子下面有一个（　）。', '球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_10', '哥哥跑（　）很快。', '得', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_11', '我每天早上都（　），晚上再做作业。', '跑步', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_12', '今天很热，我想去（　）。', '游泳', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_13', '她游泳（　）得很快，大家都喜欢看。', '游', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_14', '你的（　）是什么？我的爱好是踢足球。', '爱好', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b7_read_fill_15', '八点（　）上课，请你不要来晚。', '开始', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空')
+  fill('hsk2_b7_read_fill_01', '他（　）北京回来了，今天还要去上课。', '从', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_02', '（　）前走，学校就在前面。', '往', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_03', '别往外（　）了，外面正在下雨。', '跑', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_04', '我喜欢（　）羽毛球，也喜欢打篮球。', '打', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_05', '他（　）打得很好，大家都喜欢跟他玩。', '篮球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_06', '你每天（　）多长时间？', '运动', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_07', '我喜欢（　）足球，不喜欢打篮球。', '踢', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_08', '你喜欢踢（　）还是打篮球？', '足球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_09', '桌子下面有一个（　）。', '球', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_10', '哥哥跑（　）很快。', '得', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_11', '我每天早上都（　），晚上再做作业。', '跑步', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_12', '今天很热，我想去（　）。', '游泳', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_13', '她游泳（　）得很快，大家都喜欢看。', '游', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_14', '你的（　）是什么？我的爱好是踢足球。', '爱好', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b7_read_fill_15', '八点（　）上课，请你不要来晚。', '开始', b7ReadingWordBank, 'hsk2-b7-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)')
 ], b7ReadingWordBank);
 
 const b7Listening: Question[] = [
-  listeningGroup('hsk2_b7_listen_01', 'Bài 1 · 听短文，判断对错', '我叫小明，我的爱好是运动。我每天早上从家跑步去学校。一下课，我就往外跑，跟同学一起打篮球。我篮球打得不错，但是足球踢得不太好。星期天我喜欢跟爸爸去游泳。', 'listening_tf', [
+  listeningGroup('hsk2_b7_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '我叫小明，我的爱好是运动。我每天早上从家跑步去学校。一下课，我就往外跑，跟同学一起打篮球。我篮球打得不错，但是足球踢得不太好。星期天我喜欢跟爸爸去游泳。', 'listening_tf', [
     listeningTf('hsk2_b7_listen_01_01', '小明的爱好是运动。', true),
     listeningTf('hsk2_b7_listen_01_02', '小明每天从学校跑步回家。', false),
     listeningTf('hsk2_b7_listen_01_03', '一下课，小明就跟同学一起打篮球。', true),
     listeningTf('hsk2_b7_listen_01_04', '小明足球踢得很好。', false),
     listeningTf('hsk2_b7_listen_01_05', '星期天小明跟爸爸去踢足球。', false)
   ]),
-  listeningGroup('hsk2_b7_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：你是什么时候从北京回来的？男：昨天中午。', 'listening_mc', [
+  listeningGroup('hsk2_b7_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '女：你是什么时候从北京回来的？男：昨天中午。', 'listening_mc', [
     listeningMc('hsk2_b7_listen_02_01', '男的是什么时候回来的？', ['昨天中午', '昨天晚上', '今天早上'], 0)
   ]),
-  listeningGroup('hsk2_b7_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '女：你怎么一下课就往外跑？男：我跟同学说好了，一起去打篮球。', 'listening_mc', [
+  listeningGroup('hsk2_b7_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '女：你怎么一下课就往外跑？男：我跟同学说好了，一起去打篮球。', 'listening_mc', [
     listeningMc('hsk2_b7_listen_02_02', '男的为什么往外跑？', ['要回家', '要去打篮球', '要去游泳'], 1)
   ]),
-  listeningGroup('hsk2_b7_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：你踢得怎么样？男：我踢得还可以。', 'listening_mc', [
+  listeningGroup('hsk2_b7_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '女：你踢得怎么样？男：我踢得还可以。', 'listening_mc', [
     listeningMc('hsk2_b7_listen_02_03', '男的踢得怎么样？', ['很好', '还可以', '不好'], 1)
   ]),
-  listeningGroup('hsk2_b7_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：你跑得快不快？女：我跑得不快，也不太喜欢跑步。', 'listening_mc', [
+  listeningGroup('hsk2_b7_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '男：你跑得快不快？女：我跑得不快，也不太喜欢跑步。', 'listening_mc', [
     listeningMc('hsk2_b7_listen_02_04', '女的喜欢跑步吗？', ['喜欢', '不太喜欢', '很喜欢'], 1)
   ]),
-  listeningGroup('hsk2_b7_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：你游泳游得怎么样？男：我游得很快，从小就喜欢游泳。', 'listening_mc', [
+  listeningGroup('hsk2_b7_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '女：你游泳游得怎么样？男：我游得很快，从小就喜欢游泳。', 'listening_mc', [
     listeningMc('hsk2_b7_listen_02_05', '男的游泳游得怎么样？', ['不快', '很快', '不会游'], 1)
   ])
 ];
@@ -262,33 +262,33 @@ const b7AudioTranslationRubric = [
 ];
 
 const b7Speaking: Question[] = [
-  speaking('hsk2_b7_speak_01', '你是什么时候从北京回来的？', 'Nǐ shì shénme shíhou cóng Běijīng huílái de?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b7_speak_02', '你怎么一下课就往外跑？', 'Nǐ zěnme yí xiàkè jiù wǎng wài pǎo?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b7_speak_03', '我跟同学说好了，一起去打篮球。', 'Wǒ gēn tóngxué shuō hǎo le, yìqǐ qù dǎ lánqiú.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b7_speak_04', '我还喜欢踢足球，一到星期天就跟朋友们一起去踢。', 'Wǒ hái xǐhuan tī zúqiú, yí dào xīngqītiān jiù gēn péngyoumen yìqǐ qù tī.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b7_speak_05', '你踢得怎么样？我踢得还可以。', 'Nǐ tī de zěnmeyàng? Wǒ tī de hái kěyǐ.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b7_speak_06', '我跑得不快，也不太喜欢跑步。', 'Wǒ pǎo de bú kuài, yě bú tài xǐhuan pǎobù.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b7_speak_07', '从 → 我昨天从______回来。', 'Wǒ zuótiān cóng ______ huílái.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我昨天从北京回来。', referenceAnswers: ['我昨天从北京回来。'], requiredElements: ['从'] }),
-  speaking('hsk2_b7_speak_08', '一……就…… → 一到星期天，______。', 'Yí dào xīngqītiān, ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '一到星期天，我就去踢足球。', referenceAnswers: ['一到星期天，我就去踢足球。'], requiredElements: ['一……就……'] }),
-  speaking('hsk2_b7_speak_09', '得 → 我篮球打______。', 'Wǒ lánqiú dǎ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我篮球打得还可以。', referenceAnswers: ['我篮球打得还可以。'], requiredElements: ['得'] }),
-  speaking('hsk2_b7_speak_10', '爱好 → 你的______？', 'Nǐ de ______?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '你的爱好是什么？', referenceAnswers: ['你的爱好是什么？'], requiredElements: ['爱好'] }),
-  speaking('hsk2_b7_speak_11', '开始 → 从今天______。', 'Cóng jīntiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '从今天开始，我每天跑步。', referenceAnswers: ['从今天开始，我每天跑步。'], requiredElements: ['开始'] })
+  speaking('hsk2_b7_speak_01', '你是什么时候从北京回来的？', 'Nǐ shì shénme shíhou cóng Běijīng huílái de?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b7_speak_02', '你怎么一下课就往外跑？', 'Nǐ zěnme yí xiàkè jiù wǎng wài pǎo?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b7_speak_03', '我跟同学说好了，一起去打篮球。', 'Wǒ gēn tóngxué shuō hǎo le, yìqǐ qù dǎ lánqiú.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b7_speak_04', '我还喜欢踢足球，一到星期天就跟朋友们一起去踢。', 'Wǒ hái xǐhuan tī zúqiú, yí dào xīngqītiān jiù gēn péngyoumen yìqǐ qù tī.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b7_speak_05', '你踢得怎么样？我踢得还可以。', 'Nǐ tī de zěnmeyàng? Wǒ tī de hái kěyǐ.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b7_speak_06', '我跑得不快，也不太喜欢跑步。', 'Wǒ pǎo de bú kuài, yě bú tài xǐhuan pǎobù.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b7_speak_07', '从 → 我昨天从______回来。', 'Wǒ zuótiān cóng ______ huílái.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我昨天从北京回来。', referenceAnswers: ['我昨天从北京回来。'], requiredElements: ['从'] }),
+  speaking('hsk2_b7_speak_08', '一……就…… → 一到星期天，______。', 'Yí dào xīngqītiān, ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '一到星期天，我就去踢足球。', referenceAnswers: ['一到星期天，我就去踢足球。'], requiredElements: ['一……就……'] }),
+  speaking('hsk2_b7_speak_09', '得 → 我篮球打______。', 'Wǒ lánqiú dǎ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我篮球打得还可以。', referenceAnswers: ['我篮球打得还可以。'], requiredElements: ['得'] }),
+  speaking('hsk2_b7_speak_10', '爱好 → 你的______？', 'Nǐ de ______?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '你的爱好是什么？', referenceAnswers: ['你的爱好是什么？'], requiredElements: ['爱好'] }),
+  speaking('hsk2_b7_speak_11', '开始 → 从今天______。', 'Cóng jīntiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '从今天开始，我每天跑步。', referenceAnswers: ['从今天开始，我每天跑步。'], requiredElements: ['开始'] })
 ];
 
 const b7EssayQuestions: Question[] = [
-  errorCorrection('hsk2_b7_error_01', '我跑步得很快。', '我跑步跑得很快。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '跑步是动词离合词，需要重复 跑，再接 得 + 补语。' }),
-  errorCorrection('hsk2_b7_error_02', '我篮球很打得好。', '我篮球打得很好。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '得要紧跟在动词 打 后面，程度词 很 放在补语位置。' }),
-  errorCorrection('hsk2_b7_error_03', '我喜欢打足球。', '我喜欢踢足球。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '篮球用 打，足球用 踢。' }),
-  errorCorrection('hsk2_b7_error_04', '我从家到学校走。', '我从家走到学校。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '从 后接起点，方向 到 放在动词后：从家走到学校。' }),
-  errorCorrection('hsk2_b7_error_05', '我一到家，妈妈就电话。', '我一到家，妈妈就打来电话了。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '就 后面需要完整的动词短语，电话作名词时要搭配 打。' }),
+  errorCorrection('hsk2_b7_error_01', '我跑步得很快。', '我跑步跑得很快。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '跑步是动词离合词，需要重复 跑，再接 得 + 补语。' }),
+  errorCorrection('hsk2_b7_error_02', '我篮球很打得好。', '我篮球打得很好。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '得要紧跟在动词 打 后面，程度词 很 放在补语位置。' }),
+  errorCorrection('hsk2_b7_error_03', '我喜欢打足球。', '我喜欢踢足球。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '篮球用 打，足球用 踢。' }),
+  errorCorrection('hsk2_b7_error_04', '我从家到学校走。', '我从家走到学校。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '从 后接起点，方向 到 放在动词后：从家走到学校。' }),
+  errorCorrection('hsk2_b7_error_05', '我一到家，妈妈就电话。', '我一到家，妈妈就打来电话了。', { taskGroup: 'bai7-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '就 后面需要完整的动词短语，电话作名词时要搭配 打。' }),
   essay(
     'hsk2_b7_writing',
-    '介绍你的爱好。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 爱好、运动、打、踢、得、开始、从、一……就……、游泳、跑步。',
+    '介绍你的爱好。(Giới thiệu sở thích của em.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 爱好、运动、打、踢、得、开始、从、一……就……、游泳、跑步。',
     '我的爱好是运动。从上小学开始，我就喜欢踢足球。我足球踢得还可以，篮球打得不太好。一到星期天，我就跟朋友们一起去踢球。我也喜欢游泳，但是游得不快。',
     ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung giới thiệu rõ sở thích'],
     {
       taskGroup: 'bai7-writing',
-      taskGroupTitle: 'III. 写作 · Bài 3: 写短文',
+      taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)',
       explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.',
       rubric: b7WritingRubric,
       maxScore: 10
@@ -351,21 +351,21 @@ const b8ReadingQuestions: Question[] = [
   mc('hsk2_b8_read_04', '他们去哪儿吃饭了？', ['饭馆', '家里', '学校'], 0),
   mc('hsk2_b8_read_05', '哪个菜更好吃？', ['肉', '鱼', '一样'], 1),
   mc('hsk2_b8_read_06', '妻子觉得爱情片怎么样？', ['没有意思', '很有意思', '太长'], 1),
-  fill('hsk2_b8_fill_01', '这是我从北京买的（　）。', '手表', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_02', '坐在你（　）的人是谁？', '左边', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_03', '出门往（　）走就到学校了。', '左', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_04', '姐姐（　）妹妹高。', '比', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_05', '床的（　）是桌子。', '右边', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_06', '往左走还是往（　）走？', '右', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_07', '我们看（　）吧，我喜欢这样的电影。', '爱情片', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_08', '这本书很（　），我还想看。', '有意思', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_09', '您好，现在（　）菜吗？', '点', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_10', '（　）下雨了，但是不太冷。', '虽然', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_11', '我想去饭馆，（　）妈妈想在家吃饭。', '但是', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_12', '买了很多东西，（　）了不少钱。', '花', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_13', '这是我的（　），她是老师。', '妻子', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_14', '这是我（　），他会做饭。', '丈夫', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b8_fill_15', '明天我们要去（　）吃饭。', '饭馆', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空')
+  fill('hsk2_b8_fill_01', '这是我从北京买的（　）。', '手表', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_02', '坐在你（　）的人是谁？', '左边', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_03', '出门往（　）走就到学校了。', '左', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_04', '姐姐（　）妹妹高。', '比', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_05', '床的（　）是桌子。', '右边', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_06', '往左走还是往（　）走？', '右', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_07', '我们看（　）吧，我喜欢这样的电影。', '爱情片', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_08', '这本书很（　），我还想看。', '有意思', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_09', '您好，现在（　）菜吗？', '点', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_10', '（　）下雨了，但是不太冷。', '虽然', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_11', '我想去饭馆，（　）妈妈想在家吃饭。', '但是', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_12', '买了很多东西，（　）了不少钱。', '花', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_13', '这是我的（　），她是老师。', '妻子', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_14', '这是我（　），他会做饭。', '丈夫', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b8_fill_15', '明天我们要去（　）吃饭。', '饭馆', b8WordBank, 'hsk2-b8-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)')
 ];
 const b8Arrange: Question[] = [
   arrange('hsk2_b8_arrange_01', ['右边的', '比', '好看', '我', '觉得', '左边的'], '我觉得左边的比右边的好看。', '我觉得右边的比左边的好看。'),
@@ -377,42 +377,42 @@ const b8Arrange: Question[] = [
 const b8Reading = reading('hsk2_b8_reading_01', 'II. 阅读 · Đọc hiểu', '今天虽然下雨，但是我和妻子还是去了饭馆。我们点了三个菜，鱼比肉更好吃。吃完饭，我们去看电影。我觉得爱情片没有意思，妻子觉得很有意思。', b8ReadingQuestions, b8WordBank);
 
 const b8Listening: Question[] = [
-  listeningGroup('hsk2_b8_listen_01', 'Bài 1 · 听短文，判断对错', '今天是我的生日。虽然我忘了，但是丈夫记得。他请我去饭馆吃饭，还带我去看了爱情片。他给我买了一块手表，花了不少钱。我觉得今天很快乐。', 'listening_tf', [
+  listeningGroup('hsk2_b8_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '今天是我的生日。虽然我忘了，但是丈夫记得。他请我去饭馆吃饭，还带我去看了爱情片。他给我买了一块手表，花了不少钱。我觉得今天很快乐。', 'listening_tf', [
     listeningTf('hsk2_b8_listen_01_01', '今天是我的生日。', true),
     listeningTf('hsk2_b8_listen_01_02', '我和丈夫都忘了生日。', false),
     listeningTf('hsk2_b8_listen_01_03', '丈夫请我去饭馆吃饭。', true),
     listeningTf('hsk2_b8_listen_01_04', '我们去看了足球。', false),
     listeningTf('hsk2_b8_listen_01_05', '手表没花什么钱。', false)
   ]),
-  listeningGroup('hsk2_b8_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '男：这两块手表怎么样？女：我喜欢左边这块。', 'listening_mc', [
+  listeningGroup('hsk2_b8_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '男：这两块手表怎么样？女：我喜欢左边这块。', 'listening_mc', [
     listeningMc('hsk2_b8_listen_02_01', '女的喜欢哪块手表？', ['左边的', '右边的', '都不喜欢'], 0)
   ]),
-  listeningGroup('hsk2_b8_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '女：我喜欢左边这块。男：我也觉得左边的比右边的好看。', 'listening_mc', [
+  listeningGroup('hsk2_b8_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '女：我喜欢左边这块。男：我也觉得左边的比右边的好看。', 'listening_mc', [
     listeningMc('hsk2_b8_listen_02_02', '男的觉得哪块手表更好看？', ['右边的', '左边的', '一样'], 1)
   ]),
-  listeningGroup('hsk2_b8_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：这个电影比那个爱情片更有意思。男：好，我去买票。', 'listening_mc', [
+  listeningGroup('hsk2_b8_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '女：这个电影比那个爱情片更有意思。男：好，我去买票。', 'listening_mc', [
     listeningMc('hsk2_b8_listen_02_03', '他们觉得哪个电影更有意思？', ['这个电影', '那个爱情片', '都没意思'], 0)
   ]),
-  listeningGroup('hsk2_b8_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：到网上买吧，网上买票比在这里买便宜。女：好的。', 'listening_mc', [
+  listeningGroup('hsk2_b8_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '男：到网上买吧，网上买票比在这里买便宜。女：好的。', 'listening_mc', [
     listeningMc('hsk2_b8_listen_02_04', '在哪儿买票更便宜？', ['在这里', '网上', '饭馆'], 1)
   ]),
-  listeningGroup('hsk2_b8_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '男：今天花了不少钱吧？女：虽然花了一些钱，但是我们过了一个快乐的生日。', 'listening_mc', [
+  listeningGroup('hsk2_b8_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '男：今天花了不少钱吧？女：虽然花了一些钱，但是我们过了一个快乐的生日。', 'listening_mc', [
     listeningMc('hsk2_b8_listen_02_05', '她觉得今天怎么样？', ['很快乐', '很累', '不快乐'], 0)
   ])
 ];
 
 const b8Speaking: Question[] = [
-  speaking('hsk2_b8_speak_01', '这两块手表怎么样？', 'Zhè liǎng kuài shǒubiǎo zěnmeyàng?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b8_speak_02', '我也觉得左边的比右边的好看。', 'Wǒ yě juéde zuǒbian de bǐ yòubian de hǎokàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b8_speak_03', '我看网上说这个电影比那个爱情片更有意思。', 'Wǒ kàn wǎngshàng shuō zhège diànyǐng bǐ nàge àiqíngpiān gèng yǒu yìsi.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b8_speak_04', '网上买票比在这里买便宜。', 'Wǎngshàng mǎi piào bǐ zài zhèlǐ mǎi piányi.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b8_speak_05', '虽然你忘了，但是我记得。', 'Suīrán nǐ wàng le, dànshì wǒ jìde.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b8_speak_06', '虽然花了一些钱，但是我们过了一个快乐的生日。', 'Suīrán huā le yìxiē qián, dànshì wǒmen guò le yí ge kuàilè de shēngrì.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b8_speak_07', '比 → 今天______。', 'Bǐ → Jīntiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '今天比昨天冷。', referenceAnswers: ['今天比昨天冷。'], requiredElements: ['比'] }),
-  speaking('hsk2_b8_speak_08', '更 → 这个电影比那个______。', 'Gèng → Zhège diànyǐng bǐ nàge ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '这个电影比那个更有意思。', referenceAnswers: ['这个电影比那个更有意思。'], requiredElements: ['更'] }),
-  speaking('hsk2_b8_speak_09', '虽然……但是…… → 虽然今天下雨，______。', 'Suīrán…dànshì… → Suīrán jīntiān xiàyǔ, ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '虽然今天下雨，但是我们还是去上课。', referenceAnswers: ['虽然今天下雨，但是我们还是去上课。'], requiredElements: ['虽然……但是……'] }),
-  speaking('hsk2_b8_speak_10', '花 → 买手表______。', 'Huā → Mǎi shǒubiǎo ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '买手表花了不少钱。', referenceAnswers: ['买手表花了不少钱。'], requiredElements: ['花'] }),
-  speaking('hsk2_b8_speak_11', '点 → 您好，现在______吗？', 'Diǎn → Nín hǎo, xiànzài ______ ma?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '您好，现在点菜吗？', referenceAnswers: ['您好，现在点菜吗？'], requiredElements: ['点'] })
+  speaking('hsk2_b8_speak_01', '这两块手表怎么样？', 'Zhè liǎng kuài shǒubiǎo zěnmeyàng?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b8_speak_02', '我也觉得左边的比右边的好看。', 'Wǒ yě juéde zuǒbian de bǐ yòubian de hǎokàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b8_speak_03', '我看网上说这个电影比那个爱情片更有意思。', 'Wǒ kàn wǎngshàng shuō zhège diànyǐng bǐ nàge àiqíngpiān gèng yǒu yìsi.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b8_speak_04', '网上买票比在这里买便宜。', 'Wǎngshàng mǎi piào bǐ zài zhèlǐ mǎi piányi.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b8_speak_05', '虽然你忘了，但是我记得。', 'Suīrán nǐ wàng le, dànshì wǒ jìde.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b8_speak_06', '虽然花了一些钱，但是我们过了一个快乐的生日。', 'Suīrán huā le yìxiē qián, dànshì wǒmen guò le yí ge kuàilè de shēngrì.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b8_speak_07', '比 → 今天______。', 'Bǐ → Jīntiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '今天比昨天冷。', referenceAnswers: ['今天比昨天冷。'], requiredElements: ['比'] }),
+  speaking('hsk2_b8_speak_08', '更 → 这个电影比那个______。', 'Gèng → Zhège diànyǐng bǐ nàge ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '这个电影比那个更有意思。', referenceAnswers: ['这个电影比那个更有意思。'], requiredElements: ['更'] }),
+  speaking('hsk2_b8_speak_09', '虽然……但是…… → 虽然今天下雨，______。', 'Suīrán…dànshì… → Suīrán jīntiān xiàyǔ, ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '虽然今天下雨，但是我们还是去上课。', referenceAnswers: ['虽然今天下雨，但是我们还是去上课。'], requiredElements: ['虽然……但是……'] }),
+  speaking('hsk2_b8_speak_10', '花 → 买手表______。', 'Huā → Mǎi shǒubiǎo ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '买手表花了不少钱。', referenceAnswers: ['买手表花了不少钱。'], requiredElements: ['花'] }),
+  speaking('hsk2_b8_speak_11', '点 → 您好，现在______吗？', 'Diǎn → Nín hǎo, xiànzài ______ ma?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '您好，现在点菜吗？', referenceAnswers: ['您好，现在点菜吗？'], requiredElements: ['点'] })
 ];
 
 const b8WritingRubric = [
@@ -433,17 +433,17 @@ const b8AudioTranslationRubric = [
 ];
 
 const b8EssayQuestions: Question[] = [
-  errorCorrection('hsk2_b8_error_01', '他比我很高。', '他比我高。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', acceptedVariants: ['他比我更高。'], explanation: 'Câu có 比 không dùng 很/非常 trước tính từ; có thể dùng 更 để tăng mức độ.' }),
-  errorCorrection('hsk2_b8_error_02', '今天比昨天非常冷。', '今天比昨天冷。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', acceptedVariants: ['今天比昨天更冷。'], explanation: 'Sau 比 dùng tính từ trực tiếp; muốn nhấn mạnh dùng 更 hoặc 还.' }),
-  errorCorrection('hsk2_b8_error_03', '虽然下雨，所以我们还是去了。', '虽然下雨，但是我们还是去了。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Cấu trúc chuyển ý là 虽然……但是……, không dùng 所以.' }),
-  errorCorrection('hsk2_b8_error_04', '我有一个手表。', '我有一块手表。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '手表 dùng lượng từ 块.' }),
-  errorCorrection('hsk2_b8_error_05', '我们点菜了三个。', '我们点了三个菜。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Trật tự đúng là động từ + 了 + số lượng + danh từ.' }),
-  essay('hsk2_b8_writing', '写一写你和家人（或朋友）过生日的一天。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 虽然……但是……、比、点、花、手表、饭馆、有意思、妻子（丈夫）、左边（右边）。', '昨天是我的生日。虽然我忘了，但是朋友们都记得。我们去饭馆点了很多菜，鱼比肉更好吃。朋友还送我一块手表，我们过了很快乐的一天。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung kể rõ một ngày sinh nhật'], { taskGroup: 'bai8-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b8WritingRubric, maxScore: 10 }),
-  essay('hsk2_b8_picture_01', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '哥哥比弟弟高。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 高'], { imageUrl: '/images/hsk2-bai8/bai8_bi_01.png', imageAlt: '哥哥 – 弟弟 – 高', imageHint: 'Tính từ gợi ý: 高.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句', rubric: b8PictureRubric, maxScore: 10 }),
-  essay('hsk2_b8_picture_02', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '左边的手表比右边的贵。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 贵'], { imageUrl: '/images/hsk2-bai8/bai8_bi_02.png', imageAlt: '左边的手表 – 右边的手表 – 贵', imageHint: 'Tính từ gợi ý: 贵.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句', rubric: b8PictureRubric, maxScore: 10 }),
-  essay('hsk2_b8_picture_03', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '今天比昨天热。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 热'], { imageUrl: '/images/hsk2-bai8/bai8_bi_03.png', imageAlt: '今天 – 昨天 – 热', imageHint: 'Tính từ gợi ý: 热.', acceptedVariants: ['今天比昨天更热。'], explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句', rubric: b8PictureRubric, maxScore: 10 }),
-  essay('hsk2_b8_picture_04', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '左边的鱼比右边的长。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 长'], { imageUrl: '/images/hsk2-bai8/bai8_bi_04.png', imageAlt: '左边的鱼 – 右边的鱼 – 长', imageHint: 'Tính từ gợi ý: 长.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句', rubric: b8PictureRubric, maxScore: 10 }),
-  essay('hsk2_b8_picture_05', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '左边的苹果比右边的多。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 多'], { imageUrl: '/images/hsk2-bai8/bai8_bi_05.png', imageAlt: '左边的苹果 – 右边的苹果 – 多', imageHint: 'Tính từ gợi ý: 多.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句', rubric: b8PictureRubric, maxScore: 10 })
+  errorCorrection('hsk2_b8_error_01', '他比我很高。', '他比我高。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', acceptedVariants: ['他比我更高。'], explanation: 'Câu có 比 không dùng 很/非常 trước tính từ; có thể dùng 更 để tăng mức độ.' }),
+  errorCorrection('hsk2_b8_error_02', '今天比昨天非常冷。', '今天比昨天冷。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', acceptedVariants: ['今天比昨天更冷。'], explanation: 'Sau 比 dùng tính từ trực tiếp; muốn nhấn mạnh dùng 更 hoặc 还.' }),
+  errorCorrection('hsk2_b8_error_03', '虽然下雨，所以我们还是去了。', '虽然下雨，但是我们还是去了。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Cấu trúc chuyển ý là 虽然……但是……, không dùng 所以.' }),
+  errorCorrection('hsk2_b8_error_04', '我有一个手表。', '我有一块手表。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '手表 dùng lượng từ 块.' }),
+  errorCorrection('hsk2_b8_error_05', '我们点菜了三个。', '我们点了三个菜。', { taskGroup: 'bai8-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Trật tự đúng là động từ + 了 + số lượng + danh từ.' }),
+  essay('hsk2_b8_writing', '写一写你和家人（或朋友）过生日的一天。(Viết về một ngày sinh nhật em đón cùng gia đình hoặc bạn bè.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 虽然……但是……、比、点、花、手表、饭馆、有意思、妻子（丈夫）、左边（右边）。', '昨天是我的生日。虽然我忘了，但是朋友们都记得。我们去饭馆点了很多菜，鱼比肉更好吃。朋友还送我一块手表，我们过了很快乐的一天。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung kể rõ một ngày sinh nhật'], { taskGroup: 'bai8-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b8WritingRubric, maxScore: 10 }),
+  essay('hsk2_b8_picture_01', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '哥哥比弟弟高。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 高'], { imageUrl: '/images/hsk2-bai8/bai8_bi_01.png', imageAlt: '哥哥 – 弟弟 – 高', imageHint: 'Tính từ gợi ý: 高.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句 (Nhìn tranh, dùng 比 đặt câu)', rubric: b8PictureRubric, maxScore: 10 }),
+  essay('hsk2_b8_picture_02', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '左边的手表比右边的贵。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 贵'], { imageUrl: '/images/hsk2-bai8/bai8_bi_02.png', imageAlt: '左边的手表 – 右边的手表 – 贵', imageHint: 'Tính từ gợi ý: 贵.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句 (Nhìn tranh, dùng 比 đặt câu)', rubric: b8PictureRubric, maxScore: 10 }),
+  essay('hsk2_b8_picture_03', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '今天比昨天热。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 热'], { imageUrl: '/images/hsk2-bai8/bai8_bi_03.png', imageAlt: '今天 – 昨天 – 热', imageHint: 'Tính từ gợi ý: 热.', acceptedVariants: ['今天比昨天更热。'], explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句 (Nhìn tranh, dùng 比 đặt câu)', rubric: b8PictureRubric, maxScore: 10 }),
+  essay('hsk2_b8_picture_04', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '左边的鱼比右边的长。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 长'], { imageUrl: '/images/hsk2-bai8/bai8_bi_04.png', imageAlt: '左边的鱼 – 右边的鱼 – 长', imageHint: 'Tính từ gợi ý: 长.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句 (Nhìn tranh, dùng 比 đặt câu)', rubric: b8PictureRubric, maxScore: 10 }),
+  essay('hsk2_b8_picture_05', 'Bài 4 · 看图，用“比”造句: Viết một câu so sánh theo ảnh.', '左边的苹果比右边的多。', ['Dùng 比', 'Dùng đúng tính từ gợi ý: 多'], { imageUrl: '/images/hsk2-bai8/bai8_bi_05.png', imageAlt: '左边的苹果 – 右边的苹果 – 多', imageHint: 'Tính từ gợi ý: 多.', explanation: 'Đáp án tham khảo, không phải đáp án cố định. Giáo viên tự quyết đúng/sai theo ảnh, cấu trúc 比 và ý nghĩa câu học sinh nói/viết.', taskGroup: 'bai8-picture-comparison', taskGroupTitle: 'III. 写作 · Bài 4: 看图，用“比”造句 (Nhìn tranh, dùng 比 đặt câu)', rubric: b8PictureRubric, maxScore: 10 })
 ];
 
 const b8TranslationQuestions: Question[] = [
@@ -481,19 +481,19 @@ const b9ReadingQuestions: Question[] = [
   mc('hsk2_b9_read_mc_01', '他们走路走了多长时间？', ['十分钟', '二十分钟', '半个小时'], 1),
   mc('hsk2_b9_read_mc_02', '他们为什么什么都没买？', ['衣服太贵', '衣服没有商场里的好看', '没有时间'], 1),
   mc('hsk2_b9_read_mc_03', '后来他们去了哪儿？', ['商场', '咖啡店', '学校'], 1),
-  fill('hsk2_b9_read_fill_01', '我的手机（　）了，不能给你打电话。', '坏', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_02', '医院（　）有一家超市。', '旁边', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_03', '那个（　）在学校学习中文。', '男孩儿', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_04', '你不要（　）说，他会不高兴。', '这样', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_05', '爸爸的（　）很高，但是他跑得不快。', '个子', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_06', '今天没有昨天（　）热。', '那么', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_07', '他个子很（　），篮球打得很好。', '高', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_08', '我们在学校（　）见面吧。', '门口', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_09', '他每天早上喝一杯（　）。', '咖啡', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_10', '学校（　）这儿不远，我们走路去。', '离', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_11', '公司离我家很（　），我每天走路上班。', '近', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_12', '（　）要半个小时，你坐车去吧。', '走路', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b9_read_fill_13', '他每（　）都学习中文。', '周', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空')
+  fill('hsk2_b9_read_fill_01', '我的手机（　）了，不能给你打电话。', '坏', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_02', '医院（　）有一家超市。', '旁边', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_03', '那个（　）在学校学习中文。', '男孩儿', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_04', '你不要（　）说，他会不高兴。', '这样', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_05', '爸爸的（　）很高，但是他跑得不快。', '个子', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_06', '今天没有昨天（　）热。', '那么', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_07', '他个子很（　），篮球打得很好。', '高', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_08', '我们在学校（　）见面吧。', '门口', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_09', '他每天早上喝一杯（　）。', '咖啡', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_10', '学校（　）这儿不远，我们走路去。', '离', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_11', '公司离我家很（　），我每天走路上班。', '近', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_12', '（　）要半个小时，你坐车去吧。', '走路', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b9_read_fill_13', '他每（　）都学习中文。', '周', b9WordBank, 'hsk2-b9-reading-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)')
 ];
 const b9Arrange: Question[] = [
   arrange('hsk2_b9_arrange_01', ['好看', '没有', '那块', '这块手表'], '这块手表没有那块好看。', '那块没有这块手表好看。'),
@@ -505,26 +505,26 @@ const b9Arrange: Question[] = [
 const b9Reading = reading('hsk2_b9_reading_01', 'II. 阅读 · Đọc hiểu', '周末我和朋友去商店买衣服。商店离我家不远，我们走路去，走了二十分钟。商店里的衣服没有商场里的好看，所以我们什么都没买。后来我们去了商店旁边的咖啡店。', b9ReadingQuestions, b9WordBank);
 
 const b9Listening: Question[] = [
-  listeningGroup('hsk2_b9_listen_01', 'Bài 1 · 听短文，判断对错', '这周我休息。我家离学校很近，所以我每天走路去学校，走路只要十分钟。学校门口有一家咖啡店，我的朋友喜欢在那儿喝咖啡，但是我不喝咖啡，因为喝了咖啡晚上就不想睡觉。', 'listening_tf', [
+  listeningGroup('hsk2_b9_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '这周我休息。我家离学校很近，所以我每天走路去学校，走路只要十分钟。学校门口有一家咖啡店，我的朋友喜欢在那儿喝咖啡，但是我不喝咖啡，因为喝了咖啡晚上就不想睡觉。', 'listening_tf', [
     listeningTf('hsk2_b9_listen_01_01', '我家离学校很近。', true),
     listeningTf('hsk2_b9_listen_01_02', '我每天坐车去学校。', false),
     listeningTf('hsk2_b9_listen_01_03', '走路去学校要一个小时。', false),
     listeningTf('hsk2_b9_listen_01_04', '学校门口有一家咖啡店。', true),
     listeningTf('hsk2_b9_listen_01_05', '我喜欢喝咖啡。', false)
   ]),
-  listeningGroup('hsk2_b9_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：儿子的裤子坏了，我们给他买条新的吧。男：好啊。', 'listening_mc', [
+  listeningGroup('hsk2_b9_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '女：儿子的裤子坏了，我们给他买条新的吧。男：好啊。', 'listening_mc', [
     listeningMc('hsk2_b9_listen_02_01', '他们要给儿子买什么？', ['裤子', '书包', '手表'], 0)
   ]),
-  listeningGroup('hsk2_b9_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '女：旁边那个男孩儿穿着这样的裤子，我觉得很好看。男：儿子的个子没有他那么高。', 'listening_mc', [
+  listeningGroup('hsk2_b9_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '女：旁边那个男孩儿穿着这样的裤子，我觉得很好看。男：儿子的个子没有他那么高。', 'listening_mc', [
     listeningMc('hsk2_b9_listen_02_02', '谁的个子更高？', ['儿子', '他', '一样高'], 1)
   ]),
-  listeningGroup('hsk2_b9_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '男：我们去咖啡店吧。女：咖啡店离这儿有点儿远。', 'listening_mc', [
+  listeningGroup('hsk2_b9_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '男：我们去咖啡店吧。女：咖啡店离这儿有点儿远。', 'listening_mc', [
     listeningMc('hsk2_b9_listen_02_03', '咖啡店离这儿怎么样？', ['很近', '有点儿远', '就在门口'], 1)
   ]),
-  listeningGroup('hsk2_b9_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：要走多长时间？女：走半个多小时就到了。', 'listening_mc', [
+  listeningGroup('hsk2_b9_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '男：要走多长时间？女：走半个多小时就到了。', 'listening_mc', [
     listeningMc('hsk2_b9_listen_02_04', '走路要多长时间？', ['半个多小时', '十分钟', '两个小时'], 0)
   ]),
-  listeningGroup('hsk2_b9_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：你为什么不喝咖啡？男：喝了咖啡，晚上就别想睡觉了。', 'listening_mc', [
+  listeningGroup('hsk2_b9_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '女：你为什么不喝咖啡？男：喝了咖啡，晚上就别想睡觉了。', 'listening_mc', [
     listeningMc('hsk2_b9_listen_02_05', '男的为什么不喝咖啡？', ['咖啡不好喝', '喝了晚上睡不着', '咖啡店太远'], 1)
   ])
 ];
@@ -542,26 +542,26 @@ const b9AudioTranslationRubric = [
 ];
 
 const b9Speaking: Question[] = [
-  speaking('hsk2_b9_speak_01', '儿子的裤子坏了，我们给他买条新的吧。', 'Érzi de kùzi huài le, wǒmen gěi tā mǎi tiáo xīn de ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b9_speak_02', '没有你上次买的那条好看。', 'Méiyǒu nǐ shàng cì mǎi de nà tiáo hǎokàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b9_speak_03', '儿子的个子没有他那么高。', 'Érzi de gèzi méiyǒu tā nàme gāo.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b9_speak_04', '咖啡店离这儿有点儿远。', 'Kāfēi diàn lí zhèr yǒudiǎnr yuǎn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b9_speak_05', '这里离家很近，还是走路吧。', 'Zhèlǐ lí jiā hěn jìn, háishi zǒulù ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b9_speak_06', '走半个多小时就到了。', 'Zǒu bàn ge duō xiǎoshí jiù dào le.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b9_speak_07', '没有 → 昨天没有今天______。', 'Méiyǒu → Zuótiān méiyǒu jīntiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '昨天没有今天这么冷。', referenceAnswers: ['昨天没有今天这么冷。'], requiredElements: ['没有'] }),
-  speaking('hsk2_b9_speak_08', '离 → 学校离______。', 'Lí → Xuéxiào lí ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '学校离我家很近。', referenceAnswers: ['学校离我家很近。'], requiredElements: ['离'] }),
-  speaking('hsk2_b9_speak_09', '有……吗 → 妹妹有姐姐______吗？', 'Yǒu…ma → Mèimei yǒu jiějie ______ ma?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '妹妹有姐姐高吗？', referenceAnswers: ['妹妹有姐姐高吗？'], requiredElements: ['有……吗'] }),
-  speaking('hsk2_b9_speak_10', '走路 → 我家离学校很近，我______。', 'Zǒulù → Wǒ jiā lí xuéxiào hěn jìn, wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我家离学校很近，我每天走路去学校。', referenceAnswers: ['我家离学校很近，我每天走路去学校。'], requiredElements: ['走路'] }),
-  speaking('hsk2_b9_speak_11', '旁边 → 学校______。', 'Pángbiān → Xuéxiào ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '学校旁边有一家咖啡店。', referenceAnswers: ['学校旁边有一家咖啡店。'], requiredElements: ['旁边'] })
+  speaking('hsk2_b9_speak_01', '儿子的裤子坏了，我们给他买条新的吧。', 'Érzi de kùzi huài le, wǒmen gěi tā mǎi tiáo xīn de ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b9_speak_02', '没有你上次买的那条好看。', 'Méiyǒu nǐ shàng cì mǎi de nà tiáo hǎokàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b9_speak_03', '儿子的个子没有他那么高。', 'Érzi de gèzi méiyǒu tā nàme gāo.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b9_speak_04', '咖啡店离这儿有点儿远。', 'Kāfēi diàn lí zhèr yǒudiǎnr yuǎn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b9_speak_05', '这里离家很近，还是走路吧。', 'Zhèlǐ lí jiā hěn jìn, háishi zǒulù ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b9_speak_06', '走半个多小时就到了。', 'Zǒu bàn ge duō xiǎoshí jiù dào le.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b9_speak_07', '没有 → 昨天没有今天______。', 'Méiyǒu → Zuótiān méiyǒu jīntiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '昨天没有今天这么冷。', referenceAnswers: ['昨天没有今天这么冷。'], requiredElements: ['没有'] }),
+  speaking('hsk2_b9_speak_08', '离 → 学校离______。', 'Lí → Xuéxiào lí ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '学校离我家很近。', referenceAnswers: ['学校离我家很近。'], requiredElements: ['离'] }),
+  speaking('hsk2_b9_speak_09', '有……吗 → 妹妹有姐姐______吗？', 'Yǒu…ma → Mèimei yǒu jiějie ______ ma?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '妹妹有姐姐高吗？', referenceAnswers: ['妹妹有姐姐高吗？'], requiredElements: ['有……吗'] }),
+  speaking('hsk2_b9_speak_10', '走路 → 我家离学校很近，我______。', 'Zǒulù → Wǒ jiā lí xuéxiào hěn jìn, wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我家离学校很近，我每天走路去学校。', referenceAnswers: ['我家离学校很近，我每天走路去学校。'], requiredElements: ['走路'] }),
+  speaking('hsk2_b9_speak_11', '旁边 → 学校______。', 'Pángbiān → Xuéxiào ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '学校旁边有一家咖啡店。', referenceAnswers: ['学校旁边有一家咖啡店。'], requiredElements: ['旁边'] })
 ];
 
 const b9EssayQuestions: Question[] = [
-  errorCorrection('hsk2_b9_error_01', '昨天没有今天比冷。', '昨天没有今天冷。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', acceptedVariants: ['昨天没有今天这么冷。'], explanation: 'Mẫu 没有 so sánh không dùng thêm 比.' }),
-  errorCorrection('hsk2_b9_error_02', '学校医院离不远。', '学校离医院不远。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '离 đứng giữa hai địa điểm: 学校离医院不远.' }),
-  errorCorrection('hsk2_b9_error_03', '他们学中文了两年。', '他们学了两年中文。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Bổ ngữ thời lượng đứng sau động từ; 了 đứng ngay sau 学.' }),
-  errorCorrection('hsk2_b9_error_04', '这块手表没有那块比好看。', '这块手表没有那块好看。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Mẫu 没有 so sánh không dùng thêm 比.' }),
-  errorCorrection('hsk2_b9_error_05', '妹妹有姐姐很高吗？', '妹妹有姐姐高吗？', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Mẫu A 有 B + tính từ không thêm 很.' }),
-  essay('hsk2_b9_writing', '写一写你每天怎么去学校（或公司），家离学校（或公司）远不远。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 离、近（远）、走路、半个小时、没有……那么……、旁边、门口、咖啡。', '我家离学校不太远，走路要二十分钟，所以我每天走路去学校。学校旁边有一家咖啡店，门口有很多人。我朋友家没有我家这么近，他每天坐车去。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung nói rõ cách đi và khoảng cách'], { taskGroup: 'bai9-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b9WritingRubric, maxScore: 10 })
+  errorCorrection('hsk2_b9_error_01', '昨天没有今天比冷。', '昨天没有今天冷。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', acceptedVariants: ['昨天没有今天这么冷。'], explanation: 'Mẫu 没有 so sánh không dùng thêm 比.' }),
+  errorCorrection('hsk2_b9_error_02', '学校医院离不远。', '学校离医院不远。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '离 đứng giữa hai địa điểm: 学校离医院不远.' }),
+  errorCorrection('hsk2_b9_error_03', '他们学中文了两年。', '他们学了两年中文。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Bổ ngữ thời lượng đứng sau động từ; 了 đứng ngay sau 学.' }),
+  errorCorrection('hsk2_b9_error_04', '这块手表没有那块比好看。', '这块手表没有那块好看。', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Mẫu 没有 so sánh không dùng thêm 比.' }),
+  errorCorrection('hsk2_b9_error_05', '妹妹有姐姐很高吗？', '妹妹有姐姐高吗？', { taskGroup: 'bai9-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Mẫu A 有 B + tính từ không thêm 很.' }),
+  essay('hsk2_b9_writing', '写一写你每天怎么去学校（或公司），家离学校（或公司）远不远。(Viết xem hằng ngày em đi học (hoặc đi làm) bằng cách nào, nhà cách trường (hoặc công ty) xa hay gần.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 离、近（远）、走路、半个小时、没有……那么……、旁边、门口、咖啡。', '我家离学校不太远，走路要二十分钟，所以我每天走路去学校。学校旁边有一家咖啡店，门口有很多人。我朋友家没有我家这么近，他每天坐车去。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung nói rõ cách đi và khoảng cách'], { taskGroup: 'bai9-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b9WritingRubric, maxScore: 10 })
 ];
 
 const b9TranslationQuestions: Question[] = [
@@ -597,7 +597,7 @@ const b10Vocab = vocab([
 const b10Listening: Question[] = [
   listeningGroup(
     'hsk2_b10_listen_01',
-    'Bài 1 · 听短文，判断对错',
+    'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)',
     '上个周末，我和朋友小王一起去商场买东西。商场离我家不太远，我们走路去，走了二十分钟。我想买一支新笔，小王想买一个本子。因为我们都喜欢红色，所以买了红色的。回家以后，我已经有点儿累了，就早早地休息了。',
     'listening_tf',
     [
@@ -608,11 +608,11 @@ const b10Listening: Question[] = [
       listeningTf('hsk2_b10_listen_01_05', '回家以后，我很早就休息了。', true)
     ]
   ),
-  listeningGroup('hsk2_b10_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '男：这次考试你准备得怎么样？女：我每天都看书，还看了很多做错的题。', 'listening_mc', [listeningMc('hsk2_b10_listen_02_01', '女的是怎么准备考试的？', ['看书，还看做错的题', '打篮球', '去旅游'], 0)]),
-  listeningGroup('hsk2_b10_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '女：学校离你家远不远？男：不太远，走路十五分钟就到了。', 'listening_mc', [listeningMc('hsk2_b10_listen_03_01', '男的怎么去学校？', ['打车', '走路', '坐公交车'], 1)]),
-  listeningGroup('hsk2_b10_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '男：星期六是我的生日，你能来吗？女：当然，我给你准备了一个礼物。', 'listening_mc', [listeningMc('hsk2_b10_listen_04_01', '星期六是谁的生日？', ['男的', '女的', '朋友'], 0)]),
-  listeningGroup('hsk2_b10_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '女：你喜欢踢足球还是打篮球？男：踢足球，我一到星期天就去踢。', 'listening_mc', [listeningMc('hsk2_b10_listen_05_01', '男的喜欢什么运动？', ['踢足球', '打篮球', '游泳'], 0)]),
-  listeningGroup('hsk2_b10_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '男：门口有一家咖啡店，我们进去坐坐吧。女：好啊，我想喝杯奶茶。', 'listening_mc', [listeningMc('hsk2_b10_listen_06_01', '女的想喝什么？', ['咖啡', '奶茶', '茶'], 1)])
+  listeningGroup('hsk2_b10_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '男：这次考试你准备得怎么样？女：我每天都看书，还看了很多做错的题。', 'listening_mc', [listeningMc('hsk2_b10_listen_02_01', '女的是怎么准备考试的？', ['看书，还看做错的题', '打篮球', '去旅游'], 0)]),
+  listeningGroup('hsk2_b10_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '女：学校离你家远不远？男：不太远，走路十五分钟就到了。', 'listening_mc', [listeningMc('hsk2_b10_listen_03_01', '男的怎么去学校？', ['打车', '走路', '坐公交车'], 1)]),
+  listeningGroup('hsk2_b10_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '男：星期六是我的生日，你能来吗？女：当然，我给你准备了一个礼物。', 'listening_mc', [listeningMc('hsk2_b10_listen_04_01', '星期六是谁的生日？', ['男的', '女的', '朋友'], 0)]),
+  listeningGroup('hsk2_b10_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '女：你喜欢踢足球还是打篮球？男：踢足球，我一到星期天就去踢。', 'listening_mc', [listeningMc('hsk2_b10_listen_05_01', '男的喜欢什么运动？', ['踢足球', '打篮球', '游泳'], 0)]),
+  listeningGroup('hsk2_b10_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '男：门口有一家咖啡店，我们进去坐坐吧。女：好啊，我想喝杯奶茶。', 'listening_mc', [listeningMc('hsk2_b10_listen_06_01', '女的想喝什么？', ['咖啡', '奶茶', '茶'], 1)])
 ];
 
 const b10ReadingWordBank = b10WordBank;
@@ -623,20 +623,20 @@ const b10Reading = reading('hsk2_b10_reading_01', 'II. 阅读 · Đọc hiểu',
   mc('hsk2_b10_read_mc_01', '小李的爱好是什么？', ['运动', '画画', '看电影'], 0),
   mc('hsk2_b10_read_mc_02', '小李周末做什么？', ['在家休息', '和同学打篮球', '去商场'], 1),
   mc('hsk2_b10_read_mc_03', '下个月小李要做什么？', ['开学', '回国', '考试'], 1),
-  fill('hsk2_b10_read_fill_01', '我们下星期（　），我还没有准备好。', '开学', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_02', '让我来开（　）吧，你先坐一会儿。', '门', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_03', '他坐在我（　），我看不见老师。', '后面', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_04', '你能（　）我拿一下书包吗？', '帮', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_05', '我的（　）坏了，我要买一支新的。', '笔', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_06', '明天有一个（　），我要好好学习。', '考试', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_07', '今天我学了十个（　），还有两个不会。', '词', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_08', '我的（　）里有很多词。', '本子', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_09', '这个字写（　）了，你再看看。', '错', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_10', '这道（　）我做错了，但是我知道哪里错。', '题', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_11', '你喝茶（　）喝咖啡？', '还是', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_12', '今天我们（　）中文，我还没有复习好。', '考', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_13', '电影（　）开始了，我们快进去吧。', '快要', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空'),
-  fill('hsk2_b10_read_fill_14', '他（　）了笑，没说什么就走了。', '笑', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空')
+  fill('hsk2_b10_read_fill_01', '我们下星期（　），我还没有准备好。', '开学', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_02', '让我来开（　）吧，你先坐一会儿。', '门', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_03', '他坐在我（　），我看不见老师。', '后面', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_04', '你能（　）我拿一下书包吗？', '帮', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_05', '我的（　）坏了，我要买一支新的。', '笔', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_06', '明天有一个（　），我要好好学习。', '考试', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_07', '今天我学了十个（　），还有两个不会。', '词', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_08', '我的（　）里有很多词。', '本子', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_09', '这个字写（　）了，你再看看。', '错', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_10', '这道（　）我做错了，但是我知道哪里错。', '题', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_11', '你喝茶（　）喝咖啡？', '还是', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_12', '今天我们（　）中文，我还没有复习好。', '考', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_13', '电影（　）开始了，我们快进去吧。', '快要', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'),
+  fill('hsk2_b10_read_fill_14', '他（　）了笑，没说什么就走了。', '笑', b10ReadingWordBank, 'hsk2-b10-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)')
 ], b10ReadingWordBank);
 
 const b10Arrange: Question[] = [
@@ -654,26 +654,26 @@ const b10WritingRubric = [
   { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
 ];
 const b10EssayQuestions: Question[] = [
-  errorCorrection('hsk2_b10_error_01', '电影快要开始。', '电影快要开始了。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Mẫu 快要……了 là mẫu cố định, không bỏ 了.' }),
-  errorCorrection('hsk2_b10_error_02', '我们下星期快要考试了。', '我们下星期就要考试了。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Có thời gian cụ thể thì thường dùng 就要……了.' }),
-  errorCorrection('hsk2_b10_error_03', '你想喝茶还是咖啡吗？', '你想喝茶还是咖啡？', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Câu hỏi lựa chọn A 还是 B không thêm 吗.' }),
-  errorCorrection('hsk2_b10_error_04', '我看了错时间。', '我看错了时间。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '错 là bổ ngữ kết quả đứng sau động từ; 了 đứng sau bổ ngữ.' }),
-  errorCorrection('hsk2_b10_error_05', '他笑笑了，没说什么。', '他笑了笑，没说什么。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Động từ lặp đã xảy ra dùng A 了 A.' }),
-  essay('hsk2_b10_writing', '写一写开学（或考试）前你做了什么准备。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 快要（就要）……了、帮、笔、本子、考试、错、还是、词、笑。', '下星期就要开学了，我在准备书包。我的书包在门后面，笔和本子都在桌子上。妈妈帮我看了看，说还要买一支新笔。我笑了笑，因为明天可以去商店了。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung nói rõ việc chuẩn bị trước khi khai giảng hoặc thi'], { taskGroup: 'bai10-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b10WritingRubric, maxScore: 10 })
+  errorCorrection('hsk2_b10_error_01', '电影快要开始。', '电影快要开始了。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Mẫu 快要……了 là mẫu cố định, không bỏ 了.' }),
+  errorCorrection('hsk2_b10_error_02', '我们下星期快要考试了。', '我们下星期就要考试了。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Có thời gian cụ thể thì thường dùng 就要……了.' }),
+  errorCorrection('hsk2_b10_error_03', '你想喝茶还是咖啡吗？', '你想喝茶还是咖啡？', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Câu hỏi lựa chọn A 还是 B không thêm 吗.' }),
+  errorCorrection('hsk2_b10_error_04', '我看了错时间。', '我看错了时间。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '错 là bổ ngữ kết quả đứng sau động từ; 了 đứng sau bổ ngữ.' }),
+  errorCorrection('hsk2_b10_error_05', '他笑笑了，没说什么。', '他笑了笑，没说什么。', { taskGroup: 'bai10-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Động từ lặp đã xảy ra dùng A 了 A.' }),
+  essay('hsk2_b10_writing', '写一写开学（或考试）前你做了什么准备。(Viết xem trước khi khai giảng (hoặc trước kỳ thi) em đã chuẩn bị những gì.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 快要（就要）……了、帮、笔、本子、考试、错、还是、词、笑。', '下星期就要开学了，我在准备书包。我的书包在门后面，笔和本子都在桌子上。妈妈帮我看了看，说还要买一支新笔。我笑了笑，因为明天可以去商店了。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nội dung nói rõ việc chuẩn bị trước khi khai giảng hoặc thi'], { taskGroup: 'bai10-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b10WritingRubric, maxScore: 10 })
 ];
 
 const b10Speaking: Question[] = [
-  speaking('hsk2_b10_speak_01', '明天就开学啊？爸爸，我的书包你看见了吗？', 'Míngtiān jiù kāixué a? Bàba, wǒ de shūbāo nǐ kànjiàn le ma?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b10_speak_02', '书包在门后面，书在床上，笔在桌子上。', 'Shūbāo zài mén hòumiàn, shū zài chuáng shàng, bǐ zài zhuōzi shàng.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b10_speak_03', '明天考试，我在看书呢。', 'Míngtiān kǎoshì, wǒ zài kàn shū ne.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b10_speak_04', '本子上做错的题也要看一看。', 'Běnzi shàng zuòcuò de tí yě yào kàn yí kàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b10_speak_05', '是您准备考试还是我准备考试？', 'Shì nín zhǔnbèi kǎoshì háishi wǒ zhǔnbèi kǎoshì?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b10_speak_06', '饭菜快要做好了，你叫弟弟一起去洗手吧。', 'Fàncài kuàiyào zuò hǎo le, nǐ jiào dìdi yìqǐ qù xǐshǒu ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b10_speak_07', '快要……了 → 电影______。', 'Kuàiyào…le → Diànyǐng ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '电影快要开始了。', referenceAnswers: ['电影快要开始了。'], requiredElements: ['Dùng 快要……了'] }),
-  speaking('hsk2_b10_speak_08', '就要……了 → 我们下星期______。', 'Jiùyào…le → Wǒmen xià xīngqī ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我们下星期就要考试了。', referenceAnswers: ['我们下星期就要考试了。'], requiredElements: ['Dùng 就要……了'] }),
-  speaking('hsk2_b10_speak_09', '帮 → 你能______吗？', 'Bāng → Nǐ néng ______ ma?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '你能帮我拿一下书包吗？', referenceAnswers: ['你能帮我拿一下书包吗？'], requiredElements: ['Dùng 帮'] }),
-  speaking('hsk2_b10_speak_10', '还是 → 你______？', 'Háishi → Nǐ ______?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '你喝茶还是喝咖啡？', referenceAnswers: ['你喝茶还是喝咖啡？'], requiredElements: ['Dùng 还是'] }),
-  speaking('hsk2_b10_speak_11', '错 → 这个字______。', 'Cuò → Zhège zì ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '这个字写错了。', referenceAnswers: ['这个字写错了。'], requiredElements: ['Dùng 错'] })
+  speaking('hsk2_b10_speak_01', '明天就开学啊？爸爸，我的书包你看见了吗？', 'Míngtiān jiù kāixué a? Bàba, wǒ de shūbāo nǐ kànjiàn le ma?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b10_speak_02', '书包在门后面，书在床上，笔在桌子上。', 'Shūbāo zài mén hòumiàn, shū zài chuáng shàng, bǐ zài zhuōzi shàng.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b10_speak_03', '明天考试，我在看书呢。', 'Míngtiān kǎoshì, wǒ zài kàn shū ne.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b10_speak_04', '本子上做错的题也要看一看。', 'Běnzi shàng zuòcuò de tí yě yào kàn yí kàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b10_speak_05', '是您准备考试还是我准备考试？', 'Shì nín zhǔnbèi kǎoshì háishi wǒ zhǔnbèi kǎoshì?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b10_speak_06', '饭菜快要做好了，你叫弟弟一起去洗手吧。', 'Fàncài kuàiyào zuò hǎo le, nǐ jiào dìdi yìqǐ qù xǐshǒu ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b10_speak_07', '快要……了 → 电影______。', 'Kuàiyào…le → Diànyǐng ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '电影快要开始了。', referenceAnswers: ['电影快要开始了。'], requiredElements: ['Dùng 快要……了'] }),
+  speaking('hsk2_b10_speak_08', '就要……了 → 我们下星期______。', 'Jiùyào…le → Wǒmen xià xīngqī ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我们下星期就要考试了。', referenceAnswers: ['我们下星期就要考试了。'], requiredElements: ['Dùng 就要……了'] }),
+  speaking('hsk2_b10_speak_09', '帮 → 你能______吗？', 'Bāng → Nǐ néng ______ ma?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '你能帮我拿一下书包吗？', referenceAnswers: ['你能帮我拿一下书包吗？'], requiredElements: ['Dùng 帮'] }),
+  speaking('hsk2_b10_speak_10', '还是 → 你______？', 'Háishi → Nǐ ______?', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '你喝茶还是喝咖啡？', referenceAnswers: ['你喝茶还是喝咖啡？'], requiredElements: ['Dùng 还是'] }),
+  speaking('hsk2_b10_speak_11', '错 → 这个字______。', 'Cuò → Zhège zì ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '这个字写错了。', referenceAnswers: ['这个字写错了。'], requiredElements: ['Dùng 错'] })
 ];
 
 const b10AudioTranslationRubric = [
@@ -711,18 +711,18 @@ const b11Vocab = vocab([
 ]);
 
 const b11Listening: Question[] = [
-  listeningGroup('hsk2_b11_listen_01', 'Bài 1 · 听短文，判断对错', '周末我经常和家人去公园。昨天路上车很多，我们开得很慢。到公园的时候，爷爷已经在门口等着我们了。他穿着红色的衣服，手里拿着一杯奶茶。我最喜欢和爷爷一起走路，因为走路对身体很好。', 'listening_tf', [
+  listeningGroup('hsk2_b11_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '周末我经常和家人去公园。昨天路上车很多，我们开得很慢。到公园的时候，爷爷已经在门口等着我们了。他穿着红色的衣服，手里拿着一杯奶茶。我最喜欢和爷爷一起走路，因为走路对身体很好。', 'listening_tf', [
     listeningTf('hsk2_b11_listen_01_01', '我周末经常去公园。', true),
     listeningTf('hsk2_b11_listen_01_02', '昨天路上车很少。', false),
     listeningTf('hsk2_b11_listen_01_03', '爷爷在门口等着我们。', true),
     listeningTf('hsk2_b11_listen_01_04', '爷爷穿着白色的衣服。', false),
     listeningTf('hsk2_b11_listen_01_05', '我最喜欢和爷爷一起跑步。', false)
   ]),
-  listeningGroup('hsk2_b11_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：你怎么了？男：我牙疼，不能吃东西。', 'listening_mc', [listeningMc('hsk2_b11_listen_02_01', '男的怎么了？', ['头疼', '牙疼', '肚子疼'], 1)]),
-  listeningGroup('hsk2_b11_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '男：你吃药了吗？女：吃过了，药店的人说一天吃两次。', 'listening_mc', [listeningMc('hsk2_b11_listen_03_01', '女的在哪儿买药？', ['医院', '药店', '超市'], 1)]),
-  listeningGroup('hsk2_b11_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：老师，我可以进来吗？男：请进，门开着呢。', 'listening_mc', [listeningMc('hsk2_b11_listen_04_01', '门怎么样？', ['开着', '坏了', '很小'], 0)]),
-  listeningGroup('hsk2_b11_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：你们班谁中文说得最好？女：小王说得最好，他每天都说中文。', 'listening_mc', [listeningMc('hsk2_b11_listen_05_01', '谁中文说得最好？', ['小王', '女的', '男的'], 0)]),
-  listeningGroup('hsk2_b11_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：你的身体怎么样？男：我经常跑步，身体很好。', 'listening_mc', [listeningMc('hsk2_b11_listen_06_01', '男的经常做什么？', ['跑步', '游泳', '打球'], 0)])
+  listeningGroup('hsk2_b11_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '女：你怎么了？男：我牙疼，不能吃东西。', 'listening_mc', [listeningMc('hsk2_b11_listen_02_01', '男的怎么了？', ['头疼', '牙疼', '肚子疼'], 1)]),
+  listeningGroup('hsk2_b11_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '男：你吃药了吗？女：吃过了，药店的人说一天吃两次。', 'listening_mc', [listeningMc('hsk2_b11_listen_03_01', '女的在哪儿买药？', ['医院', '药店', '超市'], 1)]),
+  listeningGroup('hsk2_b11_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '女：老师，我可以进来吗？男：请进，门开着呢。', 'listening_mc', [listeningMc('hsk2_b11_listen_04_01', '门怎么样？', ['开着', '坏了', '很小'], 0)]),
+  listeningGroup('hsk2_b11_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '男：你们班谁中文说得最好？女：小王说得最好，他每天都说中文。', 'listening_mc', [listeningMc('hsk2_b11_listen_05_01', '谁中文说得最好？', ['小王', '女的', '男的'], 0)]),
+  listeningGroup('hsk2_b11_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '女：你的身体怎么样？男：我经常跑步，身体很好。', 'listening_mc', [listeningMc('hsk2_b11_listen_06_01', '男的经常做什么？', ['跑步', '游泳', '打球'], 0)])
 ];
 
 const b11Reading = reading('hsk2_b11_reading_01', 'II. 阅读 · Đọc hiểu', '小红在一家商场工作，她最喜欢的颜色是绿色。她经常坐公交车上班，路上要半个小时。今天路上车很多，公交车开得很慢，所以她来晚了。到商场的时候，朋友站在门口，笑着对她说：“没关系，快进来吧。”', [
@@ -746,7 +746,7 @@ const b11Reading = reading('hsk2_b11_reading_01', 'II. 阅读 · Đọc hiểu',
     '我经常跑步，对（　）很好。',
     '吃饭（　）不要看手机。',
     '在我们家，爸爸（　）高。'
-  ][index], word, b11WordBank, 'hsk2-b11-read-fill', 'Bài 3 · 选词填空'))
+  ][index], word, b11WordBank, 'hsk2-b11-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'))
 ], b11WordBank);
 
 const b11Arrange: Question[] = [
@@ -764,26 +764,26 @@ const b11WritingRubric = [
   { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
 ];
 const b11EssayQuestions: Question[] = [
-  errorCorrection('hsk2_b11_error_01', '门开了着。', '门开着。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '着 đứng ngay sau động từ để biểu thị trạng thái tiếp diễn, không dùng chung với 了.' }),
-  errorCorrection('hsk2_b11_error_02', '她穿着了红色的衣服。', '她穿着红色的衣服。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Mẫu V + 着 + tân ngữ không thêm 了.' }),
-  errorCorrection('hsk2_b11_error_03', '教室的门不开着。', '教室的门没开着。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Phủ định của 着 dùng 没（有） trước động từ.' }),
-  errorCorrection('hsk2_b11_error_04', '他最很喜欢中国菜。', '他最喜欢中国菜。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '最 đã là phó từ mức độ, không dùng cùng 很.' }),
-  errorCorrection('hsk2_b11_error_05', '我头疼很。', '我头很疼。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Phó từ mức độ đứng trước tính từ: 头很疼.' }),
-  essay('hsk2_b11_writing', '介绍一个你经常做的运动，说说它对身体好不好。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 经常、最、着、身体、……时、路上、慢、药、疼。', '我最喜欢的运动是跑步，我经常早上六点去跑步。路上人不多，我跑得很慢，但是对身体很好。有时候朋友也和我一起去，他笑着说我跑得最慢。跑完步以后，我觉得身体很舒服。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Giới thiệu một môn thể thao thường làm và lợi ích cho sức khỏe'], { taskGroup: 'bai11-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b11WritingRubric, maxScore: 10 })
+  errorCorrection('hsk2_b11_error_01', '门开了着。', '门开着。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '着 đứng ngay sau động từ để biểu thị trạng thái tiếp diễn, không dùng chung với 了.' }),
+  errorCorrection('hsk2_b11_error_02', '她穿着了红色的衣服。', '她穿着红色的衣服。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Mẫu V + 着 + tân ngữ không thêm 了.' }),
+  errorCorrection('hsk2_b11_error_03', '教室的门不开着。', '教室的门没开着。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Phủ định của 着 dùng 没（有） trước động từ.' }),
+  errorCorrection('hsk2_b11_error_04', '他最很喜欢中国菜。', '他最喜欢中国菜。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '最 đã là phó từ mức độ, không dùng cùng 很.' }),
+  errorCorrection('hsk2_b11_error_05', '我头疼很。', '我头很疼。', { taskGroup: 'bai11-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Phó từ mức độ đứng trước tính từ: 头很疼.' }),
+  essay('hsk2_b11_writing', '介绍一个你经常做的运动，说说它对身体好不好。(Giới thiệu một môn thể thao em thường tập và nói xem nó có tốt cho sức khỏe không.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 经常、最、着、身体、……时、路上、慢、药、疼。', '我最喜欢的运动是跑步，我经常早上六点去跑步。路上人不多，我跑得很慢，但是对身体很好。有时候朋友也和我一起去，他笑着说我跑得最慢。跑完步以后，我觉得身体很舒服。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Giới thiệu một môn thể thao thường làm và lợi ích cho sức khỏe'], { taskGroup: 'bai11-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b11WritingRubric, maxScore: 10 })
 ];
 
 const b11Speaking: Question[] = [
-  speaking('hsk2_b11_speak_01', '你怎么了？是不是肚子疼？', 'Nǐ zěnme le? Shì bú shì dùzi téng?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b11_speak_02', '你这几天经常头疼，去医院看看吧。', 'Nǐ zhè jǐ tiān jīngcháng tóuténg, qù yīyuàn kànkan ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b11_speak_03', '现在不能动，一动就疼。', 'Xiànzài bù néng dòng, yí dòng jiù téng.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b11_speak_04', '现在路上车多，还下着雪，我开慢一点儿。', 'Xiànzài lùshang chē duō, hái xiàzhe xuě, wǒ kāi màn yìdiǎnr.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b11_speak_05', '你最喜欢吃中国菜。', 'Nǐ zuì xǐhuan chī Zhōngguó cài.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b11_speak_06', '身体不舒服时更要好好吃饭。', 'Shēntǐ bù shūfu shí gèng yào hǎohāo chīfàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音' }),
-  speaking('hsk2_b11_speak_07', '着 → 教室的门______。', 'Zhe → Jiàoshì de mén ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '教室的门开着。', referenceAnswers: ['教室的门开着。'], requiredElements: ['Dùng 着'] }),
-  speaking('hsk2_b11_speak_08', '没（有）……着 → 教室的门______。', 'Méi (yǒu)…zhe → Jiàoshì de mén ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '教室的门没开着。', referenceAnswers: ['教室的门没开着。'], requiredElements: ['Dùng 没（有）……着'] }),
-  speaking('hsk2_b11_speak_09', '最 → 在我们家，______。', 'Zuì → Zài wǒmen jiā, ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '在我们家，爸爸最高。', referenceAnswers: ['在我们家，爸爸最高。'], requiredElements: ['Dùng 最'] }),
-  speaking('hsk2_b11_speak_10', '经常 → 我______。', 'Jīngcháng → Wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我经常去公园跑步。', referenceAnswers: ['我经常去公园跑步。'], requiredElements: ['Dùng 经常'] }),
-  speaking('hsk2_b11_speak_11', '疼 → 我______。', 'Téng → Wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我头有点儿疼。', referenceAnswers: ['我头有点儿疼。'], requiredElements: ['Dùng 疼'] })
+  speaking('hsk2_b11_speak_01', '你怎么了？是不是肚子疼？', 'Nǐ zěnme le? Shì bú shì dùzi téng?', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b11_speak_02', '你这几天经常头疼，去医院看看吧。', 'Nǐ zhè jǐ tiān jīngcháng tóuténg, qù yīyuàn kànkan ba.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b11_speak_03', '现在不能动，一动就疼。', 'Xiànzài bù néng dòng, yí dòng jiù téng.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b11_speak_04', '现在路上车多，还下着雪，我开慢一点儿。', 'Xiànzài lùshang chē duō, hái xiàzhe xuě, wǒ kāi màn yìdiǎnr.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b11_speak_05', '你最喜欢吃中国菜。', 'Nǐ zuì xǐhuan chī Zhōngguó cài.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b11_speak_06', '身体不舒服时更要好好吃饭。', 'Shēntǐ bù shūfu shí gèng yào hǎohāo chīfàn.', { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)' }),
+  speaking('hsk2_b11_speak_07', '着 → 教室的门______。', 'Zhe → Jiàoshì de mén ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '教室的门开着。', referenceAnswers: ['教室的门开着。'], requiredElements: ['Dùng 着'] }),
+  speaking('hsk2_b11_speak_08', '没（有）……着 → 教室的门______。', 'Méi (yǒu)…zhe → Jiàoshì de mén ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '教室的门没开着。', referenceAnswers: ['教室的门没开着。'], requiredElements: ['Dùng 没（有）……着'] }),
+  speaking('hsk2_b11_speak_09', '最 → 在我们家，______。', 'Zuì → Zài wǒmen jiā, ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '在我们家，爸爸最高。', referenceAnswers: ['在我们家，爸爸最高。'], requiredElements: ['Dùng 最'] }),
+  speaking('hsk2_b11_speak_10', '经常 → 我______。', 'Jīngcháng → Wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我经常去公园跑步。', referenceAnswers: ['我经常去公园跑步。'], requiredElements: ['Dùng 经常'] }),
+  speaking('hsk2_b11_speak_11', '疼 → 我______。', 'Téng → Wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我头有点儿疼。', referenceAnswers: ['我头有点儿疼。'], requiredElements: ['Dùng 疼'] })
 ];
 
 const b11AudioTranslationRubric = [
@@ -819,18 +819,18 @@ const b12Vocab = vocab([
 ]);
 
 const b12Listening: Question[] = [
-  listeningGroup('hsk2_b12_listen_01', 'Bài 1 · 听短文，判断对错', '我从小就住在北京。小时候，我家住在三楼，楼下有一个地铁站。现在我在上海工作，每天坐地铁上班，要坐五站。今天是晴天，我正在地铁站等车。我觉得上海的地铁比北京的快得多。', 'listening_tf', [
+  listeningGroup('hsk2_b12_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '我从小就住在北京。小时候，我家住在三楼，楼下有一个地铁站。现在我在上海工作，每天坐地铁上班，要坐五站。今天是晴天，我正在地铁站等车。我觉得上海的地铁比北京的快得多。', 'listening_tf', [
     listeningTf('hsk2_b12_listen_01_01', '我从小住在北京。', true),
     listeningTf('hsk2_b12_listen_01_02', '小时候我家住在三楼。', true),
     listeningTf('hsk2_b12_listen_01_03', '我现在在北京工作。', false),
     listeningTf('hsk2_b12_listen_01_04', '我每天坐公交车上班。', false),
     listeningTf('hsk2_b12_listen_01_05', '我觉得上海的地铁比北京的快得多。', true)
   ]),
-  listeningGroup('hsk2_b12_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：外面是晴天还是阴天？男：阴天，没有太阳。', 'listening_mc', [listeningMc('hsk2_b12_listen_02_01', '今天天气怎么样？', ['晴天', '阴天', '下雨'], 1)]),
-  listeningGroup('hsk2_b12_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '男：喂，你在做什么呢？女：我正在做饭，一会儿给你打电话。', 'listening_mc', [listeningMc('hsk2_b12_listen_03_01', '女的在做什么？', ['打电话', '做饭', '看电影'], 1)]),
-  listeningGroup('hsk2_b12_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：你家离地铁站远不远？男：不远，走路五分钟就到了。', 'listening_mc', [listeningMc('hsk2_b12_listen_04_01', '男的怎么去地铁站？', ['走路', '打车', '坐公交车'], 0)]),
-  listeningGroup('hsk2_b12_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：你小时候喜欢做什么？女：我从小就喜欢画画。', 'listening_mc', [listeningMc('hsk2_b12_listen_05_01', '女的小时候喜欢什么？', ['唱歌', '画画', '跑步'], 1)]),
-  listeningGroup('hsk2_b12_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：这个苹果好甜啊！男：是吗？那我也吃一个。', 'listening_mc', [listeningMc('hsk2_b12_listen_06_01', '苹果怎么样？', ['很大', '很甜', '很贵'], 1)])
+  listeningGroup('hsk2_b12_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '女：外面是晴天还是阴天？男：阴天，没有太阳。', 'listening_mc', [listeningMc('hsk2_b12_listen_02_01', '今天天气怎么样？', ['晴天', '阴天', '下雨'], 1)]),
+  listeningGroup('hsk2_b12_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '男：喂，你在做什么呢？女：我正在做饭，一会儿给你打电话。', 'listening_mc', [listeningMc('hsk2_b12_listen_03_01', '女的在做什么？', ['打电话', '做饭', '看电影'], 1)]),
+  listeningGroup('hsk2_b12_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '女：你家离地铁站远不远？男：不远，走路五分钟就到了。', 'listening_mc', [listeningMc('hsk2_b12_listen_04_01', '男的怎么去地铁站？', ['走路', '打车', '坐公交车'], 0)]),
+  listeningGroup('hsk2_b12_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '男：你小时候喜欢做什么？女：我从小就喜欢画画。', 'listening_mc', [listeningMc('hsk2_b12_listen_05_01', '女的小时候喜欢什么？', ['唱歌', '画画', '跑步'], 1)]),
+  listeningGroup('hsk2_b12_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '女：这个苹果好甜啊！男：是吗？那我也吃一个。', 'listening_mc', [listeningMc('hsk2_b12_listen_06_01', '苹果怎么样？', ['很大', '很甜', '很贵'], 1)])
 ];
 
 const b12Reading = reading('hsk2_b12_reading_01', 'II. 阅读 · Đọc hiểu', '王明和李红是同学，他们从小就认识。今天外面是阴天，天气有点儿冷。王明正在楼下等李红，因为他们要一起坐地铁去学校。地铁站不远，他们走路五分钟就到了。李红说坐地铁比坐公交车快得多。', [
@@ -852,7 +852,7 @@ const b12Reading = reading('hsk2_b12_reading_01', 'II. 阅读 · Đọc hiểu',
     '他在地铁（　）下车，然后给我打电话。',
     '我（　）很喜欢画画。',
     '今天外面（　）冷，我们在家吧。'
-  ][index], word, b12WordBank, 'hsk2-b12-read-fill', 'Bài 3 · 选词填空'))
+  ][index], word, b12WordBank, 'hsk2-b12-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'))
 ], b12WordBank);
 
 const b12Arrange: Question[] = [
@@ -870,16 +870,16 @@ const b12WritingRubric = [
   { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
 ];
 const b12EssayQuestions: Question[] = [
-  errorCorrection('hsk2_b12_error_01', '我比他很快。', '我比他快得多。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', acceptedVariants: ['我比他快。', '我比他快多了。'], explanation: 'Sau 比 không dùng 很; muốn nhấn mạnh thì dùng 多了 / 得多.' }),
-  errorCorrection('hsk2_b12_error_02', '我比他跑步快。', '我跑得比他快。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'So sánh cách thực hiện hành động dùng V + 得 + tính từ.' }),
-  errorCorrection('hsk2_b12_error_03', '我跑步得比他快。', '我跑步跑得比他快。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: '跑步 là động từ ly hợp, cần lặp lại 跑 trước 得.' }),
-  errorCorrection('hsk2_b12_error_04', '他正在睡觉了。', '他正在睡觉。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', acceptedVariants: ['他正在睡觉呢。'], explanation: '正在 biểu thị hành động đang diễn ra, không dùng 了.' }),
-  errorCorrection('hsk2_b12_error_05', '我小时候喜欢很画画。', '我小时候很喜欢画画。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句', explanation: 'Phó từ mức độ đứng trước động từ tâm lý: 很喜欢.' }),
-  essay('hsk2_b12_writing', '比一比你小时候住的地方和你现在住的地方。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 小时候、从小、比……多了（得多）、地铁、楼、外面、正……呢、晴（阴）。', '我小时候住在河内，现在住在北京。河内比北京热多了，但是北京的冬天比河内冷得多。我每天坐地铁上班，地铁站离我家不远。今天外面是阴天，我正在楼下等朋友。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'So sánh nơi ở hồi nhỏ và nơi ở hiện nay'], { taskGroup: 'bai12-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b12WritingRubric, maxScore: 10 })
+  errorCorrection('hsk2_b12_error_01', '我比他很快。', '我比他快得多。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', acceptedVariants: ['我比他快。', '我比他快多了。'], explanation: 'Sau 比 không dùng 很; muốn nhấn mạnh thì dùng 多了 / 得多.' }),
+  errorCorrection('hsk2_b12_error_02', '我比他跑步快。', '我跑得比他快。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'So sánh cách thực hiện hành động dùng V + 得 + tính từ.' }),
+  errorCorrection('hsk2_b12_error_03', '我跑步得比他快。', '我跑步跑得比他快。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: '跑步 là động từ ly hợp, cần lặp lại 跑 trước 得.' }),
+  errorCorrection('hsk2_b12_error_04', '他正在睡觉了。', '他正在睡觉。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', acceptedVariants: ['他正在睡觉呢。'], explanation: '正在 biểu thị hành động đang diễn ra, không dùng 了.' }),
+  errorCorrection('hsk2_b12_error_05', '我小时候喜欢很画画。', '我小时候很喜欢画画。', { taskGroup: 'bai12-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)', explanation: 'Phó từ mức độ đứng trước động từ tâm lý: 很喜欢.' }),
+  essay('hsk2_b12_writing', '比一比你小时候住的地方和你现在住的地方。(So sánh nơi em ở hồi nhỏ với nơi em đang ở bây giờ.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 小时候、从小、比……多了（得多）、地铁、楼、外面、正……呢、晴（阴）。', '我小时候住在河内，现在住在北京。河内比北京热多了，但是北京的冬天比河内冷得多。我每天坐地铁上班，地铁站离我家不远。今天外面是阴天，我正在楼下等朋友。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'So sánh nơi ở hồi nhỏ và nơi ở hiện nay'], { taskGroup: 'bai12-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b12WritingRubric, maxScore: 10 })
 ];
 
 const b12ReadingAloudNote = 'Chấm theo thanh điệu và ngữ điệu. 事情 đọc shìqing (情 đọc nhẹ). 我这里 đọc wó zhèlǐ. 比北京 đọc bí Běijīng (hai thanh 3 liền nhau, 比 biến thành thanh 2). 比我快 đọc bí wǒ kuài. 能一起 đọc néng yìqǐ (一 đọc thanh 4 trước thanh 3). 一会儿 đọc yíhuìr (一 biến thành thanh 2 trước thanh 4). 下着雪 đọc xiàzhe xuě, 着 đọc nhẹ. Câu hỏi 吗 lên giọng cuối câu.';
-const b12ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音', explanation: b12ReadingAloudNote });
+const b12ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)', explanation: b12ReadingAloudNote });
 const b12Speaking: Question[] = [
   b12ReadAloud('hsk2_b12_speak_01', '喂，家月，是你吗？有什么事情吗？', 'Wéi, Jiāyuè, shì nǐ ma? Yǒu shénme shìqing ma?'),
   b12ReadAloud('hsk2_b12_speak_02', '我这里比北京冷多了，外边还正下着雪呢！', 'Wǒ zhèlǐ bǐ Běijīng lěng duō le, wàibian hái zhèng xiàzhe xuě ne!'),
@@ -887,11 +887,11 @@ const b12Speaking: Question[] = [
   b12ReadAloud('hsk2_b12_speak_04', '你跑步跑得比我快，我们能一起跑吗？', 'Nǐ pǎobù pǎo de bǐ wǒ kuài, wǒmen néng yìqǐ pǎo ma?'),
   b12ReadAloud('hsk2_b12_speak_05', '我从小就经常跟爸爸一起跑步。', 'Wǒ cóngxiǎo jiù jīngcháng gēn bàba yìqǐ pǎobù.'),
   b12ReadAloud('hsk2_b12_speak_06', '我现在坐地铁去找你，一会儿楼下见。', 'Wǒ xiànzài zuò dìtiě qù zhǎo nǐ, yíhuìr lóu xià jiàn.'),
-  speaking('hsk2_b12_speak_07', '比……多了 → 这里比北京______。', 'Bǐ…duō le → Zhèlǐ bǐ Běijīng ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '这里比北京冷多了。', referenceAnswers: ['这里比北京冷多了。'], requiredElements: ['Dùng 比……多了'] }),
-  speaking('hsk2_b12_speak_08', 'V得比 → 他跑得______。', 'V de bǐ → Tā pǎo de ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '他跑得比我快。', referenceAnswers: ['他跑得比我快。'], requiredElements: ['Dùng V得比'] }),
-  speaking('hsk2_b12_speak_09', '正 → 外面______。', 'Zhèng → Wàimiàn ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '外面正下雪呢。', referenceAnswers: ['外面正下雪呢。'], requiredElements: ['Dùng 正……呢'] }),
-  speaking('hsk2_b12_speak_10', '从小 → 我______。', 'Cóngxiǎo → Wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我从小就喜欢画画。', referenceAnswers: ['我从小就喜欢画画。'], requiredElements: ['Dùng 从小'] }),
-  speaking('hsk2_b12_speak_11', '地铁 → 我每天______。', 'Dìtiě → Wǒ měitiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: '我每天坐地铁上班。', referenceAnswers: ['我每天坐地铁上班。'], requiredElements: ['Dùng 地铁'] })
+  speaking('hsk2_b12_speak_07', '比……多了 → 这里比北京______。', 'Bǐ…duō le → Zhèlǐ bǐ Běijīng ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '这里比北京冷多了。', referenceAnswers: ['这里比北京冷多了。'], requiredElements: ['Dùng 比……多了'] }),
+  speaking('hsk2_b12_speak_08', 'V得比 → 他跑得______。', 'V de bǐ → Tā pǎo de ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '他跑得比我快。', referenceAnswers: ['他跑得比我快。'], requiredElements: ['Dùng V得比'] }),
+  speaking('hsk2_b12_speak_09', '正 → 外面______。', 'Zhèng → Wàimiàn ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '外面正下雪呢。', referenceAnswers: ['外面正下雪呢。'], requiredElements: ['Dùng 正……呢'] }),
+  speaking('hsk2_b12_speak_10', '从小 → 我______。', 'Cóngxiǎo → Wǒ ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我从小就喜欢画画。', referenceAnswers: ['我从小就喜欢画画。'], requiredElements: ['Dùng 从小'] }),
+  speaking('hsk2_b12_speak_11', '地铁 → 我每天______。', 'Dìtiě → Wǒ měitiān ______.', { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: '我每天坐地铁上班。', referenceAnswers: ['我每天坐地铁上班。'], requiredElements: ['Dùng 地铁'] })
 ];
 
 const b12AudioTranslationRubric = [
@@ -930,18 +930,18 @@ const b13Vocab = vocab([
 ]);
 
 const b13Listening: Question[] = [
-  listeningGroup('hsk2_b13_listen_01', 'Bài 1 · 听短文，判断对错', '我叫小林，我在大学教中文。我们班有二十个学生，他们都是外国人。新年快到了，学生们希望大家一起吃饭、一起唱歌。我告诉他们：“好啊！”大家都很高兴，每个人都准备了礼物。', 'listening_tf', [
+  listeningGroup('hsk2_b13_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '我叫小林，我在大学教中文。我们班有二十个学生，他们都是外国人。新年快到了，学生们希望大家一起吃饭、一起唱歌。我告诉他们：“好啊！”大家都很高兴，每个人都准备了礼物。', 'listening_tf', [
     listeningTf('hsk2_b13_listen_01_01', '小林在大学教中文。', true),
     listeningTf('hsk2_b13_listen_01_02', '小林的班有十个学生。', false),
     listeningTf('hsk2_b13_listen_01_03', '学生们都是中国人。', false),
     listeningTf('hsk2_b13_listen_01_04', '学生们希望新年一起吃饭、唱歌。', true),
     listeningTf('hsk2_b13_listen_01_05', '小林说不可以。', false)
   ]),
-  listeningGroup('hsk2_b13_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：请问，洗手间在哪儿？男：在里面，往左走就到了。', 'listening_mc', [listeningMc('hsk2_b13_listen_02_01', '洗手间在哪儿？', ['外面', '里面', '楼下'], 1)]),
-  listeningGroup('hsk2_b13_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '男：桌子上面有一本书，是你的吗？女：不是，可能是小王的。', 'listening_mc', [listeningMc('hsk2_b13_listen_03_01', '书可能是谁的？', ['女的', '小王', '男的'], 1)]),
-  listeningGroup('hsk2_b13_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：你知道明天考试的时间吗？男：老师告诉我了，下午三点。', 'listening_mc', [listeningMc('hsk2_b13_listen_04_01', '考试在什么时候？', ['上午', '下午三点', '晚上'], 1)]),
-  listeningGroup('hsk2_b13_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：你每天上网做什么？女：我上网学中文，也看电影。', 'listening_mc', [listeningMc('hsk2_b13_listen_05_01', '女的上网学什么？', ['中文', '画画', '游泳'], 0)]),
-  listeningGroup('hsk2_b13_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：你们班有多少个学生？男：我们班有十五个，他们班比我们班多五个。', 'listening_mc', [listeningMc('hsk2_b13_listen_06_01', '他们班有多少个学生？', ['十个', '十五个', '二十个'], 2)])
+  listeningGroup('hsk2_b13_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '女：请问，洗手间在哪儿？男：在里面，往左走就到了。', 'listening_mc', [listeningMc('hsk2_b13_listen_02_01', '洗手间在哪儿？', ['外面', '里面', '楼下'], 1)]),
+  listeningGroup('hsk2_b13_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '男：桌子上面有一本书，是你的吗？女：不是，可能是小王的。', 'listening_mc', [listeningMc('hsk2_b13_listen_03_01', '书可能是谁的？', ['女的', '小王', '男的'], 1)]),
+  listeningGroup('hsk2_b13_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '女：你知道明天考试的时间吗？男：老师告诉我了，下午三点。', 'listening_mc', [listeningMc('hsk2_b13_listen_04_01', '考试在什么时候？', ['上午', '下午三点', '晚上'], 1)]),
+  listeningGroup('hsk2_b13_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '男：你每天上网做什么？女：我上网学中文，也看电影。', 'listening_mc', [listeningMc('hsk2_b13_listen_05_01', '女的上网学什么？', ['中文', '画画', '游泳'], 0)]),
+  listeningGroup('hsk2_b13_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '女：你们班有多少个学生？男：我们班有十五个，他们班比我们班多五个。', 'listening_mc', [listeningMc('hsk2_b13_listen_06_01', '他们班有多少个学生？', ['十个', '十五个', '二十个'], 2)])
 ];
 
 const b13Reading = reading('hsk2_b13_reading_01', 'II. 阅读 · Đọc hiểu', '我的姐姐比我大三岁，她从小就喜欢花。小时候，她常常和奶奶一起去公园看花。现在她在一家花店工作，每天都和花在一起。她希望以后可以有自己的花店。昨天她告诉我，她已经开始准备了。', [
@@ -965,7 +965,7 @@ const b13Reading = reading('hsk2_b13_reading_01', 'II. 阅读 · Đọc hiểu',
     '你不要（　）说，大家会不高兴。',
     '老师（　）我们明天要考试。',
     '我们（　）有二十个学生。'
-  ][index], word, b13WordBank, 'hsk2-b13-read-fill', 'Bài 3 · 选词填空'))
+  ][index], word, b13WordBank, 'hsk2-b13-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'))
 ], b13WordBank);
 
 const b13Arrange: Question[] = [
@@ -982,21 +982,21 @@ const b13WritingRubric = [
   { id: 'grammar', label: 'Ngữ pháp đúng', maxScore: 2 },
   { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
 ];
-const b13ErrorGroup = { taskGroup: 'bai13-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句' };
+const b13ErrorGroup = { taskGroup: 'bai13-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)' };
 const b13EssayQuestions: Question[] = [
   errorCorrection('hsk2_b13_error_01', '我送花她。', '我送给她花。', { ...b13ErrorGroup, explanation: 'Mẫu hai tân ngữ: người nhận đứng trước vật được tặng.' }),
   errorCorrection('hsk2_b13_error_02', '姐姐三岁大我。', '姐姐比我大三岁。', { ...b13ErrorGroup, explanation: 'Cụm số lượng đứng sau tính từ: 比我大三岁.' }),
   errorCorrection('hsk2_b13_error_03', '这个本子比那个很贵一点儿。', '这个本子比那个贵一点儿。', { ...b13ErrorGroup, explanation: 'Không dùng 很 cùng với 比……一点儿/一些.' }),
   errorCorrection('hsk2_b13_error_04', '他卖我一本书给。', '他卖给我一本书。', { ...b13ErrorGroup, explanation: '给 đứng ngay sau động từ, sau đó là người nhận rồi đến vật.' }),
   errorCorrection('hsk2_b13_error_05', '我比他高一点儿很。', '我比他高一点儿。', { ...b13ErrorGroup, explanation: 'Không thêm 很 trong câu 比……一点儿.' }),
-  essay('hsk2_b13_writing', '写一写你想送给朋友（或老师）的新年礼物。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 新年、送给、希望、花、告诉、比……一点儿、上网、可能、里面。', '新年快到了，我想送给老师一个礼物。我上网看了看，花比本子好看一点儿，所以我买了一朵红色的花。我希望老师喜欢，也希望她新年快乐。我告诉朋友，他可能也想送花。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nói về món quà năm mới muốn tặng'], { taskGroup: 'bai13-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b13WritingRubric, maxScore: 10 })
+  essay('hsk2_b13_writing', '写一写你想送给朋友（或老师）的新年礼物。(Viết về món quà năm mới em muốn tặng bạn bè hoặc thầy cô.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 新年、送给、希望、花、告诉、比……一点儿、上网、可能、里面。', '新年快到了，我想送给老师一个礼物。我上网看了看，花比本子好看一点儿，所以我买了一朵红色的花。我希望老师喜欢，也希望她新年快乐。我告诉朋友，他可能也想送花。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Nói về món quà năm mới muốn tặng'], { taskGroup: 'bai13-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b13WritingRubric, maxScore: 10 })
 ];
 
 const b13ReadingAloudNote = 'Chấm theo thanh điệu và ngữ điệu. 新年 đọc xīnnián. 教 đọc jiāo khi là động từ “dạy”. 送给她 đọc sòng gěi tā. 王老师 đọc Wáng lǎoshī (老 là thanh 3 đứng trước thanh 1 nên đọc nửa thanh 3). 比我们 đọc bǐ wǒmen. 一点儿 đọc yìdiǎnr (一 thanh 4 trước thanh 3). 不可能 đọc bù kěnéng (不 giữ thanh 4 trước thanh 3). Câu có 吧 ở cuối đề nghị thì giọng nhẹ.';
 const b13JiaoNote = 'Động từ “dạy” luôn đọc jiāo; trong từ ghép như 教室 đọc jiào. Đáp án: 1. 教（jiāo） 2. 教（jiāo）书 3. 教室（jiàoshì） 4. 教（jiāo） 5. 教室（jiàoshì）里教（jiāo）我们.';
-const b13ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音', explanation: b13ReadingAloudNote });
-const b13Guided = (id: string, prompt: string, pinyin: string, answer: string, element: string) => speaking(id, prompt, pinyin, { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: answer, referenceAnswers: [answer], requiredElements: [element] });
-const b13Jiao = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'jiao_reading', taskGroupTitle: 'IV. 口语 · Bài 3: 朗读“教”的两种读音', requiredElements: ['Đọc đúng jiāo / jiào', 'Phát âm và thanh điệu rõ'], explanation: b13JiaoNote });
+const b13ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)', explanation: b13ReadingAloudNote });
+const b13Guided = (id: string, prompt: string, pinyin: string, answer: string, element: string) => speaking(id, prompt, pinyin, { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: answer, referenceAnswers: [answer], requiredElements: [element] });
+const b13Jiao = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'jiao_reading', taskGroupTitle: 'IV. 口语 · Bài 3: 朗读“教”的两种读音 (Đọc to, phân biệt hai cách đọc của 教)', requiredElements: ['Đọc đúng jiāo / jiào', 'Phát âm và thanh điệu rõ'], explanation: b13JiaoNote });
 const b13Speaking: Question[] = [
   b13ReadAloud('hsk2_b13_speak_01', '时间过得真快啊！新年就要到了。', 'Shíjiān guò de zhēn kuài a! Xīnnián jiù yào dào le.'),
   b13ReadAloud('hsk2_b13_speak_02', '她教得很好，因为她，我们都非常爱上中文课。', 'Tā jiāo de hěn hǎo, yīnwèi tā, wǒmen dōu fēicháng ài shàng Zhōngwén kè.'),
@@ -1052,18 +1052,18 @@ const b14Vocab = vocab([
 ]);
 
 const b14Listening: Question[] = [
-  listeningGroup('hsk2_b14_listen_01', 'Bài 1 · 听短文，判断对错', '我家有四口人，爸爸、妈妈、姐姐和我。过年的时候，我们一家人都回奶奶家。奶奶家的房子很大，前面有一个小花园。妈妈和奶奶一起包饺子，姐姐在旁边跳舞，我站在门口等客人。大家都觉得过年多高兴啊！', 'listening_tf', [
+  listeningGroup('hsk2_b14_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '我家有四口人，爸爸、妈妈、姐姐和我。过年的时候，我们一家人都回奶奶家。奶奶家的房子很大，前面有一个小花园。妈妈和奶奶一起包饺子，姐姐在旁边跳舞，我站在门口等客人。大家都觉得过年多高兴啊！', 'listening_tf', [
     listeningTf('hsk2_b14_listen_01_01', '我家有四口人。', true),
     listeningTf('hsk2_b14_listen_01_02', '过年的时候，我们回爷爷家。', false),
     listeningTf('hsk2_b14_listen_01_03', '奶奶家的房子很小。', false),
     listeningTf('hsk2_b14_listen_01_04', '妈妈和奶奶一起包饺子。', true),
     listeningTf('hsk2_b14_listen_01_05', '姐姐在门口跳舞。', false)
   ]),
-  listeningGroup('hsk2_b14_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '女：你姓什么？男：我姓李，你呢？女：我姓王。', 'listening_mc', [listeningMc('hsk2_b14_listen_02_01', '女的姓什么？', ['李', '王', '陈'], 1)]),
-  listeningGroup('hsk2_b14_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '男：楼下站着一个人，你认识吗？女：那是我的朋友。', 'listening_mc', [listeningMc('hsk2_b14_listen_03_01', '楼下有什么？', ['站着一个人', '坐着一个人', '没有人'], 0)]),
-  listeningGroup('hsk2_b14_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '女：这位是谁？男：这是我的中文老师。', 'listening_mc', [listeningMc('hsk2_b14_listen_04_01', '男的介绍了谁？', ['朋友', '老师', '妈妈'], 1)]),
-  listeningGroup('hsk2_b14_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '男：你喜欢跳舞吗？女：很喜欢，我从小就学跳舞。', 'listening_mc', [listeningMc('hsk2_b14_listen_05_01', '女的喜欢做什么？', ['唱歌', '跳舞', '画画'], 1)]),
-  listeningGroup('hsk2_b14_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '女：一个人过年多没意思啊！男：那你来我家吧。', 'listening_mc', [listeningMc('hsk2_b14_listen_06_01', '女的觉得怎么样？', ['很有意思', '没意思', '很高兴'], 1)])
+  listeningGroup('hsk2_b14_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '女：你姓什么？男：我姓李，你呢？女：我姓王。', 'listening_mc', [listeningMc('hsk2_b14_listen_02_01', '女的姓什么？', ['李', '王', '陈'], 1)]),
+  listeningGroup('hsk2_b14_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '男：楼下站着一个人，你认识吗？女：那是我的朋友。', 'listening_mc', [listeningMc('hsk2_b14_listen_03_01', '楼下有什么？', ['站着一个人', '坐着一个人', '没有人'], 0)]),
+  listeningGroup('hsk2_b14_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '女：这位是谁？男：这是我的中文老师。', 'listening_mc', [listeningMc('hsk2_b14_listen_04_01', '男的介绍了谁？', ['朋友', '老师', '妈妈'], 1)]),
+  listeningGroup('hsk2_b14_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '男：你喜欢跳舞吗？女：很喜欢，我从小就学跳舞。', 'listening_mc', [listeningMc('hsk2_b14_listen_05_01', '女的喜欢做什么？', ['唱歌', '跳舞', '画画'], 1)]),
+  listeningGroup('hsk2_b14_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '女：一个人过年多没意思啊！男：那你来我家吧。', 'listening_mc', [listeningMc('hsk2_b14_listen_06_01', '女的觉得怎么样？', ['很有意思', '没意思', '很高兴'], 1)])
 ];
 
 const b14Reading = reading('hsk2_b14_reading_01', 'II. 阅读 · Đọc hiểu', '小雨有一双大眼睛，她今年七岁，是一个爱笑的女孩儿。她家的房子在学校前面，走路三分钟就到了。每天早上，她拿着书包走进教室，一看见老师就笑着说“早”。下课以后，她常常和同学一起跳舞。', [
@@ -1086,7 +1086,7 @@ const b14Reading = reading('hsk2_b14_reading_01', 'II. 阅读 · Đọc hiểu',
     '你（　）什么？我姓李。',
     '她的（　）很漂亮，但是今天有点儿累。',
     '我很喜欢（　），每个星期都去学。'
-  ][index], word, b14WordBank, 'hsk2-b14-read-fill', 'Bài 3 · 选词填空'))
+  ][index], word, b14WordBank, 'hsk2-b14-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'))
 ], b14WordBank);
 
 const b14Arrange: Question[] = [
@@ -1103,19 +1103,19 @@ const b14WritingRubric = [
   { id: 'grammar', label: 'Ngữ pháp đúng', maxScore: 2 },
   { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
 ];
-const b14ErrorGroup = { taskGroup: 'bai14-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句' };
+const b14ErrorGroup = { taskGroup: 'bai14-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)' };
 const b14EssayQuestions: Question[] = [
   errorCorrection('hsk2_b14_error_01', '楼下一个人站着。', '楼下站着一个人。', { ...b14ErrorGroup, explanation: 'Câu tồn hiện: nơi chốn + động từ + 着 + người/vật.' }),
   errorCorrection('hsk2_b14_error_02', '我走上去楼。', '我走上楼去。', { ...b14ErrorGroup, explanation: 'Tân ngữ chỉ nơi chốn đứng giữa 上 và 去.' }),
   errorCorrection('hsk2_b14_error_03', '很好看啊！', '多好看啊！', { ...b14ErrorGroup, explanation: 'Câu cảm thán dùng mẫu 多 + tính từ + 啊.' }),
   errorCorrection('hsk2_b14_error_04', '我家有四个人口。', '我家有四口人。', { ...b14ErrorGroup, explanation: '口 đứng trước 人 để đếm thành viên gia đình.' }),
   errorCorrection('hsk2_b14_error_05', '她站着起来了。', '她站起来了。', { ...b14ErrorGroup, explanation: '站起来 là bổ ngữ xu hướng, không thêm 着.' }),
-  essay('hsk2_b14_writing', '写一写你过年（或过节）时的一件事。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 过年、包、房子、前面、站、位、多……啊、没意思、跳舞。', '过年的时候，我们一家四口都回老家。老家的房子前面有一个大花园。奶奶和妈妈一起包饺子，爸爸站在门口等客人。我觉得一个人过年多没意思啊，和家人在一起多好啊！', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Kể một việc khi ăn Tết hoặc ngày lễ'], { taskGroup: 'bai14-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b14WritingRubric, maxScore: 10 })
+  essay('hsk2_b14_writing', '写一写你过年（或过节）时的一件事。(Viết về một việc khi em ăn Tết hoặc đón ngày lễ.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 过年、包、房子、前面、站、位、多……啊、没意思、跳舞。', '过年的时候，我们一家四口都回老家。老家的房子前面有一个大花园。奶奶和妈妈一起包饺子，爸爸站在门口等客人。我觉得一个人过年多没意思啊，和家人在一起多好啊！', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Kể một việc khi ăn Tết hoặc ngày lễ'], { taskGroup: 'bai14-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b14WritingRubric, maxScore: 10 })
 ];
 
 const b14ReadingAloudNote = 'Chấm theo thanh điệu và ngữ điệu. 站着 đọc zhànzhe (着 đọc nhẹ). 你一个人 đọc nǐ yí gè rén (一 biến thành thanh 2 trước thanh 4). 没意思啊 đọc méi yìsi a (啊 sau 思 thường đọc như za, giọng cảm thán tự nhiên). 房子 đọc fángzi (子 đọc nhẹ). 上来 đọc shànglái. 位 đọc wèi.';
-const b14ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音', explanation: b14ReadingAloudNote });
-const b14Guided = (id: string, prompt: string, pinyin: string, answer: string, element: string) => speaking(id, prompt, pinyin, { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: answer, referenceAnswers: [answer], requiredElements: [element] });
+const b14ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)', explanation: b14ReadingAloudNote });
+const b14Guided = (id: string, prompt: string, pinyin: string, answer: string, element: string) => speaking(id, prompt, pinyin, { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: answer, referenceAnswers: [answer], requiredElements: [element] });
 const b14Speaking: Question[] = [
   b14ReadAloud('hsk2_b14_speak_01', '王老师，你家楼下站着一个人。', 'Wáng lǎoshī, nǐ jiā lóu xià zhànzhe yí gè rén.'),
   b14ReadAloud('hsk2_b14_speak_02', '那个人穿着黑色的裤子，手里还拿着一个黑色的包。', 'Nà ge rén chuānzhe hēisè de kùzi, shǒu lǐ hái názhe yí gè hēisè de bāo.'),
@@ -1166,18 +1166,18 @@ const b15Vocab = vocab([
 ]);
 
 const b15Listening: Question[] = [
-  listeningGroup('hsk2_b15_listen_01', 'Bài 1 · 听短文，判断对错', '我叫小红，我有两年没出国了。下个月我想去北京旅游，昨天我已经在网上买好了机票。我去过一次颐和园，那里的花很漂亮，还有很多小鸟，所以我想再去一次。我的高中同学住在北京，他会去机场接我。', 'listening_tf', [
+  listeningGroup('hsk2_b15_listen_01', 'Bài 1 · 听短文，判断对错 (Nghe đoạn văn, chọn đúng ✓ / sai ✗)', '我叫小红，我有两年没出国了。下个月我想去北京旅游，昨天我已经在网上买好了机票。我去过一次颐和园，那里的花很漂亮，还有很多小鸟，所以我想再去一次。我的高中同学住在北京，他会去机场接我。', 'listening_tf', [
     listeningTf('hsk2_b15_listen_01_01', '小红有两年没出国了。', true),
     listeningTf('hsk2_b15_listen_01_02', '小红下个月想去上海。', false),
     listeningTf('hsk2_b15_listen_01_03', '小红在网上买了机票。', true),
     listeningTf('hsk2_b15_listen_01_04', '小红没去过颐和园。', false),
     listeningTf('hsk2_b15_listen_01_05', '小红的高中同学会去机场接她。', true)
   ]),
-  listeningGroup('hsk2_b15_listen_02', 'Bài 2 · 听对话，选择正确答案 (Câu 1)', '男：请问，你的姓名是什么？女：我叫王美。', 'listening_mc', [listeningMc('hsk2_b15_listen_02_01', '女的叫什么？', ['王美', '李美', '王明'], 0)]),
-  listeningGroup('hsk2_b15_listen_03', 'Bài 2 · 听对话，选择正确答案 (Câu 2)', '女：你明天什么时候出门？男：我早上七点出门，要去机场。', 'listening_mc', [listeningMc('hsk2_b15_listen_03_01', '男的明天要去哪儿？', ['学校', '机场', '商场'], 1)]),
-  listeningGroup('hsk2_b15_listen_04', 'Bài 2 · 听对话，选择正确答案 (Câu 3)', '男：这是两张公园门票，给你一张。女：谢谢，多少钱？', 'listening_mc', [listeningMc('hsk2_b15_listen_04_01', '男的有几张门票？', ['一张', '两张', '三张'], 1)]),
-  listeningGroup('hsk2_b15_listen_05', 'Bài 2 · 听对话，选择正确答案 (Câu 4)', '女：你去过北京吗？男：去过两次，我想再去一次。', 'listening_mc', [listeningMc('hsk2_b15_listen_05_01', '男的去过几次北京？', ['一次', '两次', '三次'], 1)]),
-  listeningGroup('hsk2_b15_listen_06', 'Bài 2 · 听对话，选择正确答案 (Câu 5)', '男：天上好像要下雨了。女：那我们带把伞吧。', 'listening_mc', [listeningMc('hsk2_b15_listen_06_01', '天气怎么样？', ['好像要下雨', '很晴', '很热'], 0)])
+  listeningGroup('hsk2_b15_listen_02', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 1', '男：请问，你的姓名是什么？女：我叫王美。', 'listening_mc', [listeningMc('hsk2_b15_listen_02_01', '女的叫什么？', ['王美', '李美', '王明'], 0)]),
+  listeningGroup('hsk2_b15_listen_03', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 2', '女：你明天什么时候出门？男：我早上七点出门，要去机场。', 'listening_mc', [listeningMc('hsk2_b15_listen_03_01', '男的明天要去哪儿？', ['学校', '机场', '商场'], 1)]),
+  listeningGroup('hsk2_b15_listen_04', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 3', '男：这是两张公园门票，给你一张。女：谢谢，多少钱？', 'listening_mc', [listeningMc('hsk2_b15_listen_04_01', '男的有几张门票？', ['一张', '两张', '三张'], 1)]),
+  listeningGroup('hsk2_b15_listen_05', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 4', '女：你去过北京吗？男：去过两次，我想再去一次。', 'listening_mc', [listeningMc('hsk2_b15_listen_05_01', '男的去过几次北京？', ['一次', '两次', '三次'], 1)]),
+  listeningGroup('hsk2_b15_listen_06', 'Bài 2 · 听对话，选择正确答案 (Nghe hội thoại, chọn đáp án đúng) · Câu 5', '男：天上好像要下雨了。女：那我们带把伞吧。', 'listening_mc', [listeningMc('hsk2_b15_listen_06_01', '天气怎么样？', ['好像要下雨', '很晴', '很热'], 0)])
 ];
 
 const b15Reading = reading('hsk2_b15_reading_01', 'II. 阅读 · Đọc hiểu', '我的朋友小明在大学学中文，他有三年没回家了。他很想家，所以下个月要坐飞机回去。他已经买好了机票，机票有点儿贵，但是他还是很高兴。他告诉我，到了机场以后，他要先给妈妈打电话，再坐车回家。', [
@@ -1200,7 +1200,7 @@ const b15Reading = reading('hsk2_b15_reading_01', 'II. 阅读 · Đọc hiểu',
     '我买了一张去上海的（　）。',
     '她（　）生病了，今天没来上课。',
     '天上有一只（　），它飞得很高。'
-  ][index], word, b15WordBank, 'hsk2-b15-read-fill', 'Bài 3 · 选词填空'))
+  ][index], word, b15WordBank, 'hsk2-b15-read-fill', 'Bài 3 · 选词填空 (Chọn từ điền vào chỗ trống)'))
 ], b15WordBank);
 
 const b15Arrange: Question[] = [
@@ -1217,19 +1217,19 @@ const b15WritingRubric = [
   { id: 'grammar', label: 'Ngữ pháp đúng', maxScore: 2 },
   { id: 'writing', label: 'Chữ Hán và dấu câu', maxScore: 2 }
 ];
-const b15ErrorGroup = { taskGroup: 'bai15-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句' };
+const b15ErrorGroup = { taskGroup: 'bai15-error-correction', taskGroupTitle: 'III. 写作 · Bài 2: 改错句 (Tìm lỗi sai và sửa lại)' };
 const b15EssayQuestions: Question[] = [
   errorCorrection('hsk2_b15_error_01', '我去中国一次过。', '我去过一次中国。', { ...b15ErrorGroup, acceptedVariants: ['我去过中国一次。'], explanation: '过 đứng ngay sau động từ, sau đó là bổ ngữ động lượng.' }),
   errorCorrection('hsk2_b15_error_02', '我再吃烤鸭一次。', '我再吃一次烤鸭。', { ...b15ErrorGroup, explanation: 'Tân ngữ là sự vật thì bổ ngữ động lượng đứng trước tân ngữ.' }),
   errorCorrection('hsk2_b15_error_03', '我有一年不回国了。', '我有一年没回国了。', { ...b15ErrorGroup, explanation: 'Mẫu 有 + khoảng thời gian + 没 + động từ + 了.' }),
   errorCorrection('hsk2_b15_error_04', '我想找一次他。', '我想找他一次。', { ...b15ErrorGroup, explanation: 'Tân ngữ là đại từ thì đứng trước bổ ngữ động lượng.' }),
   errorCorrection('hsk2_b15_error_05', '安妮来过两次这儿。', '安妮来过这儿两次。', { ...b15ErrorGroup, explanation: 'Tân ngữ chỉ nơi chốn (这儿) đứng trước bổ ngữ động lượng.' }),
-  essay('hsk2_b15_writing', '写一写你想再去一次的地方。Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 去过一次、再……一次、有……没……了、机票、机场、出国（出门）、好像、门票、路。', '我去过一次北京，很想再去一次。我有两年没出国了，所以想早点儿买机票。我听说颐和园的门票不贵，那里还有很多小鸟。到了机场，我要先给家里打个电话。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Giới thiệu một nơi muốn đi thêm lần nữa'], { taskGroup: 'bai15-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b15WritingRubric, maxScore: 10 })
+  essay('hsk2_b15_writing', '写一写你想再去一次的地方。(Viết về một nơi em muốn đến thêm một lần nữa.) Viết đoạn văn khoảng 60–80 chữ. Dùng ít nhất 5 trong các từ/cấu trúc: 去过一次、再……一次、有……没……了、机票、机场、出国（出门）、好像、门票、路。', '我去过一次北京，很想再去一次。我有两年没出国了，所以想早点儿买机票。我听说颐和园的门票不贵，那里还有很多小鸟。到了机场，我要先给家里打个电话。', ['Đủ 60–80 chữ', 'Dùng đúng ít nhất 5 từ/cấu trúc yêu cầu', 'Giới thiệu một nơi muốn đi thêm lần nữa'], { taskGroup: 'bai15-writing', taskGroupTitle: 'III. 写作 · Bài 3: 写短文 (Viết đoạn văn)', explanation: 'Thang chấm 10 điểm: nội dung đủ ý 3 điểm; dùng đúng ít nhất 5 từ/cấu trúc yêu cầu 3 điểm; ngữ pháp đúng 2 điểm; chữ Hán và dấu câu 2 điểm.', rubric: b15WritingRubric, maxScore: 10 })
 ];
 
 const b15ReadingAloudNote = 'Chấm theo thanh điệu và ngữ điệu. 姓名 đọc xìngmíng. 很想 đọc hén xiǎng (hai thanh 3 liền nhau, 很 biến thành thanh 2). 去过一次 đọc qù guo yí cì (过 đọc nhẹ, 一 biến thành thanh 2 trước thanh 4). 有一年 đọc yǒu yì nián (一 thanh 4 trước thanh 2). 机票 đọc jīpiào. 好像 đọc hǎoxiàng. 小鸟 đọc xiáoniǎo (hai thanh 3 liền nhau, 小 biến thành thanh 2). Câu có 吧 ở cuối dùng để hỏi xác nhận thì lên giọng nhẹ.';
-const b15ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音', explanation: b15ReadingAloudNote });
-const b15Guided = (id: string, prompt: string, pinyin: string, answer: string, element: string) => speaking(id, prompt, pinyin, { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子', suggestedAnswer: answer, referenceAnswers: [answer], requiredElements: [element] });
+const b15ReadAloud = (id: string, prompt: string, pinyin: string) => speaking(id, prompt, pinyin, { taskGroup: 'reading_aloud', taskGroupTitle: 'IV. 口语 · Bài 1: 录音 (Ghi âm các câu sau, chú ý thanh điệu)', explanation: b15ReadingAloudNote });
+const b15Guided = (id: string, prompt: string, pinyin: string, answer: string, element: string) => speaking(id, prompt, pinyin, { taskGroup: 'guided_speaking', taskGroupTitle: 'IV. 口语 · Bài 2: 用所给词语说句子 (Dùng từ gợi ý để nói câu)', suggestedAnswer: answer, referenceAnswers: [answer], requiredElements: [element] });
 const b15Speaking: Question[] = [
   b15ReadAloud('hsk2_b15_speak_01', '考试就要开始了，请大家写上姓名。', 'Kǎoshì jiù yào kāishǐ le, qǐng dàjiā xiě shang xìngmíng.'),
   b15ReadAloud('hsk2_b15_speak_02', '我很想去中国，虽然去过一次，但是很想再去一次。', 'Wǒ hěn xiǎng qù Zhōngguó, suīrán qù guo yí cì, dànshì hěn xiǎng zài qù yí cì.'),

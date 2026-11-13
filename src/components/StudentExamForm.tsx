@@ -76,6 +76,11 @@ const formatRemainingTime = (seconds: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 };
 
+// 宋体 for Chinese word chips: Songti SC on macOS/iOS, SimSun on Windows.
+const SONGTI_FONT_STYLE: React.CSSProperties = {
+  fontFamily: '"Songti SC", "STSong", "SimSun", "宋体", "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", serif'
+};
+
 const getFillGroupDisplayTitle = (title?: string): string | undefined => {
   const displayTitle = title?.replace(/^Nhóm\s+\d+\s*·?\s*/u, '').trim();
   return displayTitle || undefined;
@@ -1702,7 +1707,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
           </div>
         ) : (
           <div className={isStructuredHsk2Lesson ? 'flex flex-col gap-6 animate-in fade-in duration-300' : 'space-y-6 animate-in fade-in duration-300'}>
-            {hasExamPinyin && (
+            {hasExamPinyin && !isStructuredHsk2Lesson && (
               <div className={`sticky z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/95 px-4 py-3 shadow-md backdrop-blur ${
                 isTimedExam && !submittedId ? 'top-48 sm:top-40' : 'top-28 sm:top-20'
               }`}>
@@ -1766,7 +1771,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                             item={item}
                             answers={structuredAnswers}
                             studentMode
-                            showPinyinOverride={hasExamPinyin ? showStructuredPinyin : undefined}
+                            showPinyinOverride={hasExamPinyin ? showStructuredPinyin && !isStructuredHsk2Lesson : undefined}
                             audioPlayCounts={listeningPlayCounts}
                             audioScope={structuredAudioScope}
                             onAudioAttempt={handleStructuredAudioAttempt}
@@ -1859,7 +1864,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     <span className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm">
                       {isHsk2Bai1 ? 'IV' : isHsk2Bai2 || isHsk2Bai3 ? 'II' : '2'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 1: Hoàn thành câu' : isHsk2Bai2 || isHsk2Bai3 ? 'II. 阅读 · Bài 3: 选词填空' : 'Điền Từ Vào Chỗ Trống & Ngữ Pháp'}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? '写作 · Bài 1: Hoàn thành câu' : isHsk2Bai2 || isHsk2Bai3 ? '阅读 · Bài 3: 选词填空 (Chọn từ điền vào chỗ trống)' : 'Điền Từ Vào Chỗ Trống & Ngữ Pháp'}</h3>
                   </div>
                   <span className="text-xs font-medium bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-full">
                     {Object.keys(fillAnswers).length}/{currentExam.fillQuestions.length} đã làm
@@ -1879,7 +1884,20 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       </div>
 
                       {/* Prominent Word Bank Display */}
-                      {group.wordBank && group.wordBank.length > 0 && (
+                      {isStructuredHsk2Lesson && group.wordBank && group.wordBank.length > 0 && (
+                        <div className="rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50/70 px-4 py-3.5 text-slate-800">
+                          <div className="mb-2.5 text-sm font-bold text-amber-900 sm:text-base">Điền từ cho sẵn vào chỗ trống:</div>
+                          <div className="flex flex-wrap gap-2">
+                            {group.wordBank.map((word, wIdx) => (
+                              <span key={`${word}-${wIdx}`} className="inline-flex items-baseline gap-1 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-lg font-semibold text-slate-900">
+                                <span className="text-xs font-medium text-slate-400">{String.fromCharCode(65 + wIdx)}.</span>
+                                <span style={SONGTI_FONT_STYLE}>{word}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!isStructuredHsk2Lesson && group.wordBank && group.wordBank.length > 0 && (
                         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2">
                           <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs uppercase tracking-wider">
                             <Sparkles className="w-4 h-4 text-emerald-600" />
@@ -1934,7 +1952,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-sm">
                       {isHsk2Bai1 ? 'IV' : isHsk2Bai2To8 ? 'III' : '3'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 2: 把词语排成句子' : isHsk2Bai2To8 ? 'III. 写作 · Bài 1: 把词语排成句子' : (isParagraphArrange ? 'Sắp Xếp Đoạn Văn' : 'Sắp Xếp Thẻ Từ Thành Câu')}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? '写作 · Bài 2: 把词语排成句子 (Sắp xếp từ thành câu)' : isHsk2Bai2To8 ? '写作 · Bài 1: 把词语排成句子 (Sắp xếp từ thành câu hoàn chỉnh)' : (isParagraphArrange ? 'Sắp Xếp Đoạn Văn' : 'Sắp Xếp Thẻ Từ Thành Câu')}</h3>
                   </div>
                   <span className="text-xs font-medium bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full">
                     {Object.keys(arrangeAnswers).length}/{currentExam.arrangeQuestions.length} đã xếp
@@ -2048,7 +2066,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-900 font-bold flex items-center justify-center text-sm">
                       {isStructuredHsk2Lesson ? 'I' : '🎧'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isStructuredHsk2Lesson ? 'I. 听力 · Nghe' : 'Phần Luyện Nghe'}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isStructuredHsk2Lesson ? '听力 · Nghe' : 'Phần Luyện Nghe'}</h3>
                   </div>
                   <span className="text-xs font-medium bg-indigo-50 text-indigo-900 px-2.5 py-1 rounded-full border border-indigo-200">
                     {listeningQuestionItems.filter(q => (q.type === 'listening_fill' || q.type === 'listening_fill_in_blank') ? !!fillAnswers[q.id]?.trim() : mcAnswers[q.id] !== undefined).length}/{listeningQuestionItems.length} đã làm
@@ -2070,8 +2088,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           <div className="flex items-start gap-2">
                             <span className="font-bold text-indigo-700 text-sm mt-0.5">{isConversation ? `Bài nghe ${idx + 1}:` : `Câu nghe ${idx + 1}:`}</span>
                             <div>
-                              <p className="text-sm font-bold text-slate-900">{q.prompt}</p>
-                              {showStructuredPinyin && q.pinyin && <p className="text-xs text-indigo-600 font-mono mt-0.5">Pinyin / Phiên âm: {q.pinyin}</p>}
+                              {!isStructuredHsk2Lesson && <p className="text-sm font-bold text-slate-900">{q.prompt}</p>}
+                              {showStructuredPinyin && !isStructuredHsk2Lesson && q.pinyin && <p className="text-xs text-indigo-600 font-mono mt-0.5">Pinyin / Phiên âm: {q.pinyin}</p>}
                             </div>
                           </div>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -2132,7 +2150,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                               {isConversation && (
                                 <div className="text-sm font-bold text-slate-900">
                                   Câu {subIdx + 1}: {subQuestion.prompt}
-                                  {showStructuredPinyin && subQuestion.pinyin && (
+                                  {showStructuredPinyin && !isStructuredHsk2Lesson && subQuestion.pinyin && (
                                     <p className="text-xs text-indigo-600 font-mono mt-0.5">
                                       Pinyin / Phiên âm: {subQuestion.pinyin}
                                     </p>
@@ -2158,7 +2176,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     <span className="w-7 h-7 rounded-lg bg-sky-100 text-sky-800 font-bold flex items-center justify-center text-sm">
                       {isStructuredHsk2Lesson ? 'II' : '4'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isStructuredHsk2Lesson ? 'II. 阅读 · Đọc' : 'Phần Đọc Hiểu Đoạn Văn'}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isStructuredHsk2Lesson ? '阅读 · Đọc' : 'Phần Đọc Hiểu Đoạn Văn'}</h3>
                   </div>
                 </div>
 
@@ -2190,12 +2208,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         {passage.questions.map((q, qIdx) => (
                           <React.Fragment key={q.id}>
                             {q.type === 'fill' && passage.questions[qIdx - 1]?.type !== 'fill' && passage.wordBank && passage.wordBank.length > 0 && (
-                              <div className="rounded-lg border-2 border-sky-300 bg-white px-4 py-4 text-sky-950">
-                                <div className="mb-3 text-base font-extrabold sm:text-lg">Ngân hàng từ · Bài 3:</div>
+                              <div className="rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50/70 px-4 py-3.5 text-slate-800">
+                                <div className="mb-2.5 text-sm font-bold text-amber-900 sm:text-base">Bài 3 · Điền từ cho sẵn vào chỗ trống:</div>
                                 <div className="flex flex-wrap gap-2">
                                   {passage.wordBank.map((word, wordIdx) => (
-                                    <span key={`${word}-${wordIdx}`} className="rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-lg font-bold leading-7 text-sky-950 sm:text-xl">
-                                      {word}
+                                    <span key={`${word}-${wordIdx}`} className="inline-flex items-baseline gap-1 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-lg font-semibold text-slate-900">
+                                      <span className="text-xs font-medium text-slate-400">{String.fromCharCode(65 + wordIdx)}.</span>
+                                      <span style={SONGTI_FONT_STYLE}>{word}</span>
                                     </span>
                                   ))}
                                 </div>
@@ -2267,7 +2286,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm">
                       {isHsk2Bai1 ? 'IV' : isHsk2Bai2To8 ? 'III' : '5'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 3–5' : isHsk2Bai2To8 ? 'III. 写作 · Bài 2–4' : 'Phần Viết & Tự Luận'}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? '写作 · Bài 3–5 (Viết)' : isHsk2Bai2To8 ? '写作 · Bài 2–4 (Viết)' : 'Phần Viết & Tự Luận'}</h3>
                   </div>
                 </div>
 
@@ -2338,9 +2357,27 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="text-sm font-semibold text-slate-800">
-                              {group.questions.length === 1 ? 'Đề bài: ' : `Câu ${idx + 1}: `}{q.prompt}
-                            </p>
+                            {(() => {
+                              const label = group.questions.length === 1 ? 'Đề bài: ' : `Câu ${idx + 1}: `;
+                              const prompt = q.prompt || '';
+                              const match = prompt.match(/^(.*?Dùng ít nhất \d+ (?:trong )?(?:các )?từ\/cấu trúc(?: sau)?:)\s*(.+?)[。.]?\s*$/su);
+                              const words = match ? match[2].split('、').map((word) => word.trim()).filter(Boolean) : [];
+                              if (!match || words.length < 2) {
+                                return <p className="text-sm font-semibold text-slate-800">{label}{prompt}</p>;
+                              }
+                              return (
+                                <>
+                                  <p className="text-sm font-semibold text-slate-800">{label}{match[1]}</p>
+                                  <div className="mt-2 flex flex-wrap gap-2 rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50/70 px-3 py-2.5">
+                                    {words.map((word, wordIdx) => (
+                                      <span key={`${word}-${wordIdx}`} style={SONGTI_FONT_STYLE} className="rounded-md border border-amber-200 bg-white px-2.5 py-1 text-lg font-semibold text-slate-900">
+                                        {word}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </>
+                              );
+                            })()}
                             {group.questions.length === 1 && (
                               <p className="mt-2 text-xs font-semibold text-slate-500">Bài làm:</p>
                             )}
@@ -2384,7 +2421,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       {isHsk2Bai1 ? 'II' : isHsk2Bai2To8 ? 'IV' : '6'}
                     </span>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'II. 口语 · Nói' : isHsk2Bai2To8 ? 'IV. 口语 · Nói' : 'Kỹ năng nói'}</h3>
+                      <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 || isHsk2Bai2To8 ? '口语 · Nói' : 'Kỹ năng nói'}</h3>
                       <p className="text-xs text-slate-500">Mỗi bài có ghi âm, dừng, nghe lại, ghi âm lại và tải file lên.</p>
                     </div>
                   </div>
@@ -2393,7 +2430,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   </span>
                 </div>
 
-                {speakingTaskGroups.some((group) => group.key === 'reading_aloud') && (
+                {!isStructuredHsk2Lesson && speakingTaskGroups.some((group) => group.key === 'reading_aloud') && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2">
                     <span className="text-xs text-indigo-900">Pinyin phần 朗读 đang ẩn mặc định.</span>
                     <button
@@ -2447,7 +2484,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                             label={q.prompt}
                             questionId={q.id}
                             taskGroup={q.taskGroup}
-                            pinyin={group.key === 'reading_aloud' && showSpeakingPinyin ? q.pinyin : undefined}
+                            pinyin={!isStructuredHsk2Lesson && group.key === 'reading_aloud' && showSpeakingPinyin ? q.pinyin : undefined}
                             onAudioRecorded={(rec) => handleAudioRecorded(q.id, rec)}
                           />
                         </div>
@@ -2469,7 +2506,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       {isStructuredHsk2Lesson ? 'V' : '7'}
                     </span>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">{isStructuredHsk2Lesson ? 'V. 翻译 · Dịch' : 'Kỹ năng dịch'}</h3>
+                      <h3 className="font-bold text-slate-800 text-lg">{isStructuredHsk2Lesson ? '翻译 · Dịch' : 'Kỹ năng dịch'}</h3>
                       <p className="text-xs text-slate-500">
                         Bao gồm dịch ghi âm phát âm, dịch câu viết Hán tự và dịch Trung - Việt
                       </p>
