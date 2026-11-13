@@ -1869,9 +1869,25 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
           />
         )}
         <p className="font-bold text-amber-950">Hướng dẫn chấm · {question.id}</p>
-        {question.referenceAnswers && (
-          <p><span className="font-semibold">Đáp án tham khảo:</span> {question.referenceAnswers.join(' / ')}</p>
-        )}
+        {(() => {
+          const references = Array.from(new Set(
+            [...(question.referenceAnswers || []), question.suggestedAnswer, ...(question.acceptedVariants || [])]
+              .map((answer) => String(answer || '').trim())
+              .filter(Boolean)
+          ));
+          return (
+            <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-emerald-950">
+              <p className="font-bold">Đáp án tham khảo:</p>
+              {references.length > 0 ? (
+                <ul className="mt-1 list-disc pl-5 space-y-0.5 text-sm">
+                  {references.map((answer) => <li key={answer}>{answer}</li>)}
+                </ul>
+              ) : (
+                <p className="mt-1 italic text-emerald-800">Chưa có đáp án tham khảo cho câu này.</p>
+              )}
+            </div>
+          );
+        })()}
         {question.requiredElements && (
           <p><span className="font-semibold">Ý bắt buộc:</span> {question.requiredElements.join(' · ')}</p>
         )}

@@ -1,4 +1,5 @@
 import { ExamLesson } from '../types';
+import { withHsk1SpeakingReferences } from './hsk1SpeakingReferences';
 import { HSK1_BAI1_TO_5_EXAMS } from './hsk1Bai1To5';
 import { HSK1_BAI6_TO_15_EXAMS } from './hsk1Bai6To15';
 import { HSK2_BAI1_WORD_EXAMS } from './hsk2Bai1Word';
@@ -1103,4 +1104,4 @@ const SAMPLE_EXAMS_WITH_LOCAL_AUDIO: ExamLesson[] = [
   }
 ];
 
-export const SAMPLE_EXAMS: ExamLesson[] = SAMPLE_EXAMS_WITH_LOCAL_AUDIO.map(attachLocalAudio);
+export const SAMPLE_EXAMS: ExamLesson[] = SAMPLE_EXAMS_WITH_LOCAL_AUDIO.map(attachLocalAudio).map(withHsk1SpeakingReferences);
