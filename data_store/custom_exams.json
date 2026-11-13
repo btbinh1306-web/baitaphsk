@@ -3382,7 +3382,7 @@
                   "id": "hsk1-trial-pdf-01-l20",
                   "number": 20,
                   "prompt": "我朋友是一个老师，今年三十岁了。问：她朋友在哪儿工作？",
-                  "correctAnswer": "A",
+                  "correctAnswer": "B",
                   "options": [
                     {
                       "id": "A",

@@ -562,7 +562,7 @@ const trial01: TrialSpec = {
       { prompt: '中午妈妈没有做饭，我们去饭店吃吧。问：他们中午去哪里？', answer: 'B', options: [option('A', '学校'), option('B', '饭店'), option('C', '商店')] },
       { prompt: '这本书是我朋友买的，我很喜欢。问：书是谁买的？', answer: 'B', options: [option('A', '我'), option('B', '朋友'), option('C', '老师')] },
       { prompt: '明天下午我想和爸爸去看电影。问：明天下午他想去哪里？', answer: 'C', options: [option('A', '医院'), option('B', '水果店'), option('C', '电影院')] },
-      { prompt: '我朋友是一个老师，今年三十岁了。问：她朋友在哪儿工作？', answer: 'A', options: [option('A', '饭店'), option('B', '学校'), option('C', '书店')] }
+      { prompt: '我朋友是一个老师，今年三十岁了。问：她朋友在哪儿工作？', answer: 'B', options: [option('A', '饭店'), option('B', '学校'), option('C', '书店')] }
     ]
   },
   reading: {
