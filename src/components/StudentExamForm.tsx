@@ -81,6 +81,29 @@ const SONGTI_FONT_STYLE: React.CSSProperties = {
   fontFamily: '"Songti SC", "STSong", "SimSun", "宋体", "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", serif'
 };
 
+// Given-word box for HSK2 lessons (fill-in word bank and writing prompts).
+const GivenWordBank: React.FC<{ words: string[]; label?: string; className?: string }> = ({ words, label, className = '' }) => (
+  <div className={`bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2 ${className}`}>
+    {label && (
+      <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs uppercase tracking-wider">
+        <Sparkles className="w-4 h-4 shrink-0 text-emerald-600" />
+        <span>{label}</span>
+      </div>
+    )}
+    <div className="flex flex-wrap gap-2.5 pt-1">
+      {words.map((word, index) => (
+        <span
+          key={`${word}-${index}`}
+          style={SONGTI_FONT_STYLE}
+          className="px-3.5 py-1.5 bg-white border border-emerald-300 text-emerald-950 font-bold text-lg rounded-lg shadow-2xs cursor-default"
+        >
+          {word}
+        </span>
+      ))}
+    </div>
+  </div>
+);
+
 const getFillGroupDisplayTitle = (title?: string): string | undefined => {
   const displayTitle = title?.replace(/^Nhóm\s+\d+\s*·?\s*/u, '').trim();
   return displayTitle || undefined;
@@ -1885,17 +1908,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
                       {/* Prominent Word Bank Display */}
                       {isStructuredHsk2Lesson && group.wordBank && group.wordBank.length > 0 && (
-                        <div className="rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50/70 px-4 py-3.5 text-slate-800">
-                          <div className="mb-2.5 text-sm font-bold text-amber-900 sm:text-base">Điền từ cho sẵn vào chỗ trống:</div>
-                          <div className="flex flex-wrap gap-2">
-                            {group.wordBank.map((word, wIdx) => (
-                              <span key={`${word}-${wIdx}`} className="inline-flex items-baseline gap-1 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-lg font-semibold text-slate-900">
-                                <span className="text-xs font-medium text-slate-400">{String.fromCharCode(65 + wIdx)}.</span>
-                                <span style={SONGTI_FONT_STYLE}>{word}</span>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                        <GivenWordBank words={group.wordBank} label="Điền từ cho sẵn vào chỗ trống (Chọn từ thích hợp để điền vào câu):" />
                       )}
                       {!isStructuredHsk2Lesson && group.wordBank && group.wordBank.length > 0 && (
                         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-xl p-4 shadow-xs space-y-2">
@@ -2208,17 +2221,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         {passage.questions.map((q, qIdx) => (
                           <React.Fragment key={q.id}>
                             {q.type === 'fill' && passage.questions[qIdx - 1]?.type !== 'fill' && passage.wordBank && passage.wordBank.length > 0 && (
-                              <div className="rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50/70 px-4 py-3.5 text-slate-800">
-                                <div className="mb-2.5 text-sm font-bold text-amber-900 sm:text-base">Bài 3 · Điền từ cho sẵn vào chỗ trống:</div>
-                                <div className="flex flex-wrap gap-2">
-                                  {passage.wordBank.map((word, wordIdx) => (
-                                    <span key={`${word}-${wordIdx}`} className="inline-flex items-baseline gap-1 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-lg font-semibold text-slate-900">
-                                      <span className="text-xs font-medium text-slate-400">{String.fromCharCode(65 + wordIdx)}.</span>
-                                      <span style={SONGTI_FONT_STYLE}>{word}</span>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
+                              <GivenWordBank words={passage.wordBank} label="Bài 3 · Điền từ cho sẵn vào chỗ trống (Chọn từ thích hợp để điền vào câu):" />
                             )}
                             <div id={getQuestionAnchor(q.id)} className="scroll-mt-32 p-3.5 rounded-lg bg-white border border-slate-200 space-y-2">
                             <p className="text-xs font-bold text-slate-700">
@@ -2368,13 +2371,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                               return (
                                 <>
                                   <p className="text-sm font-semibold text-slate-800">{label}{match[1]}</p>
-                                  <div className="mt-2 flex flex-wrap gap-2 rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50/70 px-3 py-2.5">
-                                    {words.map((word, wordIdx) => (
-                                      <span key={`${word}-${wordIdx}`} style={SONGTI_FONT_STYLE} className="rounded-md border border-amber-200 bg-white px-2.5 py-1 text-lg font-semibold text-slate-900">
-                                        {word}
-                                      </span>
-                                    ))}
-                                  </div>
+                                  <GivenWordBank words={words} label="Từ / cấu trúc cho sẵn:" className="mt-2" />
                                 </>
                               );
                             })()}
