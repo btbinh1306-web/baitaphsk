@@ -210,7 +210,16 @@ export const buildOrderedQuestionList = (exam: ExamLesson | undefined): OrderedT
   const isHsk2Bai3 = exam.id === 'hsk2-bai3-word';
   const isHsk2Bai5 = exam.id === 'hsk2-bai5-diyici-qu-zhongguo-pengyou-jia';
   const isHsk2Bai6 = exam.id === 'hsk2-bai6-xiaoxue-shengri-kuaile';
-  const isOrderedHsk2Lesson = isHsk2Bai2 || isHsk2Bai3 || isHsk2Bai5 || isHsk2Bai6;
+  const isOrderedHsk2Lesson = isHsk2Bai2 || isHsk2Bai3 || isHsk2Bai5 || isHsk2Bai6
+    || exam.id === 'hsk2-bai7-ta-lanqiu-da-de-hen-hao'
+    || exam.id === 'hsk2-bai8-xiaoxue-shengri-kuaile'
+    || exam.id === 'hsk2-bai9-meiyou-zuotian-na-me-re'
+    || exam.id === 'hsk2-bai10-jiuyaokaoshile'
+    || exam.id === 'hsk2-bai11-wo-zui-xihuan-chi-zhongguo-cai'
+    || exam.id === 'hsk2-bai12-zheli-bi-beijing-leng-duo-le'
+    || exam.id === 'hsk2-bai13-women-ai-shang-zhongwen-ke'
+    || exam.id === 'hsk2-bai14-yigeren-guonian-duo-mei-yisi-a'
+    || exam.id === 'hsk2-bai15-wo-xiang-zai-qu-yici-zhongguo';
 
   // This is the same top-to-bottom order used by StudentExamForm. The source
   // exam remains authoritative; no submission array is used to create order.

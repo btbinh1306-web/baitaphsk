@@ -1864,7 +1864,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         {showImage && question.imageUrl && (
           <img
             src={getDriveMediaPlayerUrl(question.imageUrl)}
-            alt={`Hình minh họa câu hỏi ${question.id}`}
+            alt={question.imageAlt || `Hình minh họa câu hỏi ${question.id}`}
             className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
           />
         )}
@@ -2176,7 +2176,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
         {question.imageUrl && (
           <img
             src={getDriveMediaPlayerUrl(question.imageUrl)}
-            alt={`Hình minh họa câu ${item.originalQuestionNumber}`}
+            alt={question.imageAlt || `Hình minh họa câu ${item.originalQuestionNumber}`}
             className="max-h-72 w-full rounded-xl border border-indigo-200 bg-white object-contain"
           />
         )}
@@ -4024,7 +4024,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     <span className="font-bold text-slate-800">C{idx + 1}: {q.prompt}</span>
                     {q.imageUrl && (
                       <div className="mt-1">
-                        <img src={getDriveMediaPlayerUrl(q.imageUrl)} alt="Đề bài" className="h-16 rounded border border-slate-200 object-contain bg-white" />
+                        <img src={getDriveMediaPlayerUrl(q.imageUrl)} alt={q.imageAlt || 'Đề bài'} className="h-16 rounded border border-slate-200 object-contain bg-white" />
                       </div>
                     )}
                     {q.suggestedAnswer && (
@@ -4136,7 +4136,7 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     </div>
                     {q.imageUrl && (
                       <div className="mt-1">
-                        <img src={getDriveMediaPlayerUrl(q.imageUrl)} alt="Hình luyện nói" className="h-16 rounded border border-slate-200 object-contain bg-white" />
+                        <img src={getDriveMediaPlayerUrl(q.imageUrl)} alt={q.imageAlt || 'Hình luyện nói'} className="h-16 rounded border border-slate-200 object-contain bg-white" />
                       </div>
                     )}
                     {q.pinyin && <span className="text-indigo-600 font-mono block mt-0.5">Pinyin: {q.pinyin}</span>}

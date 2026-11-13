@@ -51,6 +51,8 @@ export interface Question {
   audioUrl?: string; // Attached audio file data/URL for listening questions
   maxAudioPlayCount?: number; // Optional limit for fallback/TTS listening playback
   imageUrl?: string; // Attached image file data/URL for questions
+  imageAlt?: string;
+  imageHint?: string;
   items?: (string | Record<string, unknown>)[];
   questions?: Record<string, unknown>[];
   subQuestions?: Question[]; // Multiple questions sharing one listening/audio prompt

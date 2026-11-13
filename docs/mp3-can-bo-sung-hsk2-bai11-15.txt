@@ -1,0 +1,52 @@
+BẢNG MP3 CẦN BỔ SUNG – HSK2 BÀI 11–15
+Cập nhật: 14/11/2026
+
+Các bài này đang dùng giọng máy đọc kịch bản (TTS) vì chưa có file mp3.
+Tổng cần thu: 30 track. Mỗi bài 6 track: track 01 là đoạn văn Bài 1 (đúng/sai), track 02–06 là 5 hội thoại Bài 2.
+Thu xong, đặt file đúng thư mục/tên dưới đây; sau đó báo để gắn vào code.
+
+
+HSK 2 - Bài 11: 我最喜欢吃中国菜
+Thư mục: public/audio/HSK2_B11/
+- public/audio/HSK2_B11/hsk2_b11_listen_01.mp3 | hsk2_b11_listen_01 | 周末我经常和家人去公园。昨天路上车很多，我们开得很慢。到公园的时候，爷爷已经在门口等着我们了。他穿着红色的衣服，手里拿着一杯奶茶。我最喜欢和爷爷一起走路，因为走路对身体很好。
+- public/audio/HSK2_B11/hsk2_b11_listen_02.mp3 | hsk2_b11_listen_02 | 女：你怎么了？男：我牙疼，不能吃东西。
+- public/audio/HSK2_B11/hsk2_b11_listen_03.mp3 | hsk2_b11_listen_03 | 男：你吃药了吗？女：吃过了，药店的人说一天吃两次。
+- public/audio/HSK2_B11/hsk2_b11_listen_04.mp3 | hsk2_b11_listen_04 | 女：老师，我可以进来吗？男：请进，门开着呢。
+- public/audio/HSK2_B11/hsk2_b11_listen_05.mp3 | hsk2_b11_listen_05 | 男：你们班谁中文说得最好？女：小王说得最好，他每天都说中文。
+- public/audio/HSK2_B11/hsk2_b11_listen_06.mp3 | hsk2_b11_listen_06 | 女：你的身体怎么样？男：我经常跑步，身体很好。
+
+HSK 2 - Bài 12: 这里比北京冷多了
+Thư mục: public/audio/HSK2_B12/
+- public/audio/HSK2_B12/hsk2_b12_listen_01.mp3 | hsk2_b12_listen_01 | 我从小就住在北京。小时候，我家住在三楼，楼下有一个地铁站。现在我在上海工作，每天坐地铁上班，要坐五站。今天是晴天，我正在地铁站等车。我觉得上海的地铁比北京的快得多。
+- public/audio/HSK2_B12/hsk2_b12_listen_02.mp3 | hsk2_b12_listen_02 | 女：外面是晴天还是阴天？男：阴天，没有太阳。
+- public/audio/HSK2_B12/hsk2_b12_listen_03.mp3 | hsk2_b12_listen_03 | 男：喂，你在做什么呢？女：我正在做饭，一会儿给你打电话。
+- public/audio/HSK2_B12/hsk2_b12_listen_04.mp3 | hsk2_b12_listen_04 | 女：你家离地铁站远不远？男：不远，走路五分钟就到了。
+- public/audio/HSK2_B12/hsk2_b12_listen_05.mp3 | hsk2_b12_listen_05 | 男：你小时候喜欢做什么？女：我从小就喜欢画画。
+- public/audio/HSK2_B12/hsk2_b12_listen_06.mp3 | hsk2_b12_listen_06 | 女：这个苹果好甜啊！男：是吗？那我也吃一个。
+
+HSK 2 - Bài 13: 我们爱上中文课
+Thư mục: public/audio/HSK2_B13/
+- public/audio/HSK2_B13/hsk2_b13_listen_01.mp3 | hsk2_b13_listen_01 | 我叫小林，我在大学教中文。我们班有二十个学生，他们都是外国人。新年快到了，学生们希望大家一起吃饭、一起唱歌。我告诉他们：“好啊！”大家都很高兴，每个人都准备了礼物。
+- public/audio/HSK2_B13/hsk2_b13_listen_02.mp3 | hsk2_b13_listen_02 | 女：请问，洗手间在哪儿？男：在里面，往左走就到了。
+- public/audio/HSK2_B13/hsk2_b13_listen_03.mp3 | hsk2_b13_listen_03 | 男：桌子上面有一本书，是你的吗？女：不是，可能是小王的。
+- public/audio/HSK2_B13/hsk2_b13_listen_04.mp3 | hsk2_b13_listen_04 | 女：你知道明天考试的时间吗？男：老师告诉我了，下午三点。
+- public/audio/HSK2_B13/hsk2_b13_listen_05.mp3 | hsk2_b13_listen_05 | 男：你每天上网做什么？女：我上网学中文，也看电影。
+- public/audio/HSK2_B13/hsk2_b13_listen_06.mp3 | hsk2_b13_listen_06 | 女：你们班有多少个学生？男：我们班有十五个，他们班比我们班多五个。
+
+HSK 2 - Bài 14: 一个人过年多没意思啊
+Thư mục: public/audio/HSK2_B14/
+- public/audio/HSK2_B14/hsk2_b14_listen_01.mp3 | hsk2_b14_listen_01 | 我家有四口人，爸爸、妈妈、姐姐和我。过年的时候，我们一家人都回奶奶家。奶奶家的房子很大，前面有一个小花园。妈妈和奶奶一起包饺子，姐姐在旁边跳舞，我站在门口等客人。大家都觉得过年多高兴啊！
+- public/audio/HSK2_B14/hsk2_b14_listen_02.mp3 | hsk2_b14_listen_02 | 女：你姓什么？男：我姓李，你呢？女：我姓王。
+- public/audio/HSK2_B14/hsk2_b14_listen_03.mp3 | hsk2_b14_listen_03 | 男：楼下站着一个人，你认识吗？女：那是我的朋友。
+- public/audio/HSK2_B14/hsk2_b14_listen_04.mp3 | hsk2_b14_listen_04 | 女：这位是谁？男：这是我的中文老师。
+- public/audio/HSK2_B14/hsk2_b14_listen_05.mp3 | hsk2_b14_listen_05 | 男：你喜欢跳舞吗？女：很喜欢，我从小就学跳舞。
+- public/audio/HSK2_B14/hsk2_b14_listen_06.mp3 | hsk2_b14_listen_06 | 女：一个人过年多没意思啊！男：那你来我家吧。
+
+HSK 2 - Bài 15: 我想再去一次中国
+Thư mục: public/audio/HSK2_B15/
+- public/audio/HSK2_B15/hsk2_b15_listen_01.mp3 | hsk2_b15_listen_01 | 我叫小红，我有两年没出国了。下个月我想去北京旅游，昨天我已经在网上买好了机票。我去过一次颐和园，那里的花很漂亮，还有很多小鸟，所以我想再去一次。我的高中同学住在北京，他会去机场接我。
+- public/audio/HSK2_B15/hsk2_b15_listen_02.mp3 | hsk2_b15_listen_02 | 男：请问，你的姓名是什么？女：我叫王美。
+- public/audio/HSK2_B15/hsk2_b15_listen_03.mp3 | hsk2_b15_listen_03 | 女：你明天什么时候出门？男：我早上七点出门，要去机场。
+- public/audio/HSK2_B15/hsk2_b15_listen_04.mp3 | hsk2_b15_listen_04 | 男：这是两张公园门票，给你一张。女：谢谢，多少钱？
+- public/audio/HSK2_B15/hsk2_b15_listen_05.mp3 | hsk2_b15_listen_05 | 女：你去过北京吗？男：去过两次，我想再去一次。
+- public/audio/HSK2_B15/hsk2_b15_listen_06.mp3 | hsk2_b15_listen_06 | 男：天上好像要下雨了。女：那我们带把伞吧。

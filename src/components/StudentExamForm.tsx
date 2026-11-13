@@ -369,8 +369,17 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const isHsk2Bai5 = currentExam.id === 'hsk2-bai5-diyici-qu-zhongguo-pengyou-jia';
   const isHsk2Bai6 = currentExam.id === 'hsk2-bai6-xiaoxue-shengri-kuaile';
   const isHsk2Bai7 = currentExam.id === 'hsk2-bai7-ta-lanqiu-da-de-hen-hao';
+  const isHsk2Bai8 = currentExam.id === 'hsk2-bai8-xiaoxue-shengri-kuaile';
+  const isHsk2Bai9 = currentExam.id === 'hsk2-bai9-meiyou-zuotian-na-me-re';
+  const isHsk2Bai10 = currentExam.id === 'hsk2-bai10-jiuyaokaoshile';
+  const isHsk2Bai11 = currentExam.id === 'hsk2-bai11-wo-zui-xihuan-chi-zhongguo-cai';
   const isHsk2Bai2To7 = isHsk2Bai2 || isHsk2Bai3 || isHsk2Bai4 || isHsk2Bai5 || isHsk2Bai6 || isHsk2Bai7;
-  const isStructuredHsk2Lesson = isHsk2Bai1 || isHsk2Bai2To7;
+  const isHsk2Bai12 = currentExam.id === 'hsk2-bai12-zheli-bi-beijing-leng-duo-le';
+  const isHsk2Bai13 = currentExam.id === 'hsk2-bai13-women-ai-shang-zhongwen-ke';
+  const isHsk2Bai14 = currentExam.id === 'hsk2-bai14-yigeren-guonian-duo-mei-yisi-a';
+  const isHsk2Bai15 = currentExam.id === 'hsk2-bai15-wo-xiang-zai-qu-yici-zhongguo';
+  const isHsk2Bai2To8 = isHsk2Bai2To7 || isHsk2Bai8 || isHsk2Bai9 || isHsk2Bai10 || isHsk2Bai11 || isHsk2Bai12 || isHsk2Bai13 || isHsk2Bai14 || isHsk2Bai15;
+  const isStructuredHsk2Lesson = isHsk2Bai1 || isHsk2Bai2To8;
 
   const hasExamPinyin = useMemo(() => hasPinyinContent(currentExam), [currentExam]);
 
@@ -465,7 +474,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     })));
 
-    addGroup('arrange', isHsk2Bai1 ? 'IV. 写作 · Bài 2' : isHsk2Bai2To7 ? 'III. 写作 · Bài 1' : 'Sắp xếp câu', [{
+    addGroup('arrange', isHsk2Bai1 ? 'IV. 写作 · Bài 2' : isHsk2Bai2To8 ? 'III. 写作 · Bài 1' : 'Sắp xếp câu', [{
       id: 'arrange-items',
       title: 'Sắp xếp câu',
       items: (currentExam.arrangeQuestions || []).map((question, index) => ({
@@ -506,7 +515,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }]);
     });
 
-    addGroup('essay', isHsk2Bai1 ? 'IV. 写作 · Bài 3–5' : isHsk2Bai2To7 ? 'III. 写作 · Bài 2–3' : 'Viết & tự luận', getEssayQuestionGroups(currentExam.essayQuestions).map((group) => ({
+    addGroup('essay', isHsk2Bai1 ? 'IV. 写作 · Bài 3–5' : isHsk2Bai2To8 ? 'III. 写作 · Bài 2–4' : 'Viết & tự luận', getEssayQuestionGroups(currentExam.essayQuestions).map((group) => ({
       id: `essay-${group.key}`,
       title: group.title,
       items: group.questions.map((question, index) => ({
@@ -519,7 +528,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
       }))
     })));
 
-    addGroup('speaking', isHsk2Bai1 ? 'II. 口语 · Nói' : isHsk2Bai2To7 ? 'IV. 口语 · Nói' : 'Kỹ năng nói', [{
+    addGroup('speaking', isHsk2Bai1 ? 'II. 口语 · Nói' : isHsk2Bai2To8 ? 'IV. 口语 · Nói' : 'Kỹ năng nói', [{
       id: 'speaking-items',
       title: 'Bài nói',
       items: currentExam.speakingQuestions.map((question, index) => ({
@@ -543,8 +552,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
     if (isStructuredHsk2Lesson) {
       const sectionOrder = (id: string) => {
-        if (id.startsWith('reading-')) return isHsk2Bai2To7 ? 20 : 30;
-        if (isHsk2Bai2To7) {
+        if (id.startsWith('reading-')) return isHsk2Bai2To8 ? 20 : 30;
+        if (isHsk2Bai2To8) {
           return ({ listening: 10, fill: 21, arrange: 30, essay: 31, speaking: 40, translation: 50 }[id] ?? 0);
         }
         return ({ listening: 10, speaking: 40, fill: 20, arrange: 21, essay: 22, translation: 50 }[id] ?? 0);
@@ -566,7 +575,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     isHsk2Bai5,
     isHsk2Bai6,
     isHsk2Bai7,
-    isHsk2Bai2To7,
+    isHsk2Bai8,
+    isHsk2Bai2To8,
     isStructuredHsk2Lesson,
     listeningQuestionItems,
     mcAnswers,
@@ -1918,13 +1928,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               (() => {
                 const isParagraphArrange = currentExam.level === 'HSK 5';
                 return (
-              <div style={{ order: isHsk2Bai1 ? 21 : isHsk2Bai2To7 ? 30 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 21 : isHsk2Bai2To8 ? 30 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-sm">
-                      {isHsk2Bai1 ? 'IV' : isHsk2Bai2To7 ? 'III' : '3'}
+                      {isHsk2Bai1 ? 'IV' : isHsk2Bai2To8 ? 'III' : '3'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 2: 把词语排成句子' : isHsk2Bai2To7 ? 'III. 写作 · Bài 1: 把词语排成句子' : (isParagraphArrange ? 'Sắp Xếp Đoạn Văn' : 'Sắp Xếp Thẻ Từ Thành Câu')}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 2: 把词语排成句子' : isHsk2Bai2To8 ? 'III. 写作 · Bài 1: 把词语排成句子' : (isParagraphArrange ? 'Sắp Xếp Đoạn Văn' : 'Sắp Xếp Thẻ Từ Thành Câu')}</h3>
                   </div>
                   <span className="text-xs font-medium bg-blue-50 text-blue-800 px-2.5 py-1 rounded-full">
                     {Object.keys(arrangeAnswers).length}/{currentExam.arrangeQuestions.length} đã xếp
@@ -2142,7 +2152,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 4: READING PASSAGES */}
             {currentExam.readingPassages && currentExam.readingPassages.length > 0 && (
-              <div style={{ order: isHsk2Bai1 ? 30 : isHsk2Bai2To7 ? 20 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 30 : isHsk2Bai2To8 ? 20 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-sky-100 text-sky-800 font-bold flex items-center justify-center text-sm">
@@ -2251,13 +2261,13 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
             {/* SECTION 5: ESSAY QUESTIONS */}
             {currentExam.essayQuestions.length > 0 && (
-              <div style={{ order: isHsk2Bai1 ? 22 : isHsk2Bai2To7 ? 31 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+              <div style={{ order: isHsk2Bai1 ? 22 : isHsk2Bai2To8 ? 31 : undefined }} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <div className="flex items-center border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm">
-                      {isHsk2Bai1 ? 'IV' : isHsk2Bai2To7 ? 'III' : '5'}
+                      {isHsk2Bai1 ? 'IV' : isHsk2Bai2To8 ? 'III' : '5'}
                     </span>
-                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 3–5' : isHsk2Bai2To7 ? 'III. 写作 · Bài 2–3' : 'Phần Viết & Tự Luận'}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'IV. 写作 · Bài 3–5' : isHsk2Bai2To8 ? 'III. 写作 · Bài 2–4' : 'Phần Viết & Tự Luận'}</h3>
                   </div>
                 </div>
 
@@ -2341,9 +2351,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           <div className="my-2">
                             <img
                               src={getDriveMediaPlayerUrl(q.imageUrl)}
-                              alt={`Hình ảnh đề bài câu ${idx + 1}`}
+                              alt={q.imageAlt || `Hình ảnh đề bài câu ${idx + 1}`}
                               className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
                             />
+                            {q.imageHint && <p className="mt-1 text-sm font-semibold text-slate-700">{q.imageHint}</p>}
                           </div>
                         )}
 
@@ -2370,10 +2381,10 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">
-                      {isHsk2Bai1 ? 'II' : isHsk2Bai2To7 ? 'IV' : '6'}
+                      {isHsk2Bai1 ? 'II' : isHsk2Bai2To8 ? 'IV' : '6'}
                     </span>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'II. 口语 · Nói' : isHsk2Bai2To7 ? 'IV. 口语 · Nói' : 'Kỹ năng nói'}</h3>
+                      <h3 className="font-bold text-slate-800 text-lg">{isHsk2Bai1 ? 'II. 口语 · Nói' : isHsk2Bai2To8 ? 'IV. 口语 · Nói' : 'Kỹ năng nói'}</h3>
                       <p className="text-xs text-slate-500">Mỗi bài có ghi âm, dừng, nghe lại, ghi âm lại và tải file lên.</p>
                     </div>
                   </div>
@@ -2428,7 +2439,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           {q.imageUrl && (
                             <img
                               src={getDriveMediaPlayerUrl(q.imageUrl)}
-                              alt={`Hình ảnh luyện nói câu ${questionNumber}`}
+                              alt={q.imageAlt || `Hình ảnh luyện nói câu ${questionNumber}`}
                               className="max-h-72 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
                             />
                           )}

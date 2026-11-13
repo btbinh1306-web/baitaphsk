@@ -164,7 +164,29 @@ const LOCAL_AUDIO_BY_QUESTION_ID: Record<string, string> = {
   hsk2_b7_listen_03: '/audio/HSK2_B07/hsk2_b7_listen_03.mp3',
   hsk2_b7_listen_04: '/audio/HSK2_B07/hsk2_b7_listen_04.mp3',
   hsk2_b7_listen_05: '/audio/HSK2_B07/hsk2_b7_listen_05.mp3',
-  hsk2_b7_listen_06: '/audio/HSK2_B07/hsk2_b7_listen_06.mp3'
+  hsk2_b7_listen_06: '/audio/HSK2_B07/hsk2_b7_listen_06.mp3',
+  hsk2_b8_listen_01: '/audio/HSK2_B08/hsk2_b8_listen_01.mp3',
+  hsk2_b8_listen_02: '/audio/HSK2_B08/hsk2_b8_listen_02.mp3',
+  hsk2_b8_listen_03: '/audio/HSK2_B08/hsk2_b8_listen_03.mp3',
+  hsk2_b8_listen_04: '/audio/HSK2_B08/hsk2_b8_listen_04.mp3',
+  hsk2_b8_listen_05: '/audio/HSK2_B08/hsk2_b8_listen_05.mp3',
+  hsk2_b8_listen_06: '/audio/HSK2_B08/hsk2_b8_listen_06.mp3',
+  hsk2_b9_listen_01: '/audio/HSK2_B09/hsk2_b9_listen_01.mp3',
+  hsk2_b9_listen_02: '/audio/HSK2_B09/hsk2_b9_listen_02.mp3',
+  hsk2_b9_listen_03: '/audio/HSK2_B09/hsk2_b9_listen_03.mp3',
+  hsk2_b9_listen_04: '/audio/HSK2_B09/hsk2_b9_listen_04.mp3',
+  hsk2_b9_listen_05: '/audio/HSK2_B09/hsk2_b9_listen_05.mp3',
+  hsk2_b9_listen_06: '/audio/HSK2_B09/hsk2_b9_listen_06.mp3',
+  hsk2_b10_listen_01: '/audio/HSK2_B10/hsk2_b10_listen_01.mp3',
+  hsk2_b10_listen_02: '/audio/HSK2_B10/hsk2_b10_listen_02.mp3',
+  hsk2_b10_listen_03: '/audio/HSK2_B10/hsk2_b10_listen_03.mp3',
+  hsk2_b10_listen_04: '/audio/HSK2_B10/hsk2_b10_listen_04.mp3',
+  hsk2_b10_listen_05: '/audio/HSK2_B10/hsk2_b10_listen_05.mp3',
+  hsk2_b10_listen_06: '/audio/HSK2_B10/hsk2_b10_listen_06.mp3',
+  ...Object.fromEntries([11, 12, 13, 14, 15].flatMap((lesson) => [1, 2, 3, 4, 5, 6].map((track) => {
+    const id = `hsk2_b${lesson}_listen_0${track}`;
+    return [id, `/audio/HSK2_B${lesson}/${id}.mp3`];
+  })))
 };
 
 const attachLocalAudio = (exam: ExamLesson): ExamLesson => ({
