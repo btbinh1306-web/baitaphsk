@@ -100,7 +100,7 @@ async function proxyGoogleAppsScript(req: express.Request, res: express.Response
   try {
     const send = () => fetch(target, {
       method: req.method,
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(50000),
       headers: req.method === 'POST'
         ? { 'Content-Type': 'text/plain;charset=utf-8' }
         : undefined,

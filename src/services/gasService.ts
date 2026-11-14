@@ -520,24 +520,25 @@ export const fetchTeacherSubmissions = async (
   let gasReadError = '';
   if (config.sheetUrl && config.sheetUrl.trim() !== '') {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    const timeoutId = setTimeout(() => controller.abort(), 220000);
     try {
       const url = new URL(config.sheetUrl.trim());
       url.searchParams.append('mode', 'teacher');
       url.searchParams.append('pass', pass);
 
       // Google Apps Script sometimes hangs or fails on the first call (cold
-      // start or a dropped connection). Give each attempt its own short
-      // timeout, retry through the proxy, then try Apps Script directly.
+      // start or a dropped connection). Give each attempt its own
+      // generous timeout (the sheet can be slow), go through the proxy first,
+      // then try Apps Script directly.
       const proxiedUrl = getGasRequestUrl(url.toString());
-      const attemptUrls = [proxiedUrl, proxiedUrl, url.toString()];
+      const attemptUrls = [proxiedUrl, url.toString()];
       let data: any = null;
       let lastError: unknown = null;
       for (let attempt = 0; attempt < attemptUrls.length && !data; attempt++) {
         const attemptController = new AbortController();
         const abortAttempt = () => attemptController.abort();
         controller.signal.addEventListener('abort', abortAttempt);
-        const attemptTimer = setTimeout(abortAttempt, 25000);
+        const attemptTimer = setTimeout(abortAttempt, 105000);
         try {
           const res = await fetch(attemptUrls[attempt], {
             method: 'GET',
@@ -555,7 +556,7 @@ export const fetchTeacherSubmissions = async (
           data = parsed;
         } catch (attemptError: any) {
           lastError = attemptError?.name === 'AbortError'
-            ? new Error('quá 25 giây không phản hồi, đã thử lại 3 lần')
+            ? new Error(`quá 105 giây không phản hồi ở lần thử ${attempt + 1}/${attemptUrls.length}`)
             : attemptError;
           if (controller.signal.aborted) throw lastError;
           if (attempt < attemptUrls.length - 1) {
@@ -627,7 +628,7 @@ export const fetchTeacherSubmissions = async (
     } catch (err: any) {
       console.warn('GAS GET teacher error:', err);
       const detail = err?.name === 'AbortError'
-        ? 'quá 90 giây không phản hồi'
+        ? 'quá 220 giây không phản hồi'
         : String(err?.message || err || '').trim();
       gasReadError = `Không thể kết nối Google Sheet${detail ? ` (${detail})` : ''}`;
     } finally {
