@@ -134,6 +134,57 @@ interface EssayQuestionGroup {
   questions: Question[];
 }
 
+interface TaskQuestionGroup {
+  key: string;
+  title: string;
+  instruction?: string;
+  questions: Question[];
+}
+
+// Split a flat section into "Bài 1, Bài 2..." blocks by taskGroup. Sections
+// without task groups stay one untitled block, so older lessons look the same.
+const getTaskQuestionGroups = (questions: Question[]): TaskQuestionGroup[] => {
+  if (!questions.some((question) => question.taskGroupTitle)) {
+    return [{ key: 'all', title: '', questions }];
+  }
+  const groups: TaskQuestionGroup[] = [];
+  questions.forEach((question) => {
+    const key = question.taskGroup || question.taskGroupTitle || 'other';
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.questions.push(question);
+    } else {
+      groups.push({ key, title: question.taskGroupTitle || '', instruction: question.instruction, questions: [question] });
+    }
+  });
+  return groups;
+};
+
+const TaskGroupHeading: React.FC<{ index: number; group: TaskQuestionGroup; tone: 'teal' | 'blue' }> = ({ index, group, tone }) => (
+  <div className={`rounded-xl border px-4 py-3 ${tone === 'teal' ? 'border-teal-200 bg-teal-50/60' : 'border-blue-200 bg-blue-50/60'}`}>
+    <div className="flex items-center justify-between gap-3">
+      <h4 className={`text-base font-extrabold ${tone === 'teal' ? 'text-teal-950' : 'text-blue-950'}`}>
+        Bài {index + 1}{group.title ? ` · ${group.title}` : ''}
+      </h4>
+      <span className={`shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold ${tone === 'teal' ? 'text-teal-800' : 'text-blue-800'}`}>
+        {group.questions.length} câu
+      </span>
+    </div>
+    {group.instruction && <p className="mt-1 text-sm text-slate-700">{group.instruction}</p>}
+  </div>
+);
+
+const QuestionImage: React.FC<{ question: Question; label: string }> = ({ question, label }) => (
+  question.imageUrl ? (
+    <img
+      src={getDriveMediaPlayerUrl(question.imageUrl)}
+      alt={question.imageAlt || `Hình ảnh ${label}`}
+      loading="lazy"
+      className="max-h-80 max-w-full rounded-xl border border-slate-200 object-contain bg-white shadow-2xs"
+    />
+  ) : null
+);
+
 const getEssayQuestionGroups = (questions: Question[]): EssayQuestionGroup[] => {
   const taskGroups = new Map<string, EssayQuestionGroup>();
   questions.forEach((question) => {
@@ -672,6 +723,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
     const pools = new Map<string, Array<{ text: string; originalIndex: number }>>();
     const addQuestion = (question: Question) => {
       if (!question.options || question.options.length < 2) return;
+      // Keep "Đúng / Sai" in their natural order.
+      if (question.options.length === 2 && question.options[0] === 'Đúng' && question.options[1] === 'Sai') return;
 
       const options = question.options.map((text, originalIndex) => ({ text, originalIndex }));
       for (let index = options.length - 1; index > 0; index -= 1) {
@@ -1828,7 +1881,12 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </div>
 
                 <div className="space-y-6">
-                  {currentExam.mcQuestions.map((q, idx) => (
+                  {getTaskQuestionGroups(currentExam.mcQuestions).map((mcGroup, mcGroupIdx) => (
+                  <div key={mcGroup.key} className="space-y-4">
+                  {mcGroup.title && <TaskGroupHeading index={mcGroupIdx} group={mcGroup} tone="teal" />}
+                  {mcGroup.questions.map((q, groupQuestionIdx) => {
+                    const idx = mcGroup.title ? groupQuestionIdx : currentExam.mcQuestions.indexOf(q);
+                    return (
                     <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
                       {q.type && !['mc', 'multiple_choice', 'flashcard', 'vocab', 'fill', 'fill_in_blank', 'arrange', 'ordering', 'matching', 'dictation', 'paragraph_order', 'picture_writing', 'speaking_record', 'listening_multiple_choice', 'listening_true_false', 'listening', 'listening_mc', 'listening_tf', 'reading', 'passage', 'essay', 'writing', 'speaking', 'pronunciation', 'translation', 'translate', 'translate_vi_zh'].includes(q.type) && (
                         <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 font-mono flex items-center justify-between">
@@ -1844,6 +1902,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                           </div>
                         </div>
                       </div>
+                      <QuestionImage question={q} label={`câu ${idx + 1}`} />
 
                       {q.options && (
                         <div className={q.options.length === 2 ? 'grid grid-cols-2 gap-2 pt-1' : 'grid grid-cols-1 gap-2 pt-1'}>
@@ -1874,6 +1933,9 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                         </div>
                       )}
                     </div>
+                    );
+                  })}
+                  </div>
                   ))}
                 </div>
               </div>
@@ -1973,7 +2035,11 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                 </div>
 
                 <div className="space-y-6">
-                  {currentExam.arrangeQuestions.map((q, idx) => {
+                  {getTaskQuestionGroups(currentExam.arrangeQuestions).map((arrangeGroup, arrangeGroupIdx) => (
+                  <div key={arrangeGroup.key} className="space-y-4">
+                  {arrangeGroup.title && <TaskGroupHeading index={arrangeGroupIdx} group={arrangeGroup} tone="blue" />}
+                  {arrangeGroup.questions.map((q, groupQuestionIdx) => {
+                    const idx = arrangeGroup.title ? groupQuestionIdx : (currentExam.arrangeQuestions || []).indexOf(q);
                     const userOrdered = arrangeAnswers[q.id] || [];
                     const chips = shuffledArrangeChips.get(q.id) || q.wordChips || [];
 
@@ -1989,6 +2055,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                     return (
                       <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                         <p className="text-sm font-semibold leading-6 text-slate-800 whitespace-pre-line">{q.prompt}</p>
+                        <QuestionImage question={q} label={`câu ${idx + 1}`} />
 
                         {isParagraphArrange ? (
                           <div className="grid grid-cols-5 gap-2">
@@ -2065,6 +2132,8 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       </div>
                     );
                   })}
+                  </div>
+                  ))}
                 </div>
               </div>
                 );
