@@ -102,9 +102,47 @@ const migrateMissingBundledAudio = (exam: ExamLesson, bundledExam: ExamLesson | 
   return changed ? { ...exam, listeningQuestions } : exam;
 };
 
+// Answer-key fixes for section-based lessons whose old copies are saved in
+// Google Sheet: [lessonId, questionId, wrongAnswer, correctAnswer].
+const SECTION_ANSWER_CORRECTIONS: Array<[string, string, string, string]> = [
+  // 我朋友是一个老师 → 她朋友在学校工作 (B. 学校), not A. 饭店.
+  ['hsk1-trial-pdf-01', 'hsk1-trial-pdf-01-l20', 'A', 'B']
+];
+
+const fixSectionAnswer = (exam: ExamLesson, questionId: string, wrong: string, right: string): ExamLesson => {
+  let changed = false;
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      const next = value.map(walk);
+      return next.some((item, index) => item !== value[index]) ? next : value;
+    }
+    if (!value || typeof value !== 'object') return value;
+    const record = value as Record<string, unknown>;
+    if (record.id === questionId && record.correctAnswer === wrong) {
+      changed = true;
+      return { ...record, correctAnswer: right };
+    }
+    let copy: Record<string, unknown> | null = null;
+    for (const [key, child] of Object.entries(record)) {
+      const nextChild = walk(child);
+      if (nextChild !== child) {
+        copy = copy || { ...record };
+        copy[key] = nextChild;
+      }
+    }
+    return copy || value;
+  };
+  const fixed = walk(exam) as ExamLesson;
+  return changed ? fixed : exam;
+};
+
 /** Keep saved copies of built-in lessons compatible with bundled answer corrections. */
 const migrateKnownAnswerCorrections = (exam: ExamLesson, bundledExam: ExamLesson | undefined): ExamLesson => {
   if (!bundledExam) return exam;
+
+  for (const [lessonId, questionId, wrong, right] of SECTION_ANSWER_CORRECTIONS) {
+    if (exam.id === lessonId) exam = fixSectionAnswer(exam, questionId, wrong, right);
+  }
 
   if (exam.id === 'hsk1-de-tong-hop-bai1-5-5-ky-nang') {
     let changed = false;
