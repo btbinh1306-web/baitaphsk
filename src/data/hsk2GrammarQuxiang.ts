@@ -91,10 +91,6 @@ const JUDGE_ADVANCED = {
   taskGroup: 'quxiang-judge-advanced',
   taskGroupTitle: `Đúng/Sai nâng cao: vị trí tân ngữ, phủ định, dùng sai từ — ${JUDGE_NOTE}`
 };
-const JUDGE_SITUATION = {
-  taskGroup: 'quxiang-judge-situation',
-  taskGroupTitle: `Đúng/Sai theo tình huống, quy tắc và so sánh câu — ${JUDGE_NOTE}`
-};
 
 const blank = (id: string, prompt: string, hint: string, answers: string, explanation: string): Question => ({
   id,
@@ -215,23 +211,7 @@ const essayQuestions: Question[] = [
   judge('quxiang-36', JUDGE_ADVANCED, '他拿来出一本书。', false,
     'Sai. Thứ tự bổ ngữ kép phải là 出来, không đảo thành 来出. Đúng: 他拿出一本书来。', '他拿出一本书来。'),
   judge('quxiang-37', JUDGE_ADVANCED, '他走进教室没来。', false, 'Sai. Phủ định đặt trước động từ: 他没走进教室来。', '他没走进教室来。'),
-  judge('quxiang-38', JUDGE_ADVANCED, '妈妈买回来了很多水果。', true, 'Đúng.'),
-
-  judge('quxiang-39', JUDGE_SITUATION, 'Bạn đang ở trong phòng, bạn của bạn gõ cửa ngoài hành lang. Bạn nói: "请进来！" Câu nói này đúng không?', true,
-    'Đúng. Người nghe đi vào về phía người nói nên dùng 来.'),
-  judge('quxiang-40', JUDGE_SITUATION, 'Mẹ đang ở nhà, gọi cho con đang ở trường: "你什么时候回去？" Câu nói này đúng không?', false,
-    'Sai. Con về nhà là về phía mẹ (mốc) nên phải dùng 回来.', 'Con về nhà là về phía mẹ (mốc) nên phải dùng 回来.'),
-  judge('quxiang-41', JUDGE_SITUATION, 'Bạn đứng dưới sân, thấy bạn từ tầng 5 đi xuống. Bạn nói: "他走下来了。" Câu nói này đúng không?', true,
-    'Đúng. Đi xuống về phía người nói nên dùng 下来.'),
-  judge('quxiang-42', JUDGE_SITUATION, 'Đồng nghiệp đứng ngoài hành lang gọi bạn đang ngồi trong phòng: "你出来一下！" Câu nói này đúng không?', true,
-    'Đúng. Người nghe đi ra về phía người nói nên dùng 出来.'),
-  judge('quxiang-43', JUDGE_SITUATION, 'Nhận định: Tân ngữ chỉ nơi chốn phải đứng giữa động từ chính và 来/去 (ví dụ 走进教室来).', true, 'Đúng.'),
-  judge('quxiang-44', JUDGE_SITUATION, 'Nhận định: 来 và 去 chỉ hướng so với chủ ngữ của câu, không liên quan đến người nói.', false,
-    'Sai. 来/去 xác định theo vị trí người nói hoặc mốc được chọn.', '来/去 xác định theo vị trí người nói hoặc mốc được chọn.'),
-  judge('quxiang-45', JUDGE_SITUATION, 'Nhận định: 他走进来了 và 他走进去了 có cùng nghĩa.', false,
-    'Sai. 进来 là vào về phía người nói, 进去 là vào ra xa người nói.', '进来 là vào về phía người nói, 进去 là vào ra xa người nói.'),
-  judge('quxiang-46', JUDGE_SITUATION, 'Nhận định: 他拿出一本书来 và 他拿出来一本书 đều đúng.', true,
-    'Đúng. Tân ngữ sự vật có thể đứng trước hoặc sau 来.')
+  judge('quxiang-38', JUDGE_ADVANCED, '妈妈买回来了很多水果。', true, 'Đúng.')
 ];
 
 export const HSK2_GRAMMAR_QUXIANG_EXAM: ExamLesson = {
