@@ -98,7 +98,7 @@ async function proxyGoogleAppsScript(req: express.Request, res: express.Response
   }
 
   try {
-    const upstream = await fetch(target, {
+    const send = () => fetch(target, {
       method: req.method,
       headers: req.method === 'POST'
         ? { 'Content-Type': 'text/plain;charset=utf-8' }
@@ -107,6 +107,15 @@ async function proxyGoogleAppsScript(req: express.Request, res: express.Response
         ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}))
         : undefined
     });
+    // Reads are safe to repeat: retry once when Apps Script drops or 5xx's.
+    let upstream: Response;
+    try {
+      upstream = await send();
+      if (req.method === 'GET' && upstream.status >= 500) upstream = await send();
+    } catch (firstError) {
+      if (req.method !== 'GET') throw firstError;
+      upstream = await send();
+    }
     const body = await upstream.text();
     const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
     res

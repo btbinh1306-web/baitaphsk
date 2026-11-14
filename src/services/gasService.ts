@@ -526,16 +526,34 @@ export const fetchTeacherSubmissions = async (
       url.searchParams.append('mode', 'teacher');
       url.searchParams.append('pass', pass);
 
-      const res = await fetch(getGasRequestUrl(url.toString()), {
-        method: 'GET',
-        signal: controller.signal
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+      // Google Apps Script sometimes fails on the first call (cold start or a
+      // dropped connection), so retry a couple of times before giving up.
+      let data: any = null;
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 3 && !data; attempt++) {
+        try {
+          const res = await fetch(getGasRequestUrl(url.toString()), {
+            method: 'GET',
+            cache: 'no-store',
+            signal: controller.signal
+          });
+          const text = await res.text();
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            throw new Error(`HTTP ${res.status}: phản hồi không phải JSON`);
+          }
+          if (!res.ok && !parsed?.error) throw new Error(`HTTP ${res.status}`);
+          data = parsed;
+        } catch (attemptError) {
+          lastError = attemptError;
+          if (controller.signal.aborted || attempt === 3) throw attemptError;
+          await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+        }
       }
+      if (!data) throw lastError || new Error('Không nhận được dữ liệu');
 
-      const data = await res.json();
       if (data && data.ok && Array.isArray(data.rows)) {
         gasReadSucceeded = true;
         data.rows.forEach((r: any) => {
@@ -594,7 +612,10 @@ export const fetchTeacherSubmissions = async (
       }
     } catch (err: any) {
       console.warn('GAS GET teacher error:', err);
-      gasReadError = 'Không thể kết nối Google Sheet';
+      const detail = err?.name === 'AbortError'
+        ? 'quá 75 giây không phản hồi'
+        : String(err?.message || err || '').trim();
+      gasReadError = `Không thể kết nối Google Sheet${detail ? ` (${detail})` : ''}`;
     } finally {
       clearTimeout(timeoutId);
     }
