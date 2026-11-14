@@ -12,10 +12,15 @@ const CHOOSE_LAI_QU = {
   taskGroupTitle: 'Chọn 来 hay 去',
   instruction: 'Chọn đáp án đúng theo vị trí người nói.'
 };
-const TRUE_FALSE = {
-  taskGroup: 'quxiang-true-false',
-  taskGroupTitle: 'Đúng hay sai?',
-  instruction: 'Câu sau đúng hay sai?'
+const FIND_WRONG = {
+  taskGroup: 'quxiang-find-wrong',
+  taskGroupTitle: 'Tìm câu sai',
+  instruction: 'Trong mỗi nhóm có một câu sai. Hãy chọn câu đó.'
+};
+const CHOOSE_FIX = {
+  taskGroup: 'quxiang-choose-fix',
+  taskGroupTitle: 'Chọn cách sửa câu sai',
+  instruction: 'Câu cho sẵn là câu sai. Chọn cách sửa đúng.'
 };
 const PICTURE_CHOICE = {
   taskGroup: 'quxiang-picture-choice',
@@ -55,16 +60,41 @@ const choice = (
   ...(imageName ? { imageUrl: image(imageName), imageAlt: 'Hình minh họa hướng di chuyển' } : {})
 });
 
-const trueFalse = (id: string, sentence: string, isCorrect: boolean, explanation: string): Question => ({
+// Đúng/Sai + gõ câu sửa: the student judges the sentence and, if "Sai",
+// types the corrected sentence. Not auto-graded: the teacher scores it and sees
+// the reference judgement, correction and explanation.
+const judge = (
+  id: string,
+  group: { taskGroup: string; taskGroupTitle: string },
+  prompt: string,
+  isCorrect: boolean,
+  explanation: string,
+  correction = ''
+): Question => ({
   id,
-  type: 'mc',
-  tier: 'tier1',
-  prompt: sentence,
-  options: ['Đúng', 'Sai'],
-  answer: isCorrect ? 0 : 1,
+  type: 'error_correction',
+  tier: 'tier2',
+  prompt,
+  errorCorrection: { sentenceIsCorrect: isCorrect },
+  ...(correction ? { suggestedAnswer: correction, referenceAnswers: [correction] } : {}),
+  teacherReviewRequired: true,
   explanation,
-  ...TRUE_FALSE
+  ...(isCorrect
+    ? { maxScore: 1 }
+    : { rubric: [{ id: 'judgement', label: 'Chọn Sai', maxScore: 1 }, { id: 'correction', label: 'Sửa câu đúng', maxScore: 1 }] }),
+  ...group
 });
+
+const JUDGE_NOTE = 'Chọn Đúng hoặc Sai. Nếu chọn Sai, gõ lại câu (hoặc nhận định) đã sửa.';
+const JUDGE_BASIC = { taskGroup: 'quxiang-judge-basic', taskGroupTitle: `Đúng hay sai? — ${JUDGE_NOTE}` };
+const JUDGE_ADVANCED = {
+  taskGroup: 'quxiang-judge-advanced',
+  taskGroupTitle: `Đúng/Sai nâng cao: vị trí tân ngữ, phủ định, dùng sai từ — ${JUDGE_NOTE}`
+};
+const JUDGE_SITUATION = {
+  taskGroup: 'quxiang-judge-situation',
+  taskGroupTitle: `Đúng/Sai theo tình huống, quy tắc và so sánh câu — ${JUDGE_NOTE}`
+};
 
 const blank = (id: string, prompt: string, hint: string, answers: string, explanation: string): Question => ({
   id,
@@ -79,16 +109,18 @@ const blank = (id: string, prompt: string, hint: string, answers: string, explan
   explanation
 });
 
-// Punctuation is ignored: the sentence counts with or without the final 。
+// Punctuation is ignored: each sentence counts with or without the final 。
+// `answers` is pipe-separated when several word orders are correct.
 const order = (
   id: string,
   group: Partial<Question>,
   chips: string[],
-  answer: string,
+  answers: string,
   explanation: string,
   imageName?: string
 ): Question => {
-  const arranged = withPunctuationChips(chips, answer);
+  const arranged = withPunctuationChips(chips, answers);
+  const withoutPunctuation = arranged.acceptableAnswers.split('|').map((answer) => answer.replace(/[。！？]$/u, ''));
   return {
     id,
     type: 'arrange',
@@ -96,7 +128,7 @@ const order = (
     prompt: 'Sắp xếp các từ thành câu hoàn chỉnh.',
     explanation,
     ...arranged,
-    acceptableAnswers: `${arranged.acceptableAnswers}|${answer.replace(/[。！？]$/u, '')}`,
+    acceptableAnswers: [arranged.acceptableAnswers, ...withoutPunctuation].join('|'),
     ...group,
     ...(imageName ? { imageUrl: image(imageName), imageAlt: 'Hình minh họa hướng di chuyển' } : {})
   };
@@ -120,11 +152,6 @@ const mcQuestions: Question[] = [
   choice('quxiang-08', CHOOSE_LAI_QU, 'Tôi ở trong phòng, bạn ở ngoài. Tôi nói: 你进___吧，外面冷。', ['来', '去'], 'A',
     'Người nghe đi vào về phía tôi nên dùng 来.'),
 
-  trueFalse('quxiang-20', '他走进来教室。', false, 'Sai. Tân ngữ địa điểm đứng trước 来: 他走进教室来。'),
-  trueFalse('quxiang-21', '他回家来了。', true, 'Đúng.'),
-  trueFalse('quxiang-22', '他去进教室。', false, 'Sai. Phải nói 他走进教室去了。'),
-  trueFalse('quxiang-23', '她买回一些水果来。', true, 'Đúng. Tân ngữ sự vật có thể đứng trước hoặc sau 来.'),
-
   choice('quxiang-24', PICTURE_CHOICE, 'Chọn câu đúng với hình.', ['她走进来。', '她走出去。', '她走上去。', '她走下来。'], 'A',
     'Cô bé đi vào phòng, về phía ngôi sao.', 'qx_01'),
   choice('quxiang-25', PICTURE_CHOICE, 'Chọn câu đúng với hình.', ['他走进来。', '他走出去。', '他走上去。', '他走下来。'], 'B',
@@ -140,7 +167,21 @@ const mcQuestions: Question[] = [
   choice('quxiang-30', PICTURE_CHOICE, 'Chọn câu đúng với hình.', ['她带来了一些橘子。', '她带去了一些橘子。', '她拿出了一些橘子。', '她带回去了一些橘子。'], 'A',
     'Cô bé mang cam đến chỗ ngôi sao (người nói).', 'qx_07'),
   choice('quxiang-31', PICTURE_CHOICE, 'Chọn câu đúng với hình.', ['他走过来。', '他走过去。', '他走回来。', '他走回去。'], 'B',
-    'Cậu bé đi sang bên kia đường, xa ngôi sao.', 'qx_08')
+    'Cậu bé đi sang bên kia đường, xa ngôi sao.', 'qx_08'),
+
+  choice('quxiang-47', FIND_WRONG, 'Chọn câu SAI trong các câu sau.', ['他回家来了。', '她跑上楼去了。', '他走出去教室了。', '他走进教室去了。'], 'C',
+    'Tân ngữ địa điểm phải đứng trước 去: 他走出教室去了。'),
+  choice('quxiang-48', FIND_WRONG, 'Chọn câu SAI trong các câu sau.', ['我买回来了一些水果。', '我买回来一些水果。', '我买了回来一些水果。', '我买回一些水果来。'], 'C',
+    '了 đứng sau bổ ngữ: 我买回来了一些水果。'),
+  choice('quxiang-49', FIND_WRONG, 'Chọn câu SAI trong các câu sau.', ['请你拿出来一本书。', '请你拿出一本书来。', '请你拿出书来。', '请你拿来出书。'], 'D',
+    'Thứ tự phải là 出来, không phải 来出.'),
+
+  choice('quxiang-50', CHOOSE_FIX, 'Chọn cách sửa đúng cho câu sai: 他走进来教室了。', ['他走进教室来了。', '他进走教室来了。', '他走来进教室了。'], 'A',
+    'Tân ngữ địa điểm 教室 đứng giữa 进 và 来.'),
+  choice('quxiang-51', CHOOSE_FIX, 'Chọn cách sửa đúng cho câu sai: 她跑上去楼了。', ['她跑去上楼了。', '她跑上楼来去了。', '她跑上楼去了。'], 'C',
+    'Tân ngữ địa điểm 楼 đứng trước 去.'),
+  choice('quxiang-52', CHOOSE_FIX, 'Chọn cách sửa đúng cho câu sai: (Bạn ở dưới nói với bạn ở trên) 你快下去吧！', ['你快上来吧！', '你快下去了吧！', '你快下来吧！'], 'C',
+    'Người nghe đi xuống về phía người nói nên dùng 下来.')
 ];
 
 const fillQuestions: Question[] = [
@@ -154,14 +195,43 @@ const fillQuestions: Question[] = [
 
 const arrangeQuestions: Question[] = [
   order('quxiang-15', ARRANGE, ['他', '走', '进', '教室', '去', '了'], '他走进教室去了。', 'Tân ngữ địa điểm 教室 đứng trước 去.'),
-  order('quxiang-16', ARRANGE, ['他', '拿', '出', '一本书', '来'], '他拿出一本书来。', 'Tân ngữ sự vật có thể đứng trước 来.'),
+  order('quxiang-16', ARRANGE, ['他', '拿', '出', '一本书', '来'], '他拿出一本书来。|他拿出来一本书。', 'Tân ngữ sự vật có thể đứng trước hoặc sau 来.'),
   order('quxiang-17', ARRANGE, ['妈妈', '回', '家', '来', '了'], '妈妈回家来了。', '回家来: 家 đứng trước 来.'),
   order('quxiang-18', ARRANGE, ['她', '买', '回来', '一些水果'], '她买回来一些水果。', 'Tân ngữ sự vật đứng sau 回来.'),
   order('quxiang-19', ARRANGE, ['他', '走', '下', '楼', '来', '了'], '他走下楼来了。', '走下楼来: 楼 đứng trước 来.'),
 
-  order('quxiang-32', PICTURE_ARRANGE, ['她', '拿', '下来', '一本书'], '她拿下来一本书。', 'Tân ngữ sau 下来.', 'qx_05'),
+  order('quxiang-32', PICTURE_ARRANGE, ['她', '拿', '下来', '一本书'], '她拿下来一本书。|她拿一本书下来。', 'Tân ngữ sự vật đứng trước hoặc sau 下来 đều đúng.', 'qx_05'),
   order('quxiang-33', PICTURE_ARRANGE, ['他', '放', '一本书', '进', '书包里', '去'], '他放一本书进书包里去。', '书包里 đứng trước 去.', 'qx_06'),
-  order('quxiang-34', PICTURE_ARRANGE, ['她', '带', '来', '了', '一些橘子'], '她带来了一些橘子。', '带来了 + tân ngữ.', 'qx_07')
+  order('quxiang-34', PICTURE_ARRANGE, ['她', '带', '来', '了', '一些橘子'], '她带来了一些橘子。|她带了一些橘子来。', 'Tân ngữ sự vật 一些橘子 đứng sau 带来了 hoặc trước 来 đều đúng.', 'qx_07')
+];
+
+const essayQuestions: Question[] = [
+  judge('quxiang-20', JUDGE_BASIC, '他走进来教室。', false, 'Sai. Tân ngữ địa điểm đứng trước 来: 他走进教室来。', '他走进教室来。'),
+  judge('quxiang-21', JUDGE_BASIC, '他回家来了。', true, 'Đúng.'),
+  judge('quxiang-22', JUDGE_BASIC, '他去进教室。', false, 'Sai. Phải nói 他走进教室去了。', '他走进教室去了。'),
+  judge('quxiang-23', JUDGE_BASIC, '她买回一些水果来。', true, 'Đúng. Tân ngữ sự vật có thể đứng trước hoặc sau 来.'),
+
+  judge('quxiang-35', JUDGE_ADVANCED, '他拿出来一本书。', true, 'Đúng. Tân ngữ sự vật có thể đứng sau 出来.'),
+  judge('quxiang-36', JUDGE_ADVANCED, '他拿来出一本书。', false,
+    'Sai. Thứ tự bổ ngữ kép phải là 出来, không đảo thành 来出. Đúng: 他拿出一本书来。', '他拿出一本书来。'),
+  judge('quxiang-37', JUDGE_ADVANCED, '他走进教室没来。', false, 'Sai. Phủ định đặt trước động từ: 他没走进教室来。', '他没走进教室来。'),
+  judge('quxiang-38', JUDGE_ADVANCED, '妈妈买回来了很多水果。', true, 'Đúng.'),
+
+  judge('quxiang-39', JUDGE_SITUATION, 'Bạn đang ở trong phòng, bạn của bạn gõ cửa ngoài hành lang. Bạn nói: "请进来！" Câu nói này đúng không?', true,
+    'Đúng. Người nghe đi vào về phía người nói nên dùng 来.'),
+  judge('quxiang-40', JUDGE_SITUATION, 'Mẹ đang ở nhà, gọi cho con đang ở trường: "你什么时候回去？" Câu nói này đúng không?', false,
+    'Sai. Con về nhà là về phía mẹ (mốc) nên phải dùng 回来.', 'Con về nhà là về phía mẹ (mốc) nên phải dùng 回来.'),
+  judge('quxiang-41', JUDGE_SITUATION, 'Bạn đứng dưới sân, thấy bạn từ tầng 5 đi xuống. Bạn nói: "他走下来了。" Câu nói này đúng không?', true,
+    'Đúng. Đi xuống về phía người nói nên dùng 下来.'),
+  judge('quxiang-42', JUDGE_SITUATION, 'Đồng nghiệp đứng ngoài hành lang gọi bạn đang ngồi trong phòng: "你出来一下！" Câu nói này đúng không?', true,
+    'Đúng. Người nghe đi ra về phía người nói nên dùng 出来.'),
+  judge('quxiang-43', JUDGE_SITUATION, 'Nhận định: Tân ngữ chỉ nơi chốn phải đứng giữa động từ chính và 来/去 (ví dụ 走进教室来).', true, 'Đúng.'),
+  judge('quxiang-44', JUDGE_SITUATION, 'Nhận định: 来 và 去 chỉ hướng so với chủ ngữ của câu, không liên quan đến người nói.', false,
+    'Sai. 来/去 xác định theo vị trí người nói hoặc mốc được chọn.', '来/去 xác định theo vị trí người nói hoặc mốc được chọn.'),
+  judge('quxiang-45', JUDGE_SITUATION, 'Nhận định: 他走进来了 và 他走进去了 có cùng nghĩa.', false,
+    'Sai. 进来 là vào về phía người nói, 进去 là vào ra xa người nói.', '进来 là vào về phía người nói, 进去 là vào ra xa người nói.'),
+  judge('quxiang-46', JUDGE_SITUATION, 'Nhận định: 他拿出一本书来 và 他拿出来一本书 đều đúng.', true,
+    'Đúng. Tân ngữ sự vật có thể đứng trước hoặc sau 来.')
 ];
 
 export const HSK2_GRAMMAR_QUXIANG_EXAM: ExamLesson = {
@@ -173,6 +243,6 @@ export const HSK2_GRAMMAR_QUXIANG_EXAM: ExamLesson = {
   mcQuestions,
   fillQuestions,
   arrangeQuestions,
-  essayQuestions: [],
+  essayQuestions,
   speakingQuestions: []
 };
