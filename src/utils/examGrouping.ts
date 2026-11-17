@@ -46,6 +46,20 @@ function aggregateRange(exam: ExamLesson): [number, number] | null {
   return match ? [Number(match[1]), Number(match[2])] : null;
 }
 
+// "HSK 6 · Đề 2 · Luyện tập 词素" -> series "Luyện tập 词素", number 2, so each
+// series stays together (Đề 1, 2, 3) instead of interleaving with another series.
+function numberedSeries(exam: ExamLesson): { series: string; number: number } | null {
+  const match = exam.title.match(/^HSK\s*\d\s*·\s*Đề\s*(\d+)\s*·\s*(.+)$/u);
+  return match ? { series: match[2].trim(), number: Number(match[1]) } : null;
+}
+
+// Vocabulary practice (词语练习) first, then 词素, then 选词填空 (chọn đáp án).
+const SERIES_ORDER = [/词语练习/u, /词素/u, /选词填空/u];
+const seriesRank = (series: string) => {
+  const index = SERIES_ORDER.findIndex((pattern) => pattern.test(series));
+  return index === -1 ? SERIES_ORDER.length : index;
+};
+
 function sortExams(a: ExamLesson, b: ExamLesson): number {
   const aPinyinPractice = a.id === 'pinyin-nghe-va-doc';
   const bPinyinPractice = b.id === 'pinyin-nghe-va-doc';
@@ -72,6 +86,16 @@ function sortExams(a: ExamLesson, b: ExamLesson): number {
       if (aRange[0] !== bRange[0]) return aRange[0] - bRange[0];
       if (aRange[1] !== bRange[1]) return bRange[1] - aRange[1];
     }
+  }
+
+  const aSeries = numberedSeries(a);
+  const bSeries = numberedSeries(b);
+  if (aSeries && bSeries) {
+    if (aSeries.series !== bSeries.series) {
+      const rankDifference = seriesRank(aSeries.series) - seriesRank(bSeries.series);
+      return rankDifference || aSeries.series.localeCompare(bSeries.series, 'vi');
+    }
+    return aSeries.number - bSeries.number;
   }
 
   const numberDifference = lessonNumber(a) - lessonNumber(b);

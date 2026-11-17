@@ -33,6 +33,7 @@ export interface Question {
   referenceImages?: string[]; // for handwriting_submission
   pinyin?: string;
   options?: string[];
+  keepOptionOrder?: boolean; // matching (nối) lists keep their A–J order instead of shuffling
   optionImages?: Array<{ id: string; url: string; alt?: string }>;
   answer?: number | string; // index for mc
   wordChips?: string[]; // array of word chips for sentence arrangement
@@ -46,6 +47,7 @@ export interface Question {
     sentenceIsCorrect: boolean;
   };
   explanation?: string;
+  showExplanationToStudent?: boolean; // show `explanation` on the student's result lookup page
   audioText?: string; // Hidden TTS script used when a listening audio file is not attached
   audioPromptUrl?: string;
   audioUrl?: string; // Attached audio file data/URL for listening questions

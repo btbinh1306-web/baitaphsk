@@ -20,6 +20,10 @@ import { HSK3_BAI3_COMMUNITY_EXAM } from './hsk3Bai3Community';
 import { HSK6_YUBING_EXAMS } from './hsk6Yubing';
 import { HSK6_READING_WORD_FILL_EXAMS } from './hsk6ReadingWordFill';
 import { HSK6_MOCK_EXAMS } from './hsk6MockExams';
+import { HSK6_DE1_CISU_FILE1_EXAM } from './hsk6De1CisuFile1';
+import { HSK6_DE1_CISU_FILE2_EXAM } from './hsk6De1CisuFile2';
+import { HSK6_DE1_TU_VUNG_EXAMS } from './hsk6De1TuVung';
+import { HSK6_DE1_CHON_DAP_AN_EXAMS } from './hsk6De1ChonDapAn';
 import { PINYIN_PRACTICE_EXAM } from './pinyinPractice';
 import {
   HSK1_PDF_TRIAL_01_EXAM,
@@ -223,6 +227,10 @@ const SAMPLE_EXAMS_WITH_LOCAL_AUDIO: ExamLesson[] = [
   HSK3_BAI3_COMMUNITY_EXAM,
   ...HSK6_YUBING_EXAMS,
   ...HSK6_READING_WORD_FILL_EXAMS,
+  HSK6_DE1_CISU_FILE1_EXAM,
+  HSK6_DE1_CISU_FILE2_EXAM,
+  ...HSK6_DE1_TU_VUNG_EXAMS,
+  ...HSK6_DE1_CHON_DAP_AN_EXAMS,
   ...HSK6_MOCK_EXAMS,
   PINYIN_PRACTICE_EXAM,
   {

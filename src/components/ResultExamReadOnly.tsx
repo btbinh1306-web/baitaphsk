@@ -33,7 +33,21 @@ export interface ReadOnlyExamItem {
   teacherComment?: string;
   teacherScore?: string | number;
   teacherReviewStatus?: TeacherReviewStatus;
+  explanation?: string;
 }
+
+// Full explanation written for students: "Đúng · …" lines in green, "Sai · …" in red.
+export const AnswerExplanation: React.FC<{ text: string }> = ({ text }) => (
+  <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-sm text-slate-800">
+    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-800">Giải thích</p>
+    <ul className="space-y-1.5">
+      {text.split('\n').map((line) => line.trim()).filter(Boolean).map((line, index) => {
+        const tone = /^Đúng\b/u.test(line) ? 'text-emerald-800 font-semibold' : /^Sai\b/u.test(line) ? 'text-rose-800' : 'text-slate-800';
+        return <li key={index} className={`leading-relaxed ${tone}`}>{line}</li>;
+      })}
+    </ul>
+  </div>
+);
 
 export interface ReadOnlyExamSection {
   title: string;
@@ -475,6 +489,8 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
                     </div>
                   </div>
                 )}
+
+                {item.explanation && <AnswerExplanation text={item.explanation} />}
               </article>
             );
           })}

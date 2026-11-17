@@ -5,7 +5,7 @@ import { getHandwritingSubmissions } from '../services/handwritingService';
 import { SAMPLE_EXAMS } from '../data/sampleExams';
 import { getAudioLinkLabel, getAudioSrcFromObject, getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { ImageLightboxModal } from './ImageLightboxModal';
-import { ResultExamReadOnly } from './ResultExamReadOnly';
+import { AnswerExplanation, ResultExamReadOnly } from './ResultExamReadOnly';
 import type { ReadOnlyExamSection } from './ResultExamReadOnly';
 import { normalizeImageList } from '../utils/imageUtils';
 import { getStructuredQuestionRows, isStructuredExerciseItem } from '../utils/structuredExercises';
@@ -60,6 +60,7 @@ interface PrintableItem extends AnswerSnapshotItem {
   studentAudioUrl?: string;
   teacherAudioUrl?: string;
   studentAudioLabel?: string;
+  explanation?: string;
 }
 
 interface PrintableSection {
@@ -753,6 +754,9 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
     const teacherReviewRequired = sourceQuestion
       ? requiresTeacherReview(sourceQuestion.question)
       : undefined;
+    const explanation = sourceQuestion?.question.showExplanationToStudent
+      ? sourceQuestion.question.explanation
+      : undefined;
     const saved = snapshotById.get(id) || snapshotById.get(prompt);
     const legacyWrong = findLegacyWrong(prompt);
     if (saved) {
@@ -763,6 +767,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
         prompt,
         options,
         ...media,
+        explanation,
         teacherReviewRequired: teacherReviewRequired ?? (saved as PrintableItem).teacherReviewRequired
       };
       const subjective = Boolean(teacherReviewRequired) || Boolean(media.subjectiveKind) || isSubjectiveQuestion(savedItem);
@@ -807,6 +812,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
             : 'unanswered'),
       legacyFallback: true,
       options,
+      explanation,
       ...media
     };
   };
@@ -1885,6 +1891,7 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
                   <div className="space-y-3">
                     {displayWrongList.map((wrongLine, idx) => {
                       const item = parseWrongLineItem(wrongLine);
+                      const wrongExplanation = findResultItemForPrompt(item.prompt || item.raw)?.explanation;
                       return (
                         <article key={idx} className="border border-slate-200 rounded-lg p-4 space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
@@ -1916,6 +1923,8 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
                               </div>
                             </div>
                           )}
+
+                          {wrongExplanation && <AnswerExplanation text={wrongExplanation} />}
                         </article>
                       );
                     })}
@@ -2323,6 +2332,12 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
                       )}
                       <p><strong>Học sinh trả lời:</strong> {item.userAnswer || 'Chưa có câu trả lời'}</p>
                       <p className="print-report-correct"><strong>Đáp án đúng:</strong> {item.correctAnswer || 'Giáo viên chấm / chưa có đáp án tự động'}</p>
+                      {item.explanation && (
+                        <div className="print-report-explanation">
+                          <strong>Giải thích:</strong>
+                          {item.explanation.split('\n').map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
+                        </div>
+                      )}
                     </article>
                   );
                 })}

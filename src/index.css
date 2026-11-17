@@ -156,6 +156,15 @@
     color: #047857;
   }
 
+  .print-report-explanation {
+    margin-top: 4px;
+    color: #334155;
+  }
+
+  .print-report-explanation p {
+    margin: 2px 0 0 12px;
+  }
+
   .print-status-correct,
   .print-status-wrong,
   .print-status-manual,

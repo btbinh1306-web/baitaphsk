@@ -9,6 +9,7 @@ import { sanitizeExamSections } from '../utils/lessonParser';
 import { groupExamsForSelection } from '../utils/examGrouping';
 import { ExerciseRenderer } from './ExerciseRenderer';
 import { StructuredBlockAudio } from './exercises/HskStructuredExercise';
+import { MatchingBoard } from './exercises/MatchingBoard';
 import {
   getQuestionAnchor,
   getStructuredQuestionRows,
@@ -158,6 +159,26 @@ const getTaskQuestionGroups = (questions: Question[]): TaskQuestionGroup[] => {
     }
   });
   return groups;
+};
+
+// A "nối" set: every item shares the same fixed A–J list, so it is shown as a
+// two-column matching board instead of one card per item.
+const isMatchingGroup = (questions: Question[]) => {
+  const options = questions[0]?.options;
+  return questions.length > 1 && Boolean(options && options.length > 2) && questions.every((question) => (
+    question.keepOptionOrder && question.options?.join('\n') === options?.join('\n')
+  ));
+};
+
+// Short options (single words like "A. 截止") sit side by side: one row of 3–4 on
+// wider screens, two per row on phones. Longer options keep one per line.
+const getOptionGridClass = (options: string[]) => {
+  const isShort = options.every((option) => option.replace(/^[A-H][.)、]\s*/u, '').length <= 8);
+  if (options.length === 2) return 'grid grid-cols-2 gap-2 pt-1';
+  if (isShort && options.length <= 4) {
+    return `grid grid-cols-2 gap-2 pt-1 ${options.length === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`;
+  }
+  return 'grid grid-cols-1 gap-2 pt-1';
 };
 
 const TaskGroupHeading: React.FC<{ index: number; group: TaskQuestionGroup; tone: 'teal' | 'blue' }> = ({ index, group, tone }) => (
@@ -722,7 +743,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
   const shuffledChoiceOptions = useMemo(() => {
     const pools = new Map<string, Array<{ text: string; originalIndex: number }>>();
     const addQuestion = (question: Question) => {
-      if (!question.options || question.options.length < 2) return;
+      if (!question.options || question.options.length < 2 || question.keepOptionOrder) return;
       // Keep "Đúng / Sai" in their natural order.
       if (question.options.length === 2 && question.options[0] === 'Đúng' && question.options[1] === 'Sai') return;
 
@@ -889,6 +910,14 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
 
   const handleMcSelect = (qId: string, optionIdx: number) => {
     setMcAnswers((prev) => ({ ...prev, [qId]: optionIdx }));
+  };
+
+  const handleMcClear = (qId: string) => {
+    setMcAnswers((prev) => {
+      const next = { ...prev };
+      delete next[qId];
+      return next;
+    });
   };
 
   const handleFillChange = (qId: string, value: string) => {
@@ -1517,7 +1546,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
               <BookOpen className="w-3.5 h-3.5" /> Hệ Thống Luyện Thi & Ôn Tập HSK Tương Tác
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">{currentExam.title}</h2>
-            <p className="text-teal-100 text-sm mt-1 max-w-2xl">{currentExam.description}</p>
+            {currentExam.description && <p className="text-teal-100 text-sm mt-1 max-w-2xl">{currentExam.description}</p>}
           </div>
         </div>
       )}
@@ -1884,7 +1913,15 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                   {getTaskQuestionGroups(currentExam.mcQuestions).map((mcGroup, mcGroupIdx) => (
                   <div key={mcGroup.key} className="space-y-4">
                   {mcGroup.title && <TaskGroupHeading index={mcGroupIdx} group={mcGroup} tone="teal" />}
-                  {mcGroup.questions.map((q, groupQuestionIdx) => {
+                  {isMatchingGroup(mcGroup.questions) ? (
+                    <MatchingBoard
+                      questions={mcGroup.questions}
+                      answers={mcAnswers}
+                      onAssign={handleMcSelect}
+                      onClear={handleMcClear}
+                      getAnchorId={getQuestionAnchor}
+                    />
+                  ) : mcGroup.questions.map((q, groupQuestionIdx) => {
                     const idx = mcGroup.title ? groupQuestionIdx : currentExam.mcQuestions.indexOf(q);
                     return (
                     <div id={getQuestionAnchor(q.id)} key={q.id} className="scroll-mt-32 p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
@@ -1905,7 +1942,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                       <QuestionImage question={q} label={`câu ${idx + 1}`} />
 
                       {q.options && (
-                        <div className={q.options.length === 2 ? 'grid grid-cols-2 gap-2 pt-1' : 'grid grid-cols-1 gap-2 pt-1'}>
+                        <div className={getOptionGridClass(q.options)}>
                           {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
                             const isSelected = mcAnswers[q.id] === originalIndex;
                             return (
@@ -2297,7 +2334,7 @@ export const StudentExamForm: React.FC<StudentExamFormProps> = ({
                               Câu {qIdx + 1}: {q.prompt}
                             </p>
                             {q.options && q.options.length > 0 ? (
-                              <div className={q.options.length === 2 ? 'grid grid-cols-2 gap-2 pt-1' : 'grid grid-cols-1 gap-2 pt-1'}>
+                              <div className={getOptionGridClass(q.options)}>
                                 {(shuffledChoiceOptions.get(q.id) || q.options.map((text, originalIndex) => ({ text, originalIndex }))).map(({ text: opt, originalIndex }) => {
                                   const isSelected = mcAnswers[q.id] === originalIndex;
                                   return (
