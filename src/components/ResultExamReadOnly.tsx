@@ -2,7 +2,7 @@ import React from 'react';
 import { Mic } from 'lucide-react';
 import { LessonSection } from '../types/lesson';
 import { ExerciseRenderer } from './ExerciseRenderer';
-import { getStructuredQuestionRows, isStructuredExerciseItem, StructuredAnswerMap } from '../utils/structuredExercises';
+import { getDisplayedRowOptions, getStructuredQuestionRows, isStructuredExerciseItem, StructuredAnswerMap } from '../utils/structuredExercises';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../utils/audioUtils';
 import { speakText } from '../utils/tts';
 import type { AnswerSnapshotStatus } from '../types';
@@ -84,25 +84,31 @@ const exactAnswerMatches = (left: string, right: string): boolean => {
 
 const resolveStructuredAnswerId = (
   answer: string,
-  options: Array<{ id: string; text?: string }>
+  options: Array<{ id: string; text?: string; answerId?: string }>
 ): string => {
   const normalizedAnswer = normalizeAnswer(answer);
   if (!normalizedAnswer) return '';
 
-  const matched = options.find((option) => {
-    const candidates = [
-      option.id,
-      option.text ? `${option.id}. ${option.text}` : '',
-      option.text || ''
-    ].filter(Boolean);
+  // Saved answers look like "B. 我爸爸" (or just "B" for pictures), where the
+  // letter is the original option id. Trust it first: a loose "contains" match
+  // would turn "我爸爸" into option "我".
+  const trimmed = answer.trim();
+  const label = trimmed.match(/^([a-z])\s*(?:[.)。：:]|$)/i)?.[1]?.toUpperCase();
+  const byLabel = label ? options.find((option) => option.id.toUpperCase() === label) : undefined;
+  if (byLabel && (!byLabel.text || trimmed.length === 1 || normalizeAnswer(byLabel.text) === normalizedAnswer)) {
+    return byLabel.answerId || byLabel.id;
+  }
 
-    return candidates.some((candidate) => (
-      normalizeAnswer(candidate) === normalizedAnswer ||
-      answerMatches(answer, candidate)
-    ));
-  });
+  const exact = options.find((option) => (
+    [option.id, option.text ? `${option.id}. ${option.text}` : '', option.text || '']
+      .filter(Boolean)
+      .some((candidate) => normalizeAnswer(candidate) === normalizedAnswer)
+  ));
+  if (exact) return exact.answerId || exact.id;
+  if (byLabel) return byLabel.answerId || byLabel.id;
 
-  return matched?.id || '';
+  const loose = options.filter((option) => option.text && answerMatches(answer, option.text));
+  return loose.length === 1 ? (loose[0].answerId || loose[0].id) : '';
 };
 
 const statusLabel = (item: ReadOnlyExamItem): string => {
@@ -181,7 +187,9 @@ export const ResultExamReadOnly: React.FC<ResultExamReadOnlyProps> = ({ sections
           ?.items.find((candidate) => candidate.id === row.key);
         structuredCorrectAnswers[row.key] = row.correctAnswer;
         const rawUserAnswer = resultItem?.userAnswer || '';
-        const resolvedAnswerId = resolveStructuredAnswerId(rawUserAnswer, row.options);
+        // Saved answers carry the letters the student saw, so resolve them
+        // against that same shuffled layout and keep the original id.
+        const resolvedAnswerId = resolveStructuredAnswerId(rawUserAnswer, getDisplayedRowOptions(item, row, true));
         if (resolvedAnswerId) structuredAnswers[row.key] = resolvedAnswerId;
 
         if (!rawUserAnswer.trim()) {

@@ -263,6 +263,52 @@ export function getStructuredQuestionRows(item: LessonItem): StructuredQuestionR
   });
 }
 
+function shuffleWithSeed<T>(items: T[], seed: string): T[] {
+  const result = [...items];
+  let state = 2166136261;
+  for (const char of seed) state = Math.imul(state ^ char.charCodeAt(0), 16777619);
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    state = Math.imul(state ^ (state >>> 13), 1274126177);
+    const swapIndex = Math.abs(state) % (index + 1);
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+// Shuffle with a fixed seed and give the options fresh A, B, C… labels.
+// `answerId` keeps the original id, which is what gets saved and graded.
+export function shuffleAndRelabelOptions(options: StructuredOption[], seed: string): StructuredOption[] {
+  return shuffleWithSeed(options, seed).map((option, index) => ({
+    ...option,
+    id: String.fromCharCode(65 + index),
+    answerId: option.id
+  }));
+}
+
+// The shared option bank exactly as the student saw it while doing the exercise.
+export function getDisplayedSharedOptions(item: LessonItem, studentLayout: boolean): StructuredOption[] {
+  const data = asRecord(item.data);
+  const sharedOptions = getStructuredSharedOptions(item);
+  const shuffleOptions = data.shuffleOptions !== false && (studentLayout || data.shuffleOptions === true);
+  const haveImages = sharedOptions.some((option) => option.image);
+  if (haveImages) return data.shuffleImages === true ? shuffleAndRelabelOptions(sharedOptions, `${item.id}:images`) : sharedOptions;
+  return shuffleOptions ? shuffleAndRelabelOptions(sharedOptions, item.id) : sharedOptions;
+}
+
+// One row's options exactly as the student saw them (same order and letters).
+export function getDisplayedRowOptions(item: LessonItem, row: StructuredQuestionRow, studentLayout: boolean): StructuredOption[] {
+  if (getStructuredSharedOptions(item).length > 0) return getDisplayedSharedOptions(item, studentLayout);
+  const data = asRecord(item.data);
+  const shuffleOptions = data.shuffleOptions !== false && (studentLayout || data.shuffleOptions === true);
+  const shuffle = row.options.some((option) => option.image) ? data.shuffleImages === true : shuffleOptions;
+  return shuffle ? shuffleAndRelabelOptions(row.options, row.key) : row.options;
+}
+
+// Letter the student saw for a saved (original) option id.
+export function getDisplayedOptionLabel(options: StructuredOption[], answerId: string): string {
+  return options.find((option) => (option.answerId || option.id) === answerId)?.id || answerId;
+}
+
 export function getStructuredExerciseLabel(item: LessonItem): string {
   const type = String(item.type || '').toLowerCase().trim();
   if (type === 'listening_image_choice') {

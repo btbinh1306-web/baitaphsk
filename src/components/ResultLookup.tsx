@@ -8,7 +8,7 @@ import { ImageLightboxModal } from './ImageLightboxModal';
 import { AnswerExplanation, ResultExamReadOnly } from './ResultExamReadOnly';
 import type { ReadOnlyExamSection } from './ResultExamReadOnly';
 import { normalizeImageList } from '../utils/imageUtils';
-import { getStructuredQuestionRows, isStructuredExerciseItem } from '../utils/structuredExercises';
+import { getDisplayedRowOptions, getStructuredQuestionRows, isStructuredExerciseItem } from '../utils/structuredExercises';
 import { buildExamCatalog } from '../utils/examCatalog';
 import { getExamAudioQuestions } from '../utils/examAudio';
 import { calculateHsk1TrialScore, formatScore, getHsk1TrialPart, getQuestionMaxScore, isExcludedFromOverallScore, isHsk1TrialExam, parseTeacherItemScores, TeacherItemScore } from '../utils/teacherScoring';
@@ -962,19 +962,35 @@ export const ResultLookup: React.FC<ResultLookupProps> = ({
         if (isStructuredExerciseItem(item)) {
           getStructuredQuestionRows(item).forEach((row, index) => {
             const correctOption = row.options.find((option) => option.id === row.correctAnswer);
-            structuredItems.push(makePrintableItem(
+            // Show options in the order and with the letters the student saw
+            // (they were shuffled and relabelled while doing the exam).
+            const shown = getDisplayedRowOptions(item, row, true);
+            const relabel = (value: unknown): string => {
+              const text = safeText(value);
+              const match = text.match(/^([A-Z])(\s*[.)。：:][\s\S]*|)$/u);
+              const option = match ? shown.find((candidate) => (candidate.answerId || candidate.id) === match[1]) : undefined;
+              return option && match ? `${option.id}${match[2]}` : text;
+            };
+            const printable = makePrintableItem(
               row.key,
               section.title || 'Bài tập',
               row.prompt,
-              correctOption ? `${correctOption.id}. ${correctOption.text}` : row.correctAnswer,
+              // Picture options have no text: the key is just "C" (as saved),
+              // not "C. ", which normalises to nothing and never matches.
+              correctOption ? [correctOption.id, correctOption.text].filter(Boolean).join('. ') : row.correctAnswer,
               row.number || index + 1,
-              row.options.map((option) => `${option.id}. ${option.text}`),
+              shown.map((option) => [option.id, option.text].filter(Boolean).join('. ')),
               {
-                optionImages: row.options.map((option) => option.image),
+                optionImages: shown.map((option) => option.image),
                 audioUrl: row.audio || row.questionAudio,
                 audioText: row.transcript
               }
-            ));
+            );
+            structuredItems.push({
+              ...printable,
+              userAnswer: relabel(printable.userAnswer),
+              correctAnswer: relabel(printable.correctAnswer)
+            });
           });
           return;
         }

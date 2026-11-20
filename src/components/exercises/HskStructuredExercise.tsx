@@ -8,7 +8,10 @@ import {
   StructuredAnswerMap,
   StructuredOption,
   getStructuredExerciseLabel,
-  StructuredExerciseType
+  StructuredExerciseType,
+  getDisplayedOptionLabel,
+  getDisplayedRowOptions,
+  getDisplayedSharedOptions
 } from '../../utils/structuredExercises';
 import { getDriveAudioPlayerUrl, getDriveMediaPlayerUrl } from '../../utils/audioUtils';
 import { speakText } from '../../utils/tts';
@@ -151,26 +154,6 @@ function ExampleFixedAnswer({ answer }: { answer: string }) {
       <p className="mt-1 text-xs font-extrabold">✓ Đáp án đúng</p>
     </div>
   );
-}
-
-function shuffleWithSeed<T>(items: T[], seed: string): T[] {
-  const result = [...items];
-  let state = 2166136261;
-  for (const char of seed) state = Math.imul(state ^ char.charCodeAt(0), 16777619);
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    state = Math.imul(state ^ (state >>> 13), 1274126177);
-    const swapIndex = Math.abs(state) % (index + 1);
-    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
-  }
-  return result;
-}
-
-function shuffleAndRelabelOptions(options: StructuredOption[], seed: string): StructuredOption[] {
-  return shuffleWithSeed(options, seed).map((option, index) => ({
-    ...option,
-    id: String.fromCharCode(65 + index),
-    answerId: option.id
-  }));
 }
 
 function LimitedAudio({
@@ -428,8 +411,6 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
   const currentAnswers = answers || localAnswers;
   const readOnly = mode === 'result';
   const showPinyin = showPinyinOverride ?? data.showPinyin === true;
-  const shouldShuffleOptions = data.shuffleOptions !== false && (studentMode || data.shuffleOptions === true);
-  const shouldShuffleImages = data.shuffleImages === true;
   const playCount = typeof data.maxPlayCount === 'number' && data.maxPlayCount > 0
     ? data.maxPlayCount
     : typeof data.playCount === 'number' && data.playCount > 0
@@ -444,11 +425,8 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
   const sharedOptionsHaveImages = sharedOptions.some((option) => option.image);
   const sharedImageBankLayout = hasSharedOptions && sharedOptionsHaveImages;
   const sharedChoiceSelectLayout = (type === 'reading_shared_image_match' && !sharedOptionsHaveImages) || (type === 'fill' && hasSharedOptions);
-  const displayedSharedOptions = shouldShuffleImages && sharedOptionsHaveImages
-    ? shuffleAndRelabelOptions(sharedOptions, `${item.id}:images`)
-    : shouldShuffleOptions && !sharedOptionsHaveImages
-      ? shuffleAndRelabelOptions(sharedOptions, item.id)
-    : sharedOptions;
+  // The read-only result view shows the same order and letters the student saw.
+  const displayedSharedOptions = getDisplayedSharedOptions(item, studentMode || readOnly);
   const passage = data.passage && typeof data.passage === 'object' && !Array.isArray(data.passage)
     ? data.passage as Record<string, unknown>
     : null;
@@ -564,12 +542,10 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
           const rowStatus: AnswerSnapshotStatus = answerStatuses?.[row.key] || (
             !correctAnswer ? 'manual' : selected ? (selected === correctAnswer ? 'correct' : 'wrong') : 'unanswered'
           );
-          const rowOptionsHaveImages = row.options.some((option) => option.image);
           const options = hasSharedOptions
             ? displayedSharedOptions
-            : ((rowOptionsHaveImages ? shouldShuffleImages : shouldShuffleOptions)
-              ? shuffleAndRelabelOptions(row.options, row.key)
-              : row.options);
+            : getDisplayedRowOptions(item, row, studentMode || readOnly);
+          const correctLabel = correctAnswer ? getDisplayedOptionLabel(options, correctAnswer) : '';
           const isSelectLayout = type === 'sentence_matching';
           const inlineSelectLayout = sharedChoiceSelectLayout;
           const hideListeningPrompt = studentMode && isListening && (
@@ -711,7 +687,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                   />
                   {readOnly && (
                     <p className={`text-xs font-bold ${rowStatus === 'correct' ? 'text-emerald-800' : rowStatus === 'wrong' ? 'text-rose-800' : 'text-slate-600'}`}>
-                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctAnswer || 'GV chấm'}` : 'Chưa trả lời'}
+                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctLabel || 'GV chấm'}` : 'Chưa trả lời'}
                     </p>
                   )}
                 </div>
@@ -754,7 +730,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                   </div>
                   {readOnly && (
                     <p className={`text-xs font-bold ${rowStatus === 'correct' ? 'text-emerald-800' : rowStatus === 'wrong' ? 'text-rose-800' : 'text-slate-600'}`}>
-                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctAnswer || 'GV chấm'}` : 'Chưa trả lời'}
+                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctLabel || 'GV chấm'}` : 'Chưa trả lời'}
                     </p>
                   )}
                 </div>
@@ -782,7 +758,7 @@ export const HskStructuredExercise: React.FC<HskStructuredExerciseProps> = ({
                   </select>
                   {readOnly && (
                     <p className={`text-xs font-bold ${rowStatus === 'correct' ? 'text-emerald-800' : rowStatus === 'wrong' ? 'text-rose-800' : 'text-slate-600'}`}>
-                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctAnswer || 'GV chấm'}` : 'Chưa trả lời'}
+                      {rowStatus === 'correct' ? '✓ Đúng' : rowStatus === 'wrong' ? `✗ Sai · Đáp án: ${correctLabel || 'GV chấm'}` : 'Chưa trả lời'}
                     </p>
                   )}
                 </div>
