@@ -66,7 +66,7 @@
                 "options": [
                   { "id": "A", "image": "/images/hsk1-mock-01/teacher.webp", "alt": "Một cô giáo" },
                   { "id": "B", "image": "/images/hsk1-mock-01/doctor.webp", "alt": "Một bác sĩ" },
-                  { "id": "C", "image": "/images/hsk1-mock-01/student.webp", "alt": "Một học sinh đeo ba lô" }
+                  { "id": "C", "image": "/images/hsk1-mock-01/student.webp", "alt": "Một nữ sinh đeo ba lô ôm sách" }
                 ],
                 "correctAnswer": "C"
               },

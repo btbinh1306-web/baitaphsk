@@ -624,7 +624,7 @@ const trial02: TrialSpec = {
       { image: 'listen-p1-q1.png', alt: 'Trời nắng', prompt: '下雨', answer: 'B' },
       { image: 'listen-p1-q2.png', alt: 'Một đôi giày', prompt: '买衣服', answer: 'B' },
       { image: 'listen-p1-q3.png', alt: 'Người đang ăn táo', prompt: '吃苹果', answer: 'A' },
-      { image: 'listen-p1-q4.png', alt: 'Người phụ nữ', prompt: '看电视', answer: 'B' },
+      { image: 'listen-p1-q4.png', alt: 'Người phụ nữ đang mua hoa', prompt: '看电视', answer: 'B' },
       { image: 'listen-p1-q5.png', alt: 'Học sinh đeo cặp đi học', prompt: '去学校', answer: 'A' }
     ],
     part2: [
@@ -664,7 +664,7 @@ const trial02: TrialSpec = {
       { image: 'read-p1-q21.png', alt: 'Con mèo', prompt: '狗', answer: 'B' },
       { image: 'read-p1-q22.png', alt: 'Người đang ngủ', prompt: '睡觉', answer: 'A' },
       { image: 'read-p1-q23.png', alt: 'Đĩa bánh bao', prompt: '米饭', answer: 'B' },
-      { image: 'read-p1-q24.png', alt: 'Người đang tập thể dục', prompt: '学习', answer: 'B' },
+      { image: 'read-p1-q24.png', alt: 'Người đang chơi bóng rổ', prompt: '学习', answer: 'B' },
       { image: 'read-p1-q25.png', alt: 'Người phụ nữ vui vẻ', prompt: '高兴', answer: 'A' }
     ],
     part2: {
